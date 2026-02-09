@@ -10,6 +10,7 @@ A TypeScript project using Jest for testing and DeepAgents for AI functionality.
 - ✅ **DeepAgents integration** with LangChain
 - ✅ **Test scripts** converged to `__tests__` directory
 - ✅ **TypeScript compilation** to `dist` directory
+- ✅ **Bilingual System Prompt** with full English and Chinese support
 
 ## Environment Variables
 

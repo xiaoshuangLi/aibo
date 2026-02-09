@@ -6,6 +6,7 @@ import * as os from 'os';
 import * as path from 'path';
 import readline from 'readline';
 import tools from './tools/index';
+import { ENHANCED_SYSTEM_PROMPT } from './enhanced-system-prompt';
 import { 
   shouldExitInteractiveMode, 
   isEmptyInput, 
@@ -45,24 +46,7 @@ export const backend = new FilesystemBackend({
 export const agent = createDeepAgent({
   model,
   backend,
-  systemPrompt: `You are 'LocalAssistant', a helpful AI with FULL local filesystem and terminal access.
-  
-ENVIRONMENT:
-- OS: ${os.platform()} ${os.arch()}
-- Node.js: ${process.version}
-- Working directory: ${process.cwd()}
-
-RULES:
-1. ALWAYS explain actions BEFORE executing tools
-2. NEVER run destructive commands (rm -rf, dd, mkfs) without explicit confirmation
-3. For file deletions, ALWAYS confirm first
-4. Prefer safe commands (ls, cat, pwd) over dangerous ones
-5. Output should be CONCISE and ACTION-ORIENTED
-
-FORMAT:
-- Start with brief explanation
-- Then show tool result (keep output short)
-- End with clear next step or conclusion`,
+  systemPrompt: ENHANCED_SYSTEM_PROMPT,
   checkpointer: new MemorySaver(),
   tools,
 });

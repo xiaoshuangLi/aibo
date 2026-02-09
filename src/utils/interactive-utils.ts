@@ -1,6 +1,7 @@
 /**
  * Interactive mode utility functions for AI Assistant (重构版).
  */
+import { HumanMessage } from "langchain";
 
 import { 
   shouldExitInteractiveMode, 
@@ -127,10 +128,14 @@ export function handleTextToolResult(result: string, lastToolCall: any) {
   console.log(styled.toolResult(lastToolCall?.name || "unknown", success, preview));
 }
 
-export async function handleAIContent(msg: any, state: StreamState) {
+export async function handleAIContent(msg: any, state: StreamState, userInput?: string) {
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
-  const newContent = String(msg.content).replace(state.fullResponse, "");
+  const currentContent = String(msg.content);
+  // 只显示新增的内容，避免重复
+  if (currentContent.length <= state.fullResponse.length) return;
+  
+  const newContent = currentContent.substring(state.fullResponse.length);
   if (!newContent) return;
 
   for (const char of newContent) {
@@ -139,34 +144,39 @@ export async function handleAIContent(msg: any, state: StreamState) {
     await new Promise(resolve => setTimeout(resolve, config.output.verbose ? 5 : 15));
   }
 
-  state.fullResponse = msg.content;
+  state.fullResponse = currentContent;
 }
 
 export function handleTodos(msg: any, state: StreamState) {
   if (!Array.isArray(msg.todos) || state.abortSignal.aborted) return;
 
-  const newTodos = msg.todos.filter((todo: any) => 
-    !state.fullResponse.includes(todo.content) && todo.status !== 'pending'
+  // 只显示非pending状态的todo（completed或in_progress），避免显示过多的pending任务
+  const nonPendingTodos = msg.todos.filter((todo: any) => 
+    (todo.status === 'completed' || todo.status === 'in_progress') && 
+    !state.fullResponse.includes(todo.content)
   );
 
-  if (newTodos.length === 0) return;
+  if (nonPendingTodos.length === 0) return;
 
   if (!state.hasDisplayedThinking) {
     console.log('\n💭 AI 正在思考...');
     state.hasDisplayedThinking = true;
   }
 
-  newTodos.forEach((todo: any) => {
-    const emoji = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⏳';
+  nonPendingTodos.forEach((todo: any) => {
+    const emoji = todo.status === 'completed' ? '✅' : '🔄';
     console.log(`\n${emoji} ${todo.content}`);
   });
 }
+
+const processedMessageIds = new Set<string>();
 
 // ============ 主流程控制 ============
 export async function processStreamChunks(
   stream: AsyncIterable<any>,
   state: StreamState,
-  rl: any
+  rl: any,
+  userInput?: string
 ): Promise<string> {
   let hasShownInitialIndicator = false;
 
@@ -175,24 +185,44 @@ export async function processStreamChunks(
       if (state.abortSignal.aborted) throw new Error("操作已被用户中断");
 
       const { messages, todos } = extractMessagesAndTodos(chunk);
-      const newMessages = messages.filter((msg: any) => !msg._processed);
-      newMessages.forEach((msg: any) => msg._processed = true);
-
-      // Show initial indicator on first message
-      if (!hasShownInitialIndicator && newMessages.length > 0) {
-        if (todos.length > 0) {
-          // Will be handled by handleTodos
-        } else {
-          console.log(styled.assistant("..."));
+      
+      // 使用更可靠的去重机制 - 基于消息内容或ID
+      const newMessages = messages.filter((msg: any) => {
+        const messageId = msg.id || msg.content?.substring(0, 50) || JSON.stringify(msg);
+        if (processedMessageIds.has(messageId)) {
+          return false;
         }
-        hasShownInitialIndicator = true;
+
+        if (msg instanceof HumanMessage) {
+          return false;
+        }
+
+        processedMessageIds.add(messageId);
+        return true;
+      });
+
+      // Show initial indicator on first unprocessed message
+      if (!hasShownInitialIndicator && newMessages.length > 0) {
+        // Check if any of the new messages are actually unprocessed
+        const hasUnprocessedMessage = newMessages.some((msg: any) => !msg._processed);
+        if (hasUnprocessedMessage) {
+          if (todos.length > 0) {
+            // Will be handled by handleTodos
+          } else {
+            console.log(styled.assistant("..."));
+          }
+          hasShownInitialIndicator = true;
+        }
       }
 
-      // 扁平化处理各类消息（无嵌套）
+      // 扁平化处理各类消息（无嵌套），只处理非用户消息
       for (const msg of newMessages) {
+        // 跳过用户消息，只处理 AI 助手、工具调用等消息
+        if (msg.role === 'user') continue;
+        
         handleToolCall(msg, state);
         handleToolResult(msg, state);
-        await handleAIContent(msg, state);
+        await handleAIContent(msg, state, userInput);
         if (todos.length) handleTodos({ ...msg, todos }, state);
       }
     }
@@ -261,7 +291,7 @@ export async function startInputLoop(
         }
       );
 
-      await processStreamChunks(stream, state, rl);
+      await processStreamChunks(stream, state, rl, input);
     } finally {
       session.isRunning = false;
       session.abortController = null;
