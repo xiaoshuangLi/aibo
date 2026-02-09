@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import axios from "axios";
 import * as cheerio from 'cheerio';
+import { getSearchUrl, getCurrentSearchEngine } from '../utils/search-engine-detector';
 
 /**
  * Web tools for internet-based operations.
@@ -48,12 +49,14 @@ function cleanHtmlContent(html: string): string {
 }
 
 /**
- * Web search tool that searches using Bing search engine.
+ * Web search tool that automatically detects the best available search engine.
+ * Uses Google if accessible, falls back to Bing China otherwise.
  */
 export const webSearchByKeywordTool = tool(
   async ({ keyword }) => {
     try {
-      const searchUrl = `https://cn.bing.com/search?q=${encodeURIComponent(keyword)}`;
+      // Get the appropriate search URL based on detected search engine
+      const searchUrl = await getSearchUrl(keyword);
       
       // Fetch the actual search results page
       const response = await axios.get(searchUrl, {
@@ -66,13 +69,17 @@ export const webSearchByKeywordTool = tool(
       // Clean the HTML content to extract readable text
       const cleanedContent = cleanHtmlContent(response.data);
       
+      // Get the current search engine for logging
+      const currentSearchEngine = await getCurrentSearchEngine();
+      
       return JSON.stringify({
         success: true,
-        message: "Web search completed",
+        message: `Web search completed using ${currentSearchEngine} search engine`,
         search_url: searchUrl,
         keyword: keyword,
         content: cleanedContent,
-        content_length: cleanedContent.length
+        content_length: cleanedContent.length,
+        search_engine: currentSearchEngine
       });
     } catch (error: any) {
       return JSON.stringify({
@@ -84,7 +91,7 @@ export const webSearchByKeywordTool = tool(
   },
   {
     name: "WebSearchByKeyword",
-    description: "Performs a web search using the default search engine (Bing China). Fetches and returns the actual search results page content with HTML tags cleaned.",
+    description: "Performs a web search using the automatically detected search engine (Google or Bing China). Fetches and returns the actual search results page content with HTML tags cleaned.",
     schema: z.object({
       keyword: z.string().describe("The search keyword or phrase to look up")
     })

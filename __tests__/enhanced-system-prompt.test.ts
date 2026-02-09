@@ -78,11 +78,12 @@ describe('Enhanced System Prompt', () => {
     
     expect(prompt).toContain('PROBLEM-SOLVING METHODOLOGY:');
     expect(prompt).toContain('1. **Understand**');
-    expect(prompt).toContain('2. **Plan**');
-    expect(prompt).toContain('3. **Execute**');
-    expect(prompt).toContain('4. **Verify**');
-    expect(prompt).toContain('5. **Recover**');
-    expect(prompt).toContain('6. **Deliver**');
+    expect(prompt).toContain('2. **Research Best Practices**');
+    expect(prompt).toContain('3. **Plan**');
+    expect(prompt).toContain('4. **Execute**');
+    expect(prompt).toContain('5. **Verify**');
+    expect(prompt).toContain('6. **Recover**');
+    expect(prompt).toContain('7. **Deliver**');
   });
 
   test('should contain feature development workflow', () => {

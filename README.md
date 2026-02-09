@@ -1,16 +1,19 @@
-# AIBO - AI Bot with DeepAgents
+# AIBO - Advanced Autonomous Programming AI Assistant
 
-A TypeScript project using Jest for testing and DeepAgents for AI functionality.
+An advanced autonomous programming AI assistant with full local filesystem access, terminal capabilities, and sophisticated SubAgent delegation framework. Built with TypeScript, Jest, and DeepAgents.
 
 ## Features
 
-- ✅ **Jest + TypeScript** testing setup
-- ✅ **Environment variables** loaded from `.env` file with validation using Zod
-- ✅ **AI Configuration** support for `baseURL`, `apiKey`, and `modelName`
-- ✅ **DeepAgents integration** with LangChain
-- ✅ **Test scripts** converged to `__tests__` directory
-- ✅ **TypeScript compilation** to `dist` directory
-- ✅ **Bilingual System Prompt** with full English and Chinese support
+- ✅ **Advanced Autonomous Programming**: Write, edit, debug, and optimize code across any language
+- ✅ **SubAgent Delegation**: Spawn specialized SubAgents for complex, isolated tasks with parallel execution
+- ✅ **Error Recovery & Retry Strategy**: Systematic error analysis, strategy adjustment, and fallback plans
+- ✅ **Full System Access**: Complete read/write access to local filesystem and terminal commands
+- ✅ **Enhanced Web Tools**: Automatic search engine detection (Google/Bing China) with HTML content cleaning
+- ✅ **Bilingual System Prompt**: Full English and Chinese support with comprehensive methodology
+- ✅ **Interactive Chat Mode**: Real-time interactive mode with command shortcuts and session management
+- ✅ **Comprehensive Testing**: 95%+ test coverage with unit, integration, and edge case testing
+- ✅ **Problem-Solving Methodology**: 7-step structured approach including research best practices
+- ✅ **Feature Development Workflow**: Strict workflow ensuring quality with documentation and proper commits
 
 ## Environment Variables
 
@@ -34,17 +37,48 @@ MEMORY_WINDOW_SIZE=5
 
 ```
 aibo/
-├── src/                    # Source code
-│   ├── config.ts          # Environment configuration with validation
-│   └── index.ts           # Main entry point
-├── __tests__/             # Test files (converged here as requested)
-│   ├── config.test.ts     # Configuration tests
-│   └── index.test.ts      # Main functionality tests
-├── .env                   # Environment variables (gitignored)
-├── .env.example           # Environment variables template
-├── package.json           # Dependencies and scripts
-├── tsconfig.json          # TypeScript configuration
-└── jest.config.ts         # Jest configuration
+├── src/                    # Source code directory
+│   ├── agent-interaction.ts      # Agent interaction logic
+│   ├── config.ts                # Environment configuration with validation
+│   ├── enhanced-system-prompt.ts # Bilingual system prompts
+│   ├── index.ts                 # Main entry point with interactive mode
+│   ├── interactive-logic.ts     # Interactive chat mode logic
+│   ├── validators.ts            # Input validation utilities
+│   ├── logging.ts              # Logging utilities
+│   ├── tools/                  # AI tool implementations
+│   │   ├── bash.ts            # Terminal/bash command execution
+│   │   ├── utils.ts           # Utility functions for tools
+│   │   └── web.ts             # Web search and fetch tools
+│   └── utils/                 # Utility functions
+│       ├── interactive-utils.ts  # Interactive mode utilities
+│       └── search-engine-detector.ts # Automatic search engine detection
+├── __tests__/                 # Comprehensive test suite
+│   ├── agent-interaction.test.ts
+│   ├── config.test.ts
+│   ├── enhanced-system-prompt.test.ts
+│   ├── enhanced-system-prompt-chinese.test.ts
+│   ├── index.test.ts
+│   ├── index-coverage-simple.test.ts
+│   ├── interactive-logic.test.ts
+│   ├── logging.test.ts
+│   ├── validators.test.ts
+│   ├── tools/                 # Tool-specific tests
+│   │   ├── bash.test.ts
+│   │   ├── utils.test.ts
+│   │   └── web.test.ts
+│   └── utils/                 # Utility function tests
+│       ├── interactive-utils.test.ts
+│       ├── interactive-utils-basic.test.ts
+│       ├── simple-coverage.test.ts
+│       └── search-engine-detector.test.ts
+├── features/                  # Feature documentation (numbered sequentially)
+├── templates/                 # Documentation templates
+├── .env                       # Environment variables (gitignored)
+├── .env.example               # Environment variables template
+├── package.json               # Dependencies and scripts
+├── tsconfig.json              # TypeScript configuration
+├── jest.config.ts             # Jest configuration
+└── README.md                  # Project documentation
 ```
 
 ## Scripts
@@ -60,6 +94,17 @@ aibo/
 
 All tests are located in the `__tests__` directory and use Jest with TypeScript support. The test environment automatically loads environment variables from the `.env` file.
 
+### Test Coverage Requirements
+- **Minimum Coverage**: 90% statement, branch, function, and line coverage
+- **Current Coverage**: 95.67% statements, 83.15% branches, 97.26% functions, 96.94% lines
+- **Test Types**: Unit tests, integration tests, and edge case scenarios
+- **Validation**: All new features must pass comprehensive test suite before acceptance
+
+### Test Commands
+- `npm test` - Run all tests
+- `npm run test:watch` - Run tests in watch mode  
+- `npm run test:coverage` - Run tests with detailed coverage report
+
 ## Configuration
 
 The `src/config.ts` file uses Zod for schema validation of environment variables, ensuring that required variables are present and optional variables have sensible defaults.
@@ -73,3 +118,30 @@ All AI parameters can be configured via environment variables:
 - `MODEL_NAME` - Model name to use (defaults to 'gpt-4o')
 
 The configuration is validated at startup and will throw descriptive errors if required variables are missing.
+
+## Development Workflow
+
+### Feature Implementation Process
+Every feature implementation MUST follow this strict workflow:
+
+1. **Write Comprehensive Tests**: Create test scripts in `__tests__` directory with 90%+ coverage
+2. **Implement Functionality**: Write code that passes all tests
+3. **Create Feature Documentation**: Add numbered documentation file in `features/` directory using template
+4. **Update Main Documentation**: Update this README.md to reflect new capabilities
+5. **Commit Code Properly**: Use standardized commit message template from `templates/git-commit-template.md`
+
+### Problem-Solving Methodology
+AIBO follows a 7-step structured approach:
+1. **Understand**: Analyze requirements through git diff and project documentation
+2. **Research Best Practices**: Search online for current standards and patterns
+3. **Plan**: Break down into logical steps with potential pitfalls identified
+4. **Execute**: Implement step-by-step with appropriate tools and SubAgents
+5. **Verify**: Test and validate results at each critical step
+6. **Recover**: Analyze issues, adjust strategy, and retry systematically  
+7. **Deliver**: Provide complete solution with clear documentation
+
+### Quality Standards
+- **Code Quality**: Follow TypeScript best practices and maintain clean, readable code
+- **Error Handling**: Implement comprehensive error recovery with user communication
+- **Security**: Never run destructive commands without explicit confirmation
+- **Documentation**: Maintain up-to-date documentation for all features

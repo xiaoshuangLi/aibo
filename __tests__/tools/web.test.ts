@@ -13,7 +13,7 @@ describe('Web Tools', () => {
   describe('WebSearchByKeywordTool', () => {
     test('should have correct tool schema', () => {
       expect(webSearchByKeywordTool.name).toBe('WebSearchByKeyword');
-      expect(webSearchByKeywordTool.description).toContain('Performs a web search using the default search engine (Bing China)');
+      expect(webSearchByKeywordTool.description).toContain('Performs a web search using the automatically detected search engine (Google or Bing China)');
       
       const schema = webSearchByKeywordTool.schema;
       expect(schema.shape.keyword).toBeDefined();
@@ -46,7 +46,7 @@ describe('Web Tools', () => {
       const parsedResult = JSON.parse(result);
 
       expect(parsedResult.success).toBe(true);
-      expect(parsedResult.message).toBe('Web search completed');
+      expect(parsedResult.message).toMatch(/^Web search completed using (google|bing) search engine$/);
       expect(parsedResult.keyword).toBe('test search');
       expect(parsedResult.search_url).toContain('https://cn.bing.com/search?q=');
       expect(parsedResult.content).toBeDefined();
