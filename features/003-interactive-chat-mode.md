@@ -1,12 +1,5 @@
 # 003 - Interactive Chat Mode: Real-time Conversation Support
 
-> **重要命名规则**: 
-> - 生成的 feature 文件必须命名为 `features/[###]-[feature-name].md` 格式
-> - `[###]` 必须是三位数字编号（如 001, 002, 003...）
-> - 编号必须连续累加，不可重复或跳过
-> - 参考示例: `003-support-git-worktree.md`
-> - 在创建新文件前，请检查现有文件的最大编号并使用下一个编号
-
 ## 功能修复 (Bug Fix / Feature Enhancement)
 
 - **问题描述**: 

@@ -4,9 +4,16 @@ import { MemorySaver } from "@langchain/langgraph";
 import { createDeepAgent, FilesystemBackend } from 'deepagents';
 import * as os from 'os';
 import * as path from 'path';
-import * as process from 'process';
 import readline from 'readline';
 import tools from './tools/index';
+import { 
+  shouldExitInteractiveMode, 
+  isEmptyInput, 
+  createConsoleThreadId
+} from './interactive-logic';
+import { invokeAgent, handleAgentResponse, handleAgentError } from './agent-interaction';
+import { styled, createGracefulShutdown, createAskQuestion } from './utils/interactive-utils';
+import { structuredLog } from './utils/logging';
 
 /**
  * AI Agent module that provides DeepAgents integration with LangChain.
@@ -69,78 +76,29 @@ export async function startInteractiveMode() {
 
   // 会话状态
   const session = {
-    threadId: "console-session-" + Date.now(),
+    threadId: createConsoleThreadId(),
     isRunning: false,
-    abortController: null,
-    lastInterrupt: 0,
-  };
-
-  // 美化输出
-  const styled = {
-    assistant: (text: string) => `\n🤖 ${text}`,
-    toolCall: (name: string, args: any) => `\n🔧 正在调用工具: ${name}\n   参数: ${JSON.stringify(args, null, 2).split('\n').map(l => '   ' + l).join('\n').trim()}`,
-    toolResult: (name: string, success: boolean, preview: string) => 
-      `\n${success ? '✅' : '❌'} 工具执行 ${name}: ${success ? '成功' : '失败'}\n${preview}`,
-    system: (text: string) => `\n⚙️  ${text}`,
-    error: (text: string) => `\n❌ ${text}`,
-    hint: (text: string) => `\n💡 ${text}`,
-    truncated: (original: string, limit: number) => 
-      original.length > limit ? original.substring(0, limit) + `... [已截断 ${original.length - limit} 字符]` : original,
+    abortController: null as AbortController | null,
+    rl: rl, // Add rl to session for graceful shutdown
   };
 
   console.log(styled.system("AI Assistant 已启动！输入 'exit' 或 'quit' 退出对话模式。"));
   console.log(styled.hint("你可以问我任何问题，我会尽力帮助你。"));
 
-  const askQuestion = () => {
-    if (!session.isRunning) {
-      rl.question("\n👤 你: ", async (input) => {
-        if (input.trim().toLowerCase() === 'exit' || input.trim().toLowerCase() === 'quit') {
-          console.log(styled.system("再见！"));
-          rl.close();
-          return;
-        }
+  // Create graceful shutdown handler using extracted utility
+  const gracefulShutdown = createGracefulShutdown(session);
 
-        if (input.trim() === '') {
-          askQuestion();
-          return;
-        }
-
-        session.isRunning = true;
-        try {
-          console.log(styled.system("正在思考..."));
-          
-          const response = await (agent as any).invoke(input, { threadId: session.threadId });
-          
-          if (typeof response === 'string') {
-            console.log(styled.assistant(response));
-          } else if (response && typeof response === 'object') {
-            // 处理可能的复杂响应
-            console.log(styled.assistant(JSON.stringify(response, null, 2)));
-          }
-        } catch (error: any) {
-          console.log(styled.error(`发生错误: ${error.message}`));
-        } finally {
-          session.isRunning = false;
-          askQuestion();
-        }
-      });
-    }
-  };
+  // Create ask question function using extracted utility
+  const askQuestion = createAskQuestion(
+    rl,
+    session,
+    agent
+  );
 
   // 设置退出处理器
   const setupExitHandlers = () => {
-    const exitHandler = () => {
-      if (session.isRunning) {
-        console.log(styled.system("\n正在中断当前操作..."));
-        session.isRunning = false;
-      } else {
-        console.log(styled.system("\n再见！"));
-        process.exit(0);
-      }
-    };
-
-    process.on('SIGINT', exitHandler);
-    process.on('SIGTERM', exitHandler);
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   };
 
   setupExitHandlers();
@@ -205,10 +163,14 @@ export async function main() {
   }
 
   try {
-    console.log('AI Agent initialized successfully');
+    structuredLog('info', 'AI Agent initialized successfully', { component: 'main' });
     return agent;
-  } catch (error) {
-    console.error('Failed to initialize AI Agent:', error);
+  } catch (error: any) {
+    structuredLog('error', 'Failed to initialize AI Agent', { 
+      component: 'main', 
+      error: error.message,
+      stack: error.stack 
+    });
     process.exit(1);
   }
 }
