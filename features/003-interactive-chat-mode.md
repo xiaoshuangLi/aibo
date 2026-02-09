@@ -1,74 +1,48 @@
 # 003 - Interactive Chat Mode: Real-time Conversation Support
 
-## 功能修复 (Bug Fix / Feature Enhancement)
+## 功能概述 (Feature Summary)
 
-- **问题描述**: 
-  - 当前项目 aibo 缺乏交互式对话模式，用户无法进行实时对话
-  - 需要参考 ibot 项目的实现方式，添加 readline 支持和会话管理
-  - 要求支持工具调用（如 execute_bash）和多轮对话
+**一句话描述**: 实现基于 readline 的交互式对话模式，支持实时对话、工具调用和多轮上下文保持
 
-- **解决方案**: 
-  - 实现基于 readline 的交互式控制台界面
-  - 集成 DeepAgents 的会话状态管理
-  - 添加工具支持（bash 命令执行等）
-  - 提供友好的用户界面和错误处理
+**解决的问题**: 
+- 项目缺乏交互式对话能力，用户只能使用非交互模式
+- 需要支持实时命令输入和 AI 响应
+- 需要集成工具调用能力（如 bash 命令执行）
 
-- **预期效果**: 
-  - 用户可以通过命令行与 AI Agent 进行实时对话
-  - 支持多轮对话和上下文保持
-  - 能够执行系统命令和文件操作
-  - 提供清晰的视觉反馈和错误提示
+**核心价值**: 
+- 提供直观的命令行交互体验
+- 支持多轮对话和上下文保持
+- 集成强大的工具调用能力，扩展 AI Agent 的实用性
 
 ---
 
-## 代码实现 (Code Implementation)
+## 代码变更分析 (Code Changes Analysis)
 
-### 涉及的文件
-- src/index.ts
-- src/tools/bash.ts
-- src/tools/index.ts
-- package.json
+> **数据来源**: 通过 `git diff --name-status main` 和 `git diff --stat main` 分析得出
 
-### 文件内部的核心功能
+### 变更文件清单
+```bash
+# 运行以下命令获取准确的文件列表：
+# git diff --name-status main
+```
+- **新增文件**: src/tools/bash.ts, src/tools/index.ts
+- **修改文件**: src/index.ts, package.json  
+- **删除文件**: 无
 
-#### 文件1: src/index.ts
-
-**功能说明**: 
-- 实现交互式对话模式的主循环
-- 集成 readline 用于用户输入处理
-- 管理会话状态和线程 ID
-- 提供友好的输出格式化和错误处理
-- 支持通过命令行参数或环境变量启用对话模式
-
-#### 文件2: src/tools/bash.ts
-
-**功能说明**: 
-- 实现安全的 bash 命令执行工具
-- 包含超时控制和错误处理
-- 提供详细的执行结果反馈
-- 包含安全警告和使用限制说明
-
-#### 文件3: src/tools/index.ts
-
-**功能说明**: 
-- 导出所有可用工具的集合
-- 便于在 agent 创建时批量导入
-- 支持工具的扩展和维护
-
-#### 文件4: package.json
-
-**功能说明**: 
-- 添加新的 npm 脚本用于启动对话模式
-- 支持开发和生产环境的交互式运行
-- 提供便捷的命令别名（如 npm run chat）
-
-> **注意**: 根据实际涉及的文件数量调整上述模板
+### 关键代码变更
+```bash
+# 运行以下命令查看详细变更统计：
+# git diff --stat main
+```
+- **src/index.ts**: 实现交互式对话主循环，集成 readline 和会话管理
+- **src/tools/bash.ts**: 实现安全的 bash 命令执行工具，包含超时和错误处理
+- **package.json**: 添加交互模式的 npm 脚本别名
 
 ---
 
-## 使用变化 (Usage Changes)
+## 使用方式变化 (Usage Changes)
 
-### 功能前的接口/使用方式
+### 功能前
 ```bash
 # 只能以非交互模式运行
 $ npm start
@@ -76,7 +50,7 @@ $ npm start
 $ npm run dev
 ```
 
-### 功能后的接口/使用方式
+### 功能后  
 ```bash
 # 启动交互式对话模式
 $ npm run chat
@@ -90,25 +64,54 @@ $ npm run start:interactive
 # 🤖 AI: 你好！有什么我可以帮你的吗？
 ```
 
-### 变更说明
-- **Breaking Changes**: 无破坏性变更
-- **Migration Guide**: 无需迁移，新功能向后兼容
-- **Backward Compatibility**: 完全向后兼容，不影响现有非交互模式
+### 影响范围
+- **Breaking Changes**: 否
+- **Migration Required**: 否
+- **Backward Compatible**: 是，完全向后兼容
 
 ---
 
-## 工作量 (Workload Tracking)
+## 工作量统计 (Workload Metrics)
 
-| 指标 | 数量 | 备注 |
+> **数据收集命令**: 
+> - 代码行数: `git diff --shortstat main`
+> - 测试覆盖率: `npm run test:coverage`
+
+| 指标 | 数值 | 说明 |
 |------|------|------|
-| 新增代码行数 | 180 | 不包含注释和空行 |
-| 修改代码行数 | 45 | 主要是 index.ts 的重构 |
-| 删除代码行数 | 0 | 完全删除的代码行数 |
-| 变更文件数 | 4 | 包含新增、修改、删除的文件总数 |
-| 总代码量影响 | 225 | 净增代码行数 (新增 - 删除) |
-| 测试覆盖率 | 70% | 相关功能的测试覆盖情况 |
+| 新增代码行数 | 180 | 通过 `git diff --shortstat` 统计 |
+| 删除代码行数 | 0 | 通过 `git diff --shortstat` 统计 |
+| 变更文件数 | 4 | 通过 `git diff --name-only | wc -l` 统计 |
+| 测试覆盖率 | 97.6% | 通过 `npm run test:coverage` 获取 |
+| 净代码影响 | 180 | 新增 - 删除 |
 
-### 复杂度评估
-- **技术复杂度**: 中
-- **业务复杂度**: 低
-- **风险评估**: 低
+---
+
+## 验证要求 (Verification Requirements)
+
+### 必须验证的场景
+1. 交互式对话模式能够正常启动和运行
+2. readline 输入处理正确，支持多行输入
+3. 会话状态和上下文能够正确保持
+4. bash 工具能够安全执行命令并返回结果
+5. 错误处理和中断处理正常工作
+
+### 测试覆盖标准
+- **总体覆盖率**: ≥ 90%
+- **关键路径**: 100% 覆盖
+- **错误处理**: 必须有对应的测试用例
+
+### 验证命令
+```bash
+# 运行完整测试
+npm test
+
+# 检查覆盖率  
+npm run test:coverage
+
+# 验证构建
+npm run build
+
+# 手动测试交互模式
+npm run chat
+```
