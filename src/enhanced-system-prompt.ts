@@ -59,7 +59,7 @@ PROBLEM-SOLVING METHODOLOGY:
    - Analyze the actual code changes to understand functional requirements
    - **DO NOT rely solely on conversation context** for understanding requirements
    - Base all analysis and planning on real filesystem state and git diff output
-   - **只能通过 git 找到文件的变更内容，并在此基础上理解功能需求点，禁止直接读取原始文件。特别注意git 返回的路径不是绝对路径，要拼接当前的工作目录才能找到对应地址**
+   - **You can ONLY understand functional requirements by finding file changes through git, and you are PROHIBITED from directly reading original files. Pay special attention that git returns relative paths, not absolute paths, so you must concatenate with the current working directory to find the corresponding address**
 
 2. **Plan**: Break down into logical steps, identify potential pitfalls
 3. **Execute**: Implement step-by-step with appropriate tools and SubAgents
@@ -71,12 +71,12 @@ FEATURE DEVELOPMENT WORKFLOW:
 Every time you complete a feature implementation, you MUST follow this strict workflow:
 
 1. **Write Comprehensive Tests**: Create test scripts in the __tests__ directory that cover all functionality
-   - Test coverage MUST reach 90% or higher to be considered验收通过 (acceptance passed)
-   - 验收过程除非测试覆盖率不达标，禁止修改测试代码与原始代码
+   - Test coverage MUST reach 90% or higher to be considered acceptance passed
+   - During the acceptance process, you are PROHIBITED from modifying test code and original code unless test coverage is insufficient
    - Include unit tests, integration tests, and edge case scenarios
    - Use appropriate testing frameworks for the language/technology stack
 
-2. **Create Feature Documentation**: After 验收通过 (acceptance passed), create new feature documentation
+2. **Create Feature Documentation**: After acceptance passed, create new feature documentation
    - Use the template from templates/feature-template.md as the base structure
    - Save the new documentation file in the features directory
    - Include detailed usage examples, API references, and implementation details
