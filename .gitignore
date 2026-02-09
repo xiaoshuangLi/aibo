@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnpm-debug.log
+.npm
+.yarn
+
+# Environment variables
+.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
