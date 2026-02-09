@@ -2,6 +2,11 @@ import { config } from './config';
 import { ChatOpenAI } from '@langchain/openai';
 import { MemorySaver } from "@langchain/langgraph";
 import { createDeepAgent, FilesystemBackend } from 'deepagents';
+import * as os from 'os';
+import * as path from 'path';
+import * as process from 'process';
+import readline from 'readline';
+import tools from './tools/index';
 
 /**
  * AI Agent module that provides DeepAgents integration with LangChain.
@@ -12,6 +17,135 @@ import { createDeepAgent, FilesystemBackend } from 'deepagents';
  * 
  * @module index
  */
+
+// ==================== 初始化模型 ====================
+const model = new ChatOpenAI({
+  apiKey: config.openai.apiKey,
+  modelName: config.openai.modelName,
+  temperature: 0,
+  ...(config.openai.baseURL && { 
+    configuration: { baseURL: config.openai.baseURL } 
+  }),
+});
+
+const backend = new FilesystemBackend({
+  rootDir: process.cwd(),
+  maxFileSizeMb: 1000,
+});
+
+// ==================== 创建 Agent ====================
+const agent = createDeepAgent({
+  model,
+  backend,
+  systemPrompt: `You are 'LocalAssistant', a helpful AI with FULL local filesystem and terminal access.
+  
+ENVIRONMENT:
+- OS: ${os.platform()} ${os.arch()}
+- Node.js: ${process.version}
+- Working directory: ${process.cwd()}
+
+RULES:
+1. ALWAYS explain actions BEFORE executing tools
+2. NEVER run destructive commands (rm -rf, dd, mkfs) without explicit confirmation
+3. For file deletions, ALWAYS confirm first
+4. Prefer safe commands (ls, cat, pwd) over dangerous ones
+5. Output should be CONCISE and ACTION-ORIENTED
+
+FORMAT:
+- Start with brief explanation
+- Then show tool result (keep output short)
+- End with clear next step or conclusion`,
+  checkpointer: new MemorySaver(),
+  tools,
+});
+
+// ==================== 对话模式实现 ====================
+export async function startInteractiveMode() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "",
+  });
+
+  // 会话状态
+  const session = {
+    threadId: "console-session-" + Date.now(),
+    isRunning: false,
+    abortController: null,
+    lastInterrupt: 0,
+  };
+
+  // 美化输出
+  const styled = {
+    assistant: (text: string) => `\n🤖 ${text}`,
+    toolCall: (name: string, args: any) => `\n🔧 正在调用工具: ${name}\n   参数: ${JSON.stringify(args, null, 2).split('\n').map(l => '   ' + l).join('\n').trim()}`,
+    toolResult: (name: string, success: boolean, preview: string) => 
+      `\n${success ? '✅' : '❌'} 工具执行 ${name}: ${success ? '成功' : '失败'}\n${preview}`,
+    system: (text: string) => `\n⚙️  ${text}`,
+    error: (text: string) => `\n❌ ${text}`,
+    hint: (text: string) => `\n💡 ${text}`,
+    truncated: (original: string, limit: number) => 
+      original.length > limit ? original.substring(0, limit) + `... [已截断 ${original.length - limit} 字符]` : original,
+  };
+
+  console.log(styled.system("AI Assistant 已启动！输入 'exit' 或 'quit' 退出对话模式。"));
+  console.log(styled.hint("你可以问我任何问题，我会尽力帮助你。"));
+
+  const askQuestion = () => {
+    if (!session.isRunning) {
+      rl.question("\n👤 你: ", async (input) => {
+        if (input.trim().toLowerCase() === 'exit' || input.trim().toLowerCase() === 'quit') {
+          console.log(styled.system("再见！"));
+          rl.close();
+          return;
+        }
+
+        if (input.trim() === '') {
+          askQuestion();
+          return;
+        }
+
+        session.isRunning = true;
+        try {
+          console.log(styled.system("正在思考..."));
+          
+          const response = await (agent as any).invoke(input, { threadId: session.threadId });
+          
+          if (typeof response === 'string') {
+            console.log(styled.assistant(response));
+          } else if (response && typeof response === 'object') {
+            // 处理可能的复杂响应
+            console.log(styled.assistant(JSON.stringify(response, null, 2)));
+          }
+        } catch (error: any) {
+          console.log(styled.error(`发生错误: ${error.message}`));
+        } finally {
+          session.isRunning = false;
+          askQuestion();
+        }
+      });
+    }
+  };
+
+  // 设置退出处理器
+  const setupExitHandlers = () => {
+    const exitHandler = () => {
+      if (session.isRunning) {
+        console.log(styled.system("\n正在中断当前操作..."));
+        session.isRunning = false;
+      } else {
+        console.log(styled.system("\n再见！"));
+        process.exit(0);
+      }
+    };
+
+    process.on('SIGINT', exitHandler);
+    process.on('SIGTERM', exitHandler);
+  };
+
+  setupExitHandlers();
+  askQuestion();
+}
 
 /**
  * Creates and configures an AI agent instance.
@@ -35,35 +169,6 @@ import { createDeepAgent, FilesystemBackend } from 'deepagents';
  * @see {@link main} for the main execution function
  */
 export function createAIAgent() {
-  // Build ChatOpenAI configuration
-  const chatConfig: any = {
-    openAIApiKey: config.openai.apiKey,
-    modelName: config.openai.modelName,
-    temperature: 0,
-  };
-
-  // Only add baseURL if it's provided
-  if (config.openai.baseURL) {
-    chatConfig.configuration = {
-      baseURL: config.openai.baseURL,
-    };
-  }
-
-  const checkpointer = new MemorySaver();
-  const model = new ChatOpenAI(chatConfig);
-
-  const backend = new FilesystemBackend({
-    rootDir: process.cwd(),
-    maxFileSizeMb: 1000,
-  });
-
-  const agent = createDeepAgent({
-    model,
-    backend,
-    checkpointer,
-    // Add other createDeepAgent configuration as needed
-  });
-
   return agent;
 }
 
@@ -91,21 +196,24 @@ export function createAIAgent() {
  * 
  * @see {@link createAIAgent} for agent creation details
  */
-// Main execution function
 export async function main() {
+  // 检查是否以交互模式运行（通过命令行参数或环境变量）
+  const args = process.argv.slice(2);
+  if (args.includes('--interactive') || args.includes('-i') || process.env.AIBO_INTERACTIVE === 'true') {
+    await startInteractiveMode();
+    return agent;
+  }
+
   try {
-    const agent = createAIAgent();
     console.log('AI Agent initialized successfully');
-    // Add your main logic here
     return agent;
   } catch (error) {
-    console.error('Failed to initialize AI agent:', error);
-    throw error;
+    console.error('Failed to initialize AI Agent:', error);
+    process.exit(1);
   }
 }
 
-// Only run main if this file is executed directly
-// Use a more compatible approach for Jest testing
-if (typeof require !== 'undefined' && require.main === module) {
+// 如果直接运行此文件，则启动主函数
+if (require.main === module) {
   main().catch(console.error);
 }

@@ -10,7 +10,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "start": "node dist/index.js",
+    "start:interactive": "AIBO_INTERACTIVE=true node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "dev:interactive": "AIBO_INTERACTIVE=true ts-node src/index.ts",
+    "chat": "npm run dev:interactive",
     "prepare": "husky"
   },
   "author": "xiaoshuang",
