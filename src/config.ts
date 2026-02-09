@@ -35,6 +35,7 @@ const envSchema = z.object({
   RECURSION_LIMIT: z.coerce.number().int().positive().default(1000),
   CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite']).default('memory'),
   MEMORY_WINDOW_SIZE: z.coerce.number().int().positive().default(5),
+  VERBOSE_OUTPUT: z.coerce.boolean().default(false),
 });
 
 // Parse and validate environment variables
@@ -77,5 +78,8 @@ export const config = {
   },
   memory: {
     windowSize: env.MEMORY_WINDOW_SIZE,
+  },
+  output: {
+    verbose: env.VERBOSE_OUTPUT,
   },
 };

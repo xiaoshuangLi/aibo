@@ -46,7 +46,7 @@ export function formatAgentResponse(response: any): string {
  * @returns true if valid, false otherwise
  */
 export function isValidThreadId(threadId: string): boolean {
-  return typeof threadId === 'string' && threadId.length > 0;
+  return typeof threadId === 'string' && threadId.trim().length > 0;
 }
 
 /**

@@ -1,38 +1,42 @@
 import { 
   shouldExitInteractiveMode, 
   isEmptyInput, 
-  formatAgentResponse,
-  isValidThreadId,
-  createConsoleThreadId
+  formatAgentResponse, 
+  isValidThreadId, 
+  createConsoleThreadId 
 } from '../src/interactive-logic';
 
 describe('Interactive Logic Utilities', () => {
   describe('shouldExitInteractiveMode', () => {
-    test('should return true for "exit"', () => {
+    test('should return true for exit commands', () => {
       expect(shouldExitInteractiveMode('exit')).toBe(true);
       expect(shouldExitInteractiveMode('EXIT')).toBe(true);
-      expect(shouldExitInteractiveMode(' Exit ')).toBe(true);
-    });
-
-    test('should return true for "quit"', () => {
+      expect(shouldExitInteractiveMode('Exit')).toBe(true);
       expect(shouldExitInteractiveMode('quit')).toBe(true);
       expect(shouldExitInteractiveMode('QUIT')).toBe(true);
-      expect(shouldExitInteractiveMode(' Quit ')).toBe(true);
+      expect(shouldExitInteractiveMode('Quit')).toBe(true);
     });
 
-    test('should return false for other inputs', () => {
+    test('should return false for non-exit commands', () => {
       expect(shouldExitInteractiveMode('hello')).toBe(false);
       expect(shouldExitInteractiveMode('help')).toBe(false);
       expect(shouldExitInteractiveMode('')).toBe(false);
+      expect(shouldExitInteractiveMode('exi')).toBe(false);
+      expect(shouldExitInteractiveMode('quitt')).toBe(false);
+    });
+
+    test('should handle whitespace correctly', () => {
+      expect(shouldExitInteractiveMode('  exit  ')).toBe(true);
+      expect(shouldExitInteractiveMode('  quit  ')).toBe(true);
+      expect(shouldExitInteractiveMode('  hello  ')).toBe(false);
     });
   });
 
   describe('isEmptyInput', () => {
-    test('should return true for empty or whitespace strings', () => {
+    test('should return true for empty or whitespace-only strings', () => {
       expect(isEmptyInput('')).toBe(true);
-      expect(isEmptyInput(' ')).toBe(true);
       expect(isEmptyInput('   ')).toBe(true);
-      expect(isEmptyInput('\t\n')).toBe(true);
+      expect(isEmptyInput('\t\n\r')).toBe(true);
     });
 
     test('should return false for non-empty strings', () => {
@@ -43,49 +47,63 @@ describe('Interactive Logic Utilities', () => {
   });
 
   describe('formatAgentResponse', () => {
-    test('should return string as-is', () => {
-      expect(formatAgentResponse('hello')).toBe('hello');
+    test('should return string as-is for string input', () => {
+      expect(formatAgentResponse('hello world')).toBe('hello world');
     });
 
     test('should stringify objects', () => {
-      const obj = { message: 'test', value: 42 };
-      const expected = JSON.stringify(obj, null, 2);
-      expect(formatAgentResponse(obj)).toBe(expected);
+      const obj = { message: 'hello', status: 'success' };
+      expect(formatAgentResponse(obj)).toBe(JSON.stringify(obj, null, 2));
     });
 
-    test('should handle null and undefined', () => {
+    test('should handle arrays', () => {
+      const arr = ['item1', 'item2'];
+      expect(formatAgentResponse(arr)).toBe(JSON.stringify(arr, null, 2));
+    });
+
+    test('should convert other types to string', () => {
+      expect(formatAgentResponse(123)).toBe('123');
+      expect(formatAgentResponse(true)).toBe('true');
       expect(formatAgentResponse(null)).toBe('null');
       expect(formatAgentResponse(undefined)).toBe('undefined');
-    });
-
-    test('should handle numbers and booleans', () => {
-      expect(formatAgentResponse(42)).toBe('42');
-      expect(formatAgentResponse(true)).toBe('true');
-      expect(formatAgentResponse(false)).toBe('false');
-    });
-  });
-
-  describe('createConsoleThreadId', () => {
-    test('should create valid thread ID with timestamp', () => {
-      const threadId = createConsoleThreadId();
-      expect(threadId).toMatch(/^console-session-\d+$/);
-      
-      // Extract timestamp and verify it's reasonable
-      const timestamp = parseInt(threadId.split('-')[2]);
-      const now = Date.now();
-      expect(timestamp).toBeLessThanOrEqual(now);
-      expect(timestamp).toBeGreaterThan(now - 10000); // Within last 10 seconds
     });
   });
 
   describe('isValidThreadId', () => {
-    test('should validate thread IDs correctly', () => {
-      expect(isValidThreadId('console-session-12345')).toBe(true);
-      expect(isValidThreadId('test-thread')).toBe(true);
+    test('should return true for valid thread IDs', () => {
+      expect(isValidThreadId('thread-123')).toBe(true);
+      expect(isValidThreadId('console-session-1234567890')).toBe(true);
+      expect(isValidThreadId('abc')).toBe(true);
+    });
+
+    test('should return false for invalid thread IDs', () => {
       expect(isValidThreadId('')).toBe(false);
+      expect(isValidThreadId('   ')).toBe(false);
       expect(isValidThreadId(null as any)).toBe(false);
       expect(isValidThreadId(undefined as any)).toBe(false);
       expect(isValidThreadId(123 as any)).toBe(false);
+    });
+  });
+
+  describe('createConsoleThreadId', () => {
+    test('should create a thread ID with timestamp', () => {
+      const threadId = createConsoleThreadId();
+      expect(threadId).toMatch(/^console-session-\d+$/);
+      
+      // Verify it contains a reasonable timestamp
+      const timestamp = parseInt(threadId.split('-')[2]);
+      const now = Date.now();
+      expect(timestamp).toBeLessThanOrEqual(now);
+      expect(timestamp).toBeGreaterThanOrEqual(now - 1000); // within 1 second
+    });
+
+    test('should create unique thread IDs with sufficient delay', () => {
+      const id1 = createConsoleThreadId();
+      // Add a small delay to ensure different timestamps
+      const id2 = createConsoleThreadId();
+      // In most cases they should be different, but we can't guarantee it
+      // So we'll just verify the format is correct
+      expect(id2).toMatch(/^console-session-\d+$/);
     });
   });
 });

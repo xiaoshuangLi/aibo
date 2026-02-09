@@ -9,10 +9,11 @@ import tools from './tools/index';
 import { 
   shouldExitInteractiveMode, 
   isEmptyInput, 
-  createConsoleThreadId
+  createConsoleThreadId,
+  isValidThreadId,
 } from './interactive-logic';
 import { invokeAgent, handleAgentResponse, handleAgentError } from './agent-interaction';
-import { styled, createGracefulShutdown, createAskQuestion } from './utils/interactive-utils';
+import { styled, createGracefulShutdown, handleUserInput, showPrompt } from './utils/interactive-utils';
 import { structuredLog } from './utils/logging';
 
 /**
@@ -26,7 +27,7 @@ import { structuredLog } from './utils/logging';
  */
 
 // ==================== 初始化模型 ====================
-const model = new ChatOpenAI({
+export const model = new ChatOpenAI({
   apiKey: config.openai.apiKey,
   modelName: config.openai.modelName,
   temperature: 0,
@@ -35,13 +36,13 @@ const model = new ChatOpenAI({
   }),
 });
 
-const backend = new FilesystemBackend({
+export const backend = new FilesystemBackend({
   rootDir: process.cwd(),
   maxFileSizeMb: 1000,
 });
 
 // ==================== 创建 Agent ====================
-const agent = createDeepAgent({
+export const agent = createDeepAgent({
   model,
   backend,
   systemPrompt: `You are 'LocalAssistant', a helpful AI with FULL local filesystem and terminal access.
@@ -66,6 +67,99 @@ FORMAT:
   tools,
 });
 
+// ==================== 内部命令处理器 (柯里化) ====================
+export const createHandleInternalCommand = (session: any, rl: any) => {
+  return async (command: string): Promise<boolean> => {
+    switch (command) {
+      case "/help":
+        console.log(`
+🔧 可用命令:
+   /help        - 显示此帮助
+   /exit        - 立即退出（任何时刻可用）
+   /clear       - 清屏
+   /pwd         - 显示当前目录
+   /ls          - 列出当前目录
+   /verbose     - 切换详细/简略输出模式
+   /new         - 开始新会话（清除对话历史）
+   Ctrl+C       - 强制中断当前操作（任何时刻可用）
+`);
+        return true;
+        
+      case "/clear":
+        console.clear();
+        console.log("=".repeat(70));
+        console.log(`🚀 AI Assistant | 会话 ID: ${session.threadId}`);
+        console.log("=".repeat(70));
+        return true;
+        
+      case "/pwd":
+        console.log(styled.system(`当前目录: ${process.cwd()}`));
+        return true;
+        
+      case "/ls":
+        try {
+          const files = require("fs").readdirSync(process.cwd());
+          console.log(styled.system(`当前目录内容 (${files.length} 项):`));
+          console.log(files.map((f: string) => `   ${f}`).join("\n"));
+        } catch (e) {
+          console.log(styled.error(`目录读取失败: ${(e as Error).message}`));
+        }
+        return true;
+        
+      case "/verbose":
+        config.output.verbose = !config.output.verbose;
+        console.log(styled.system(`输出模式已切换为: ${config.output.verbose ? '详细模式' : '简略模式（自动截断长内容）'}`));
+        return true;
+        
+      case "/new":
+        session.threadId = createConsoleThreadId();
+        console.log(styled.system(`✅ 已创建新会话 (ID: ${session.threadId})`));
+        return true;
+        
+      case "/exit":
+      case "/quit":
+      case "/q":
+      case "/stop":
+        console.log(styled.system("👋 正在安全退出..."));
+        rl.close();
+        process.exit(0);
+        return true;
+        
+      default:
+        console.log(styled.error(`未知命令: ${command}\n输入 /help 查看可用命令`));
+        return true;
+    }
+  };
+};
+
+// ==================== 退出处理器 (柯里化) ====================
+export const setupExitHandlers = (session: any, rl: any, gracefulShutdown: any) => {
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  
+  // Handle Ctrl+C in readline with double-press confirmation
+  let lastInterrupt = 0;
+  rl.on('SIGINT', () => {
+    const now = Date.now();
+    
+    if (session.isRunning && session.abortController) {
+      // Interrupt current operation
+      session.abortController.abort();
+      console.log(styled.system("\n⚠️  正在中断当前操作... (再次 Ctrl+C 强制退出)"));
+    } else {
+      // Double-press quick exit
+      if (now - lastInterrupt < 500) {
+        console.log(styled.system("\n👋 双击确认，立即退出..."));
+        rl.close();
+        process.exit(0);
+      } else {
+        console.log(styled.system("\n👋 检测到退出请求 (再次 Ctrl+C 确认退出)"));
+        lastInterrupt = now;
+      }
+    }
+  });
+};
+
 // ==================== 对话模式实现 ====================
 export async function startInteractiveMode() {
   const rl = readline.createInterface({
@@ -80,29 +174,51 @@ export async function startInteractiveMode() {
     isRunning: false,
     abortController: null as AbortController | null,
     rl: rl, // Add rl to session for graceful shutdown
+    commandHistory: [] as string[],
+    historyIndex: 0,
   };
 
-  console.log(styled.system("AI Assistant 已启动！输入 'exit' 或 'quit' 退出对话模式。"));
-  console.log(styled.hint("你可以问我任何问题，我会尽力帮助你。"));
+  console.log("=".repeat(70));
+  console.log("🚀 AI Assistant 启动成功 | " + config.openai.modelName);
+  console.log(`📁 工作目录: ${process.cwd()}`);
+  console.log(`🛡️  安全模式: ${config.output.verbose ? '详细输出' : '简略输出（自动截断长内容）'}`);
+  console.log("⌨️  快捷键: Ctrl+C 强制退出 | /help 查看命令 | /verbose 切换输出模式");
+  console.log("=".repeat(70));
 
   // Create graceful shutdown handler using extracted utility
   const gracefulShutdown = createGracefulShutdown(session);
 
-  // Create ask question function using extracted utility
-  const askQuestion = createAskQuestion(
-    rl,
-    session,
-    agent
-  );
+  // Handle internal commands (柯里化)
+  const handleInternalCommand = createHandleInternalCommand(session, rl);
 
-  // 设置退出处理器
-  const setupExitHandlers = () => {
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  };
+  // Setup input handler
+  rl.on("line", async (input = '') => {
+    const trimmed = input.trim();
+    
+    // Handle internal commands
+    if (trimmed.startsWith("/")) {
+      await handleInternalCommand(trimmed);
+      showPrompt(session, rl);
+      return;
+    }
+    
+    // Empty input
+    if (!trimmed) {
+      showPrompt(session, rl);
+      return;
+    }
+    
+    // Save history
+    session.commandHistory.push(trimmed);
+    session.historyIndex = session.commandHistory.length;
+    
+    // Handle user query
+    await handleUserInput(trimmed, session, agent, rl);
+  });
 
-  setupExitHandlers();
-  askQuestion();
+  // Setup exit handlers (柯里化)
+  setupExitHandlers(session, rl, gracefulShutdown);
+  showPrompt(session, rl);
 }
 
 /**

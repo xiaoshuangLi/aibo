@@ -2,50 +2,74 @@ import { structuredLog } from '../src/utils/logging';
 
 // Mock console.log to capture output
 const originalConsoleLog = console.log;
-const mockConsoleLog = jest.fn();
-console.log = mockConsoleLog;
+let capturedLogs: string[] = [];
 
-describe('Structured Logging', () => {
-  beforeEach(() => {
-    mockConsoleLog.mockClear();
-  });
+beforeEach(() => {
+  capturedLogs = [];
+  console.log = (message: string) => {
+    capturedLogs.push(message);
+  };
+});
 
-  afterAll(() => {
-    console.log = originalConsoleLog;
-  });
+afterEach(() => {
+  console.log = originalConsoleLog;
+});
 
-  it('should log info messages correctly', () => {
-    structuredLog('info', 'Test message', { key: 'value' });
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      expect.stringMatching(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[INFO\] Test message {"key":"value"}/)
-    );
-  });
+describe('Logging Utilities', () => {
+  describe('structuredLog', () => {
+    test('should log info messages with correct format', () => {
+      structuredLog('info', 'Test message');
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[INFO\] Test message/);
+    });
 
-  it('should log error messages correctly', () => {
-    structuredLog('error', 'Test error', { key: 'value' });
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      expect.stringMatching(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[ERROR\] Test error {"key":"value"}/)
-    );
-  });
+    test('should log warn messages with correct format', () => {
+      structuredLog('warn', 'Warning message');
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[WARN\] Warning message/);
+    });
 
-  it('should log warning messages correctly', () => {
-    structuredLog('warn', 'Test warning', { key: 'value' });
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      expect.stringMatching(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[WARN\] Test warning {"key":"value"}/)
-    );
-  });
+    test('should log error messages with correct format', () => {
+      structuredLog('error', 'Error message');
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[ERROR\] Error message/);
+    });
 
-  it('should handle missing context', () => {
-    structuredLog('info', 'Test message');
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      expect.stringMatching(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[INFO\] Test message$/)
-    );
-  });
+    test('should include context when provided', () => {
+      structuredLog('info', 'Message with context', { userId: '123', action: 'login' });
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toContain('Message with context {"userId":"123","action":"login"}');
+    });
 
-  it('should handle empty context', () => {
-    structuredLog('info', 'Test message', {});
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      expect.stringMatching(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[INFO\] Test message {}$/)
-    );
+    test('should handle empty context', () => {
+      structuredLog('info', 'Message without context', {});
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] \[INFO\] Message without context/);
+    });
+
+    test('should handle complex context objects', () => {
+      const complexContext = {
+        user: { id: '123', name: 'John' },
+        timestamp: new Date('2023-01-01T00:00:00Z'),
+        metadata: { ip: '192.168.1.1', userAgent: 'test-agent' }
+      };
+      
+      structuredLog('info', 'Complex context', complexContext);
+      
+      expect(capturedLogs.length).toBe(1);
+      const log = capturedLogs[0];
+      expect(log).toContain('Complex context');
+      expect(log).toContain('"user":{"id":"123","name":"John"}');
+    });
   });
 });

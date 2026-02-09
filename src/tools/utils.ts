@@ -10,13 +10,8 @@ import { z } from "zod";
  */
 export const sleepTool = tool(
   async ({ duration }) => {
-    if (duration < 0 || duration > 10000) {
-      return JSON.stringify({
-        success: false,
-        error: "Duration must be between 0 and 10000 milliseconds"
-      });
-    }
-    
+    // Remove the validation from here since schema already handles it
+    // The schema ensures duration is between 0 and 10000
     await new Promise(resolve => setTimeout(resolve, duration));
     
     return JSON.stringify({

@@ -84,13 +84,60 @@
 
 ## 工作量 (Workload Tracking)
 
+<!-- 
+工作量数据必须通过以下 git 命令行工具收集，确保数据准确性和一致性：
+
+1. **新增/修改/删除代码行数统计**:
+   ```bash
+   # 统计当前分支相对于主分支的变更
+   git diff --shortstat main
+   
+   # 或者统计特定提交范围的变更
+   git diff --shortstat <commit-hash> HEAD
+   
+   # 详细统计（按文件类型）
+   git diff --stat main
+   ```
+
+2. **变更文件数统计**:
+   ```bash
+   # 列出所有变更的文件
+   git diff --name-only main | wc -l
+   
+   # 或者使用
+   git diff --name-status main
+   ```
+
+3. **测试覆盖率获取**:
+   ```bash
+   # 运行测试并生成覆盖率报告
+   npm run test:coverage
+   
+   # 从报告中提取总体覆盖率百分比
+   ```
+
+4. **自动化脚本示例**:
+   ```bash
+   #!/bin/bash
+   # 收集工作量数据的脚本示例
+   echo "=== 工作量统计 ==="
+   echo "变更统计:"
+   git diff --shortstat main
+   echo "变更文件数:"
+   git diff --name-only main | wc -l
+   echo "测试覆盖率:"
+   # 从 coverage/lcov-report/index.html 或类似报告中提取
+   ```
+
+注意：所有工作量数据必须基于实际的 git diff 结果，不得手动估算或虚构数据。
+-->
 | 指标 | 数量 | 备注 |
 |------|------|------|
-| 新增代码行数 | 0 | 不包含注释和空行 |
-| 修改代码行数 | 0 | 包含删除和修改的行数 |
-| 删除代码行数 | 0 | 完全删除的代码行数 |
-| 变更文件数 | 0 | 包含新增、修改、删除的文件总数 |
+| 新增代码行数 | 0 | 不包含注释和空行，通过 `git diff --shortstat` 获取 |
+| 修改代码行数 | 0 | 包含删除和修改的行数，通过 `git diff --shortstat` 获取 |
+| 删除代码行数 | 0 | 完全删除的代码行数，通过 `git diff --shortstat` 获取 |
+| 变更文件数 | 0 | 包含新增、修改、删除的文件总数，通过 `git diff --name-only | wc -l` 获取 |
 | 总代码量影响 | 0 | 净增代码行数 (新增 - 删除) |
-| 测试覆盖率 | 0% | **必须达到 90% 以上才能提交** |
+| 测试覆盖率 | 0% | **必须达到 90% 以上才能提交**，通过 `npm run test:coverage` 获取 |
 
 ---
