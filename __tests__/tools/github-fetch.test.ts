@@ -39,7 +39,7 @@ describe('GitHub Fetch Tool', () => {
     const parsedResult = JSON.parse(result);
 
     expect(parsedResult.success).toBe(true);
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/main/test.js');
+    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/ref/heads/main/test.js');
     expect(parsedResult.owner).toBe('testuser');
     expect(parsedResult.repo).toBe('testrepo');
     expect(parsedResult.path).toBe('test.js');
@@ -66,7 +66,7 @@ describe('GitHub Fetch Tool', () => {
     });
     const parsedResult = JSON.parse(result);
 
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/develop/test.txt');
+    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/ref/heads/develop/test.txt');
     expect(parsedResult.branch).toBe('develop');
   });
 
@@ -87,6 +87,6 @@ describe('GitHub Fetch Tool', () => {
     expect(parsedResult.success).toBe(false);
     expect(parsedResult.error).toBe('GITHUB_FETCH_ERROR');
     expect(parsedResult.message).toBe('File not found');
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/nonexistent/nonexistent/main/nonexistent.txt');
+    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/nonexistent/nonexistent/ref/heads/main/nonexistent.txt');
   });
 });

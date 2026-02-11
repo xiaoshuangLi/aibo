@@ -18,6 +18,7 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **Mandatory Technical Proposal Approval**: Requires user approval for all technical implementations after comprehensive research
 - ✅ **Filesystem Access Optimization**: Strategic guidance to avoid reading unnecessary directories (dist, node_modules, __tests__, coverage) to minimize token consumption and improve performance
 - ✅ **AI Thinking Capability**: Enhanced reasoning and problem-solving through enabled thinking mode in all AI Agent interactions
+- ✅ **Tencent Cloud ASR Voice Input**: Real-time voice input support using Tencent Cloud's official ASR service with microphone audio capture and speech-to-text conversion. Supports both `/voice` command (5-second fixed recording) and double-click spacebar for intuitive voice input (double-click to start recording, double-click again to stop)
 
 ## Environment Variables
 
@@ -35,6 +36,12 @@ CHECKPOINTER_TYPE=memory
 
 # Memory Configuration
 MEMORY_WINDOW_SIZE=5
+
+# Tencent Cloud ASR Configuration
+TENCENTCLOUD_APP_ID=your-app-id          # Required for voice input
+TENCENTCLOUD_SECRET_ID=your-secret-id    # Required for voice input  
+TENCENTCLOUD_SECRET_KEY=your-secret-key  # Required for voice input
+TENCENTCLOUD_REGION=ap-shanghai          # Optional, default: ap-shanghai
 ```
 
 ## Project Structure

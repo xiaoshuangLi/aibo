@@ -16,6 +16,10 @@ import {
 import { invokeAgent, handleAgentResponse, handleAgentError } from './agent-interaction';
 import { styled, createGracefulShutdown, handleUserInput, showPrompt } from './utils/interactive-utils';
 import { structuredLog } from './utils/logging';
+import { TencentASR, createTencentASR } from './utils/tencent-asr';
+
+// Enable keyboard event emission
+readline.emitKeypressEvents(process.stdin);
 
 /**
  * AI Agent module that provides DeepAgents integration with LangChain.
@@ -65,6 +69,8 @@ export const createHandleInternalCommand = (session: any, rl: any) => {
    /ls          - 列出当前目录
    /verbose     - 切换详细/简略输出模式
    /new         - 开始新会话（清除对话历史）
+   /voice       - 启动语音输入（5秒录音）
+   Cmd/Ctrl+R   - 按住开始语音输入，松开结束（推荐使用）
    Ctrl+C       - 强制中断当前操作（任何时刻可用）
 `);
         return true;
@@ -100,6 +106,33 @@ export const createHandleInternalCommand = (session: any, rl: any) => {
         console.log(styled.system(`✅ 已创建新会话 (ID: ${session.threadId})`));
         return true;
         
+      case "/voice":
+      case "/speech":
+        try {
+          console.log(styled.system("🎙️ 启动语音输入模式..."));
+          console.log(styled.system("🗣️ 请开始说话（5秒内）..."));
+          
+          const asr = createTencentASR();
+          if (!asr.canRecord()) {
+            console.log(styled.error("❌ 无法访问麦克风，请确保已安装音频录制工具（如 sox）并授予麦克风权限"));
+            return true;
+          }
+          
+          const result = await asr.recognizeSpeech(5000);
+          if (result) {
+            console.log(styled.system(`🎯 识别结果: "${result}"`));
+            // 将识别结果作为用户输入处理
+            await handleUserInput(result, session, agent, rl);
+            return true;
+          } else {
+            console.log(styled.error("❌ 未识别到有效语音"));
+            return true;
+          }
+        } catch (error) {
+          console.log(styled.error(`❌ 语音识别失败: ${(error as Error).message}`));
+          return true;
+        }
+        
       case "/exit":
       case "/quit":
       case "/q":
@@ -118,8 +151,27 @@ export const createHandleInternalCommand = (session: any, rl: any) => {
 
 // ==================== 退出处理器 (柯里化) ====================
 export const setupExitHandlers = (session: any, rl: any, gracefulShutdown: any) => {
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  // Cleanup function for voice recording
+  const cleanupVoiceRecording = () => {
+    if (session.voiceASR && session.isVoiceRecording) {
+      try {
+        session.voiceASR.stopManualRecording().catch(() => {});
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
+    session.isVoiceRecording = false;
+    session.voiceASR = null;
+  };
+
+  process.on('SIGINT', () => {
+    cleanupVoiceRecording();
+    gracefulShutdown('SIGINT');
+  });
+  process.on('SIGTERM', () => {
+    cleanupVoiceRecording();
+    gracefulShutdown('SIGTERM');
+  });
   
   // Handle Ctrl+C in readline with double-press confirmation
   let lastInterrupt = 0;
@@ -130,6 +182,11 @@ export const setupExitHandlers = (session: any, rl: any, gracefulShutdown: any) 
       // Interrupt current operation
       session.abortController.abort();
       console.log(styled.system("\n⚠️  正在中断当前操作... (再次 Ctrl+C 强制退出)"));
+    } else if (session.isVoiceRecording) {
+      // Stop voice recording if active
+      cleanupVoiceRecording();
+      console.log(styled.system("\n🎙️ 语音输入已取消"));
+      showPrompt(session, rl);
     } else {
       // Double-press quick exit
       if (now - lastInterrupt < 500) {
@@ -160,13 +217,15 @@ export async function startInteractiveMode() {
     rl: rl, // Add rl to session for graceful shutdown
     commandHistory: [] as string[],
     historyIndex: 0,
+    isVoiceRecording: false,
+    voiceASR: null as TencentASR | null,
   };
 
   console.log("=".repeat(70));
   console.log("🚀 AI Assistant 启动成功 | " + config.openai.modelName);
   console.log(`📁 工作目录: ${process.cwd()}`);
   console.log(`🛡️  安全模式: ${config.output.verbose ? '详细输出' : '简略输出（自动截断长内容）'}`);
-  console.log("⌨️  快捷键: Ctrl+C 强制退出 | /help 查看命令 | /verbose 切换输出模式");
+  console.log("⌨️  快捷键: Ctrl+C 强制退出 | Cmd/Ctrl+R 语音输入 | /help 查看命令 | /verbose 切换输出模式");
   console.log("=".repeat(70));
 
   // Create graceful shutdown handler using extracted utility
@@ -174,6 +233,11 @@ export async function startInteractiveMode() {
 
   // Handle internal commands (柯里化)
   const handleInternalCommand = createHandleInternalCommand(session, rl);
+
+  // Set stdin to raw mode to capture key combinations
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+  }
 
   // Setup input handler
   rl.on("line", async (input = '') => {
@@ -195,9 +259,129 @@ export async function startInteractiveMode() {
     // Save history
     session.commandHistory.push(trimmed);
     session.historyIndex = session.commandHistory.length;
-    
     // Handle user query
     await handleUserInput(trimmed, session, agent, rl);
+  });
+
+  // Keyboard event handler for voice input shortcut
+  let isRecordingShortcutActive = false;
+
+  const startRecord = async () => {
+    isRecordingShortcutActive = true;
+    try {
+      console.log('\n🎙️ 开始语音输入... (松开 Cmd/Ctrl + R 结束)');
+      session.isVoiceRecording = true;
+      session.voiceASR = createTencentASR();
+      
+      if (!session.voiceASR.canRecord()) {
+        console.log(styled.error('❌ 无法访问麦克风，请确保已安装音频录制工具（如 sox）并授予麦克风权限'));
+        session.isVoiceRecording = false;
+        session.voiceASR = null;
+        isRecordingShortcutActive = false;
+        showPrompt(session, rl);
+        return;
+      }
+      
+      await session.voiceASR.startManualRecording();
+    } catch (error) {
+      console.log(styled.error(`❌ 语音输入启动失败: ${(error as Error).message}`));
+      session.isVoiceRecording = false;
+      session.voiceASR = null;
+      isRecordingShortcutActive = false;
+      showPrompt(session, rl);
+    }
+  };
+
+  const stopRecord = async () => {
+    if (!isRecordingShortcutActive) {
+      return;
+    }
+    // Key released or different key pressed - stop recording
+    // Also stop if any modifier key is released
+    isRecordingShortcutActive = false;
+    if (session.voiceASR && session.isVoiceRecording) {
+      try {
+        const audioBuffer = await session.voiceASR.stopManualRecording();
+        session.isVoiceRecording = false;
+        
+        if (audioBuffer) {
+          const result = await session.voiceASR.recognizeManualRecording(audioBuffer);
+          if (result) {
+            console.log(styled.system(`🎯 识别结果: "${result}"`));
+
+            if (result.endsWith('立即执行')) {
+              // Process the recognized text as user input
+              rl.write(result);
+              for (let i = 0; i < rl.line.length + 4; i++) {
+                setTimeout(() => {
+                  rl.write('', { name: 'right', ctrl: false, meta: false, shift: false });
+                }, 10 * i);
+              }
+            } else {
+              const more = result.slice(0, -4);
+              const content = rl.line + more;
+
+              await handleUserInput(content, session, agent, rl);
+            }
+
+            // Process the recognized text as user input
+            rl.write(result);
+            for (let i = 0; i < rl.line.length + 4; i++) {
+              setTimeout(() => {
+                rl.write('', { name: 'right', ctrl: false, meta: false, shift: false });
+              }, 10 * i);
+            }
+            // 
+            return;
+          } else {
+            console.log(styled.error('❌ 未识别到有效语音'));
+          }
+        } else {
+          console.log(styled.error('❌ 未录制到音频数据'));
+        }
+      } catch (error) {
+        console.log(styled.error(`❌ 语音识别失败: ${(error as Error).message}`));
+      } finally {
+        session.voiceASR = null;
+        showPrompt(session, rl);
+      }
+    }
+  };
+
+  let time = 0;
+  
+  process.stdin.on('keypress', async (str, key) => {
+    const now = Date.now();
+    const isSpace = key.name === 'space';
+
+    let isDoubleSpace = false;
+
+    if (isSpace) {
+      if (time) {
+        const gap = now - time;
+
+        if (gap < 300) {
+          isDoubleSpace = true;
+        } else {
+          time = now;
+        }
+      } else {
+        time = now;
+      }
+    } else {
+      time = 0;
+    }
+
+    if (isDoubleSpace) {
+      // Key pressed down - start recording
+      if (!isRecordingShortcutActive && !session.isVoiceRecording) {
+        startRecord();
+      } else {
+        stopRecord();
+      }
+    } else if (isRecordingShortcutActive) {
+      stopRecord();
+    }
   });
 
   // Setup exit handlers (柯里化)

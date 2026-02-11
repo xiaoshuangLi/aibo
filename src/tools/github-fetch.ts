@@ -8,7 +8,7 @@ import axios from "axios";
 export const webFetchFromGithubTool = tool(
   async ({ owner, repo, path, branch = "main" }) => {
     try {
-      const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+      const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/ref/heads/${branch}/${path}`;
       
       const response = await axios.get(githubUrl, {
         timeout: 10000,
@@ -35,7 +35,7 @@ export const webFetchFromGithubTool = tool(
         success: false,
         error: error.code || "GITHUB_FETCH_ERROR",
         message: error.message || "Failed to fetch from GitHub",
-        github_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`
+        github_url: `https://raw.githubusercontent.com/${owner}/${repo}/ref/heads/${branch}/${path}`
       });
     }
   },
