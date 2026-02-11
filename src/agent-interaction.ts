@@ -26,6 +26,7 @@ export async function invokeAgent(agent: any, input: string, threadId: string): 
   return await agent.invoke(
     { messages: [{ role: "user", content: input }] },
     { 
+      modelKwargs: { enable_thinking: true },
       configurable: { thread_id: threadId },
       recursionLimit: Infinity,
     },

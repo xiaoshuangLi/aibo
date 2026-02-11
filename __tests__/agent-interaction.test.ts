@@ -24,6 +24,7 @@ describe('Agent Interaction Utilities', () => {
       expect(mockAgent.invoke).toHaveBeenCalledWith(
         { messages: [{ role: "user", content: "test input" }] },
         { 
+          modelKwargs: { enable_thinking: true },
           configurable: { thread_id: "test-thread-id" },
           recursionLimit: Infinity,
         }

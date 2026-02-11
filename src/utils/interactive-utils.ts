@@ -286,6 +286,7 @@ export async function startInputLoop(
         { messages: [{ role: "user", content: input }] },
         { 
           configurable: { thread_id: session.threadId },
+          modelKwargs: { enable_thinking: true },
           signal: session.abortController.signal,
           recursionLimit: Infinity,
         }
@@ -338,6 +339,7 @@ export async function handleUserInput(
       { messages: [{ role: "user", content: input }] },
       { 
         configurable: { thread_id: session.threadId },
+        modelKwargs: { enable_thinking: true },
         signal: session.abortController.signal,
         recursionLimit: Infinity,
       }
