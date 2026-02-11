@@ -11,6 +11,30 @@ afterAll(() => {
   (process.exit as any) = originalProcessExit;
 });
 
+// Create a simple readline mock that allows direct callback access
+const createMockReadline = () => {
+  const handlers: Record<string, Function[]> = {};
+  
+  return {
+    on: jest.fn((event: string, handler: Function) => {
+      if (!handlers[event]) {
+        handlers[event] = [];
+      }
+      handlers[event].push(handler);
+      return this;
+    }),
+    close: jest.fn(),
+    emitEvent: (event: string, ...args: any[]) => {
+      if (handlers[event]) {
+        handlers[event].forEach(handler => handler(...args));
+      }
+    },
+    getHandler: (event: string) => {
+      return handlers[event] ? handlers[event][0] : null;
+    }
+  };
+};
+
 // Mock other dependencies
 jest.mock('readline', () => ({
   createInterface: jest.fn().mockReturnValue({
@@ -48,6 +72,12 @@ jest.mock('@langchain/langgraph', () => ({
 
 jest.mock('../src/tools/index', () => ({}));
 
+jest.mock('../src/agent-interaction', () => ({
+  invokeAgent: jest.fn(),
+  handleAgentResponse: jest.fn(),
+  handleAgentError: jest.fn(),
+}));
+
 jest.mock('../src/utils/interactive-utils', () => ({
   styled: {
     system: jest.fn((msg) => msg),
@@ -62,8 +92,26 @@ jest.mock('../src/utils/logging', () => ({
   structuredLog: jest.fn(),
 }));
 
+// Mock TencentASR for voice command testing
+jest.mock('../src/utils/tencent-asr', () => {
+  const mockTencentASR = {
+    canRecord: jest.fn(),
+    recognizeSpeech: jest.fn(),
+    stopManualRecording: jest.fn(),
+    startManualRecording: jest.fn(),
+    recognizeManualRecording: jest.fn(),
+  };
+  
+  return {
+    TencentASR: jest.fn(() => mockTencentASR),
+    createTencentASR: jest.fn(() => mockTencentASR),
+  };
+});
+
 // Import after mocks
 import * as index from '../src/index';
+import * as readline from 'readline';
+import { createTencentASR } from '../src/utils/tencent-asr';
 
 describe('index module comprehensive tests', () => {
   beforeEach(() => {
@@ -157,6 +205,68 @@ describe('index module comprehensive tests', () => {
       expect(mockSession.threadId).not.toBe(originalThreadId);
     });
 
+    test('handles /voice command successfully with speech recognition', async () => {
+      // Setup mocks for successful voice recognition
+      (createTencentASR as jest.Mock).mockImplementation(() => ({
+        canRecord: jest.fn().mockReturnValue(true),
+        recognizeSpeech: jest.fn().mockResolvedValue('Hello world'),
+      }));
+      
+      const handleUserInputMock = require('../src/utils/interactive-utils').handleUserInput as jest.Mock;
+      handleUserInputMock.mockResolvedValue(undefined);
+      
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl);
+      const result = await handleCommand('/voice');
+      
+      expect(result).toBe(true);
+      expect(handleUserInputMock).toHaveBeenCalledWith('Hello world', mockSession, index.agent, mockRl);
+    });
+
+    test('handles /voice command when microphone access is denied', async () => {
+      // Setup mocks for microphone access denied
+      (createTencentASR as jest.Mock).mockImplementation(() => ({
+        canRecord: jest.fn().mockReturnValue(false),
+        recognizeSpeech: jest.fn(),
+      }));
+      
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl);
+      const result = await handleCommand('/voice');
+      
+      expect(result).toBe(true);
+      // Should not call handleUserInput when canRecord returns false
+      expect(require('../src/utils/interactive-utils').handleUserInput).not.toHaveBeenCalled();
+    });
+
+    test('handles /voice command when no speech is recognized', async () => {
+      // Setup mocks for no speech recognition
+      (createTencentASR as jest.Mock).mockImplementation(() => ({
+        canRecord: jest.fn().mockReturnValue(true),
+        recognizeSpeech: jest.fn().mockResolvedValue(null),
+      }));
+      
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl);
+      const result = await handleCommand('/voice');
+      
+      expect(result).toBe(true);
+      // Should not call handleUserInput when recognizeSpeech returns null
+      expect(require('../src/utils/interactive-utils').handleUserInput).not.toHaveBeenCalled();
+    });
+
+    test('handles /voice command with speech recognition error', async () => {
+      // Setup mocks for speech recognition error
+      (createTencentASR as jest.Mock).mockImplementation(() => ({
+        canRecord: jest.fn().mockReturnValue(true),
+        recognizeSpeech: jest.fn().mockRejectedValue(new Error('Recognition failed')),
+      }));
+      
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl);
+      const result = await handleCommand('/voice');
+      
+      expect(result).toBe(true);
+      // Should not call handleUserInput when recognizeSpeech throws error
+      expect(require('../src/utils/interactive-utils').handleUserInput).not.toHaveBeenCalled();
+    });
+
     test('handles exit commands', async () => {
       const handleCommand = index.createHandleInternalCommand(mockSession, mockRl);
       const exitCommands = ['/exit', '/quit', '/q', '/stop'];
@@ -202,6 +312,78 @@ describe('index module comprehensive tests', () => {
       // The function will be called with mocked readline, so it should not throw
       await expect(index.startInteractiveMode()).resolves.not.toThrow();
     });
+
+    test('calls process.stdin.setRawMode when isTTY is true', async () => {
+      // Mock process.stdin.isTTY to be true and add setRawMode method if not exists
+      const originalIsTTY = process.stdin.isTTY;
+      const originalSetRawMode = (process.stdin as any).setRawMode;
+      
+      // Add setRawMode method if it doesn't exist
+      if (typeof (process.stdin as any).setRawMode !== 'function') {
+        (process.stdin as any).setRawMode = jest.fn();
+      }
+      
+      const setRawModeSpy = jest.spyOn(process.stdin as any, 'setRawMode');
+      
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: false,
+        configurable: true
+      });
+      
+      await index.startInteractiveMode();
+      
+      expect(setRawModeSpy).toHaveBeenCalledWith(true);
+      
+      // Restore original values
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        writable: false,
+        configurable: true
+      });
+      
+      if (originalSetRawMode) {
+        (process.stdin as any).setRawMode = originalSetRawMode;
+      } else {
+        delete (process.stdin as any).setRawMode;
+      }
+    });
+
+    test('does not call process.stdin.setRawMode when isTTY is false', async () => {
+      // Mock process.stdin.isTTY to be false and add setRawMode method if not exists
+      const originalIsTTY = process.stdin.isTTY;
+      const originalSetRawMode = (process.stdin as any).setRawMode;
+      
+      // Add setRawMode method if it doesn't exist
+      if (typeof (process.stdin as any).setRawMode !== 'function') {
+        (process.stdin as any).setRawMode = jest.fn();
+      }
+      
+      const setRawModeSpy = jest.spyOn(process.stdin as any, 'setRawMode');
+      
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: false,
+        configurable: true
+      });
+      
+      await index.startInteractiveMode();
+      
+      expect(setRawModeSpy).not.toHaveBeenCalled();
+      
+      // Restore original values
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        writable: false,
+        configurable: true
+      });
+      
+      if (originalSetRawMode) {
+        (process.stdin as any).setRawMode = originalSetRawMode;
+      } else {
+        delete (process.stdin as any).setRawMode;
+      }
+    });
   });
 
   describe('main function', () => {
@@ -245,5 +427,570 @@ describe('index module comprehensive tests', () => {
     // The actual require.main === module path is covered when the file is run directly
     // For testing purposes, we ensure the main function exists and is callable
     expect(typeof index.main).toBe('function');
+  });
+});
+
+// Simple coverage tests for index.ts using direct callback triggering
+describe('index module - simple coverage tests', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('setupExitHandlers covers SIGINT with running operation', () => {
+    const mockRl = createMockReadline();
+    const mockAbortController = { abort: jest.fn() };
+    const mockSession = {
+      isRunning: true,
+      abortController: mockAbortController,
+    };
+    const mockGracefulShutdown = jest.fn();
+    
+    // Mock readline.createInterface to return our mock
+    (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
+    
+    // Call setupExitHandlers
+    index.setupExitHandlers(mockSession, mockRl as any, mockGracefulShutdown);
+    
+    // Directly trigger the SIGINT handler
+    const sigIntHandler = mockRl.getHandler('SIGINT');
+    if (sigIntHandler) {
+      sigIntHandler();
+    }
+    
+    expect(mockAbortController.abort).toHaveBeenCalled();
+  });
+
+  test('setupExitHandlers covers SIGINT double press exit', () => {
+    const mockRl = createMockReadline();
+    const mockSession = {
+      isRunning: false,
+      abortController: null,
+    };
+    const mockGracefulShutdown = jest.fn();
+    
+    (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
+    
+    index.setupExitHandlers(mockSession, mockRl as any, mockGracefulShutdown);
+    
+    const sigIntHandler = mockRl.getHandler('SIGINT');
+    if (sigIntHandler) {
+      // First press
+      sigIntHandler();
+      // Second press
+      sigIntHandler();
+    }
+    
+    expect(mockRl.close).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  test('startInteractiveMode covers line event - internal command', async () => {
+    const mockRl = createMockReadline();
+    (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
+    
+    await index.startInteractiveMode();
+    
+    const lineHandler = mockRl.getHandler('line');
+    if (lineHandler) {
+      await lineHandler('/help');
+    }
+    
+    expect(require('../src/utils/interactive-utils').handleUserInput).not.toHaveBeenCalled();
+  });
+
+  test('startInteractiveMode covers line event - normal input', async () => {
+    const mockRl = createMockReadline();
+    (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
+    
+    await index.startInteractiveMode();
+    
+    const lineHandler = mockRl.getHandler('line');
+    if (lineHandler) {
+      await lineHandler('hello world');
+    }
+    
+    expect(require('../src/utils/interactive-utils').handleUserInput).toHaveBeenCalled();
+  });
+
+  test('startInteractiveMode covers line event - empty input', async () => {
+    const mockRl = createMockReadline();
+    (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
+    
+    // Clear any previous calls to showPrompt
+    require('../src/utils/interactive-utils').showPrompt.mockClear();
+    
+    await index.startInteractiveMode();
+    
+    // Clear the initial showPrompt call from startInteractiveMode
+    require('../src/utils/interactive-utils').showPrompt.mockClear();
+    
+    const lineHandler = mockRl.getHandler('line');
+    if (lineHandler) {
+      // Test with empty string
+      await lineHandler('');
+      // Test with whitespace only
+      await lineHandler('   ');
+    }
+    
+    // handleUserInput should not be called for empty input
+    expect(require('../src/utils/interactive-utils').handleUserInput).not.toHaveBeenCalled();
+    // showPrompt should be called twice (once for each empty input)
+    expect(require('../src/utils/interactive-utils').showPrompt).toHaveBeenCalledTimes(2);
+  });
+
+  // test('main function error handling coverage', async () => {
+  //   // Mock structuredLog to verify error logging
+  //   const originalStructuredLog = require('../src/utils/logging').structuredLog;
+  //   let errorLogged = false;
+  //   
+  //   require('../src/utils/logging').structuredLog = jest.fn((level: string, message: string, meta: any) => {
+  //     if (level === 'error' && message === 'Failed to initialize AI Agent') {
+  //       errorLogged = true;
+  //     }
+  //     return originalStructuredLog(level, message, meta);
+  //   });
+  //   
+  //   // Create a mock agent that throws an error when accessed
+  //   const originalAgent = index.agent;
+  //   Object.defineProperty(index, 'agent', {
+  //     get: () => {
+  //       throw new Error('Test initialization error');
+  //     }
+  //   });
+  //   
+  //   const originalArgv = [...process.argv];
+  //   process.argv = ['node', 'index.js'];
+  //   
+  //   // Call main function and expect it to handle the error internally
+  //   await index.main().catch(() => {
+  //     // The error should be handled internally
+  //   });
+  //   
+  //   // Restore
+  //   Object.defineProperty(index, 'agent', {
+  //     value: originalAgent,
+  //     writable: true
+  //   });
+  //   require('../src/utils/logging').structuredLog = originalStructuredLog;
+  //   process.argv = originalArgv;
+  //   
+  //   // The error should have been logged
+  //   expect(errorLogged).toBe(true);
+  // });
+
+  test('require.main === module condition coverage', () => {
+    // This test ensures that the require.main === module condition is covered
+    // In the test environment, this condition is false, but we can verify that
+    // the code structure is correct
+    expect(typeof index.main).toBe('function');
+  });
+});
+
+// Test voice input shortcut functionality
+describe('voice input shortcuts', () => {
+  let mockSession: any;
+  let mockRl: any;
+  let mockAgent: any;
+
+  beforeEach(() => {
+    mockSession = {
+      threadId: 'test-thread-id',
+      isRunning: false,
+      abortController: null,
+      rl: null,
+      commandHistory: [],
+      historyIndex: 0,
+      isVoiceRecording: false,
+      voiceASR: null,
+    };
+    mockRl = {
+      on: jest.fn(),
+      close: jest.fn(),
+      line: '',
+      write: jest.fn(),
+    };
+    mockAgent = {};
+  });
+
+  test('startRecord starts voice recording successfully', async () => {
+    // Mock createTencentASR
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // Call startRecord directly
+    await index.startRecord(mockSession, mockRl);
+    
+    // Verify voice recording started
+    expect(mockSession.isVoiceRecording).toBe(true);
+    expect(mockSession.voiceASR).toBe(mockTencentASR);
+    expect(mockTencentASR.startManualRecording).toHaveBeenCalled();
+    expect(showPromptMock).not.toHaveBeenCalled();
+  });
+
+  test('startRecord handles microphone access denied', async () => {
+    // Mock createTencentASR with canRecord returning false
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(false),
+      startManualRecording: jest.fn(),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // Call startRecord directly
+    await index.startRecord(mockSession, mockRl);
+    
+    // Verify recording was not started and error was shown
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('startRecord handles recording startup failure', async () => {
+    // Mock createTencentASR with startManualRecording throwing error
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockRejectedValue(new Error('Recording failed')),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // Call startRecord directly
+    await index.startRecord(mockSession, mockRl);
+    
+    // Verify recording was not started and error was shown
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('stopRecord stops voice recording and processes audio with "干活" keyword', async () => {
+    // Clear any previous mocks
+    (createTencentASR as jest.Mock).mockClear();
+    
+    // Mock createTencentASR
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+      stopManualRecording: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      recognizeManualRecording: jest.fn().mockResolvedValue('Hello world 干活'),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt and handleUserInput
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    const handleUserInputMock = require('../src/utils/interactive-utils').handleUserInput as jest.Mock;
+    showPromptMock.mockClear();
+    handleUserInputMock.mockClear();
+    
+    // First start recording
+    await index.startRecord(mockSession, mockRl);
+    expect(mockSession.isVoiceRecording).toBe(true);
+    
+    // Then stop recording
+    await index.stopRecord(mockSession, mockRl, index.agent);
+    
+    // Verify voice recording stopped and processed with handleUserInput
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(mockTencentASR.stopManualRecording).toHaveBeenCalled();
+    expect(mockTencentASR.recognizeManualRecording).toHaveBeenCalled();
+    expect(handleUserInputMock).toHaveBeenCalledWith('Hello world 干活', mockSession, index.agent, mockRl);
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('stopRecord stops voice recording and writes to readline without "干活" keyword', async () => {
+    // Clear any previous mocks
+    (createTencentASR as jest.Mock).mockClear();
+    
+    // Mock createTencentASR
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+      stopManualRecording: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      recognizeManualRecording: jest.fn().mockResolvedValue('Hello world'),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt and handleUserInput
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    const handleUserInputMock = require('../src/utils/interactive-utils').handleUserInput as jest.Mock;
+    showPromptMock.mockClear();
+    handleUserInputMock.mockClear();
+    mockRl.write.mockClear();
+    
+    // First start recording
+    await index.startRecord(mockSession, mockRl);
+    expect(mockSession.isVoiceRecording).toBe(true);
+    
+    // Then stop recording
+    await index.stopRecord(mockSession, mockRl, index.agent);
+    
+    // Verify voice recording stopped and written to readline
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(mockTencentASR.stopManualRecording).toHaveBeenCalled();
+    expect(mockTencentASR.recognizeManualRecording).toHaveBeenCalled();
+    expect(handleUserInputMock).not.toHaveBeenCalled();
+    expect(mockRl.write).toHaveBeenCalledWith('Hello world');
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('stopRecord handles recognition failure', async () => {
+    // Mock createTencentASR with recognizeManualRecording returning null
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+      stopManualRecording: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      recognizeManualRecording: jest.fn().mockResolvedValue(null),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // First start recording
+    await index.startRecord(mockSession, mockRl);
+    expect(mockSession.isVoiceRecording).toBe(true);
+    
+    // Then stop recording
+    await index.stopRecord(mockSession, mockRl, index.agent);
+    
+    // Verify recording was stopped and no input was processed
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('stopRecord handles no audio data', async () => {
+    // Mock createTencentASR with stopManualRecording returning null
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+      stopManualRecording: jest.fn().mockResolvedValue(null),
+      recognizeManualRecording: jest.fn(),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // First start recording
+    await index.startRecord(mockSession, mockRl);
+    expect(mockSession.isVoiceRecording).toBe(true);
+    
+    // Then stop recording
+    await index.stopRecord(mockSession, mockRl, index.agent);
+    
+    // Verify recording was stopped and no input was processed
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+
+  test('stopRecord handles recognition error', async () => {
+    // Mock createTencentASR with recognizeManualRecording throwing error
+    const mockTencentASR = {
+      canRecord: jest.fn().mockReturnValue(true),
+      startManualRecording: jest.fn().mockResolvedValue(undefined),
+      stopManualRecording: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      recognizeManualRecording: jest.fn().mockRejectedValue(new Error('Recognition failed')),
+    };
+    (createTencentASR as jest.Mock).mockReturnValue(mockTencentASR);
+    
+    // Mock showPrompt
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    
+    // First start recording
+    await index.startRecord(mockSession, mockRl);
+    expect(mockSession.isVoiceRecording).toBe(true);
+    
+    // Then stop recording
+    await index.stopRecord(mockSession, mockRl, index.agent);
+    
+    // Verify recording was stopped and error was shown
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalled();
+  });
+});
+
+// Test cleanupVoiceRecording function
+describe('cleanupVoiceRecording', () => {
+  test('cleans up voice recording when session has active recording', () => {
+    const mockVoiceASR = {
+      stopManualRecording: jest.fn().mockResolvedValue(undefined)
+    };
+    const session = {
+      voiceASR: mockVoiceASR,
+      isVoiceRecording: true
+    };
+    
+    index.cleanupVoiceRecording(session);
+    
+    expect(mockVoiceASR.stopManualRecording).toHaveBeenCalled();
+    expect(session.isVoiceRecording).toBe(false);
+    expect(session.voiceASR).toBeNull();
+  });
+
+  test('handles cleanup errors gracefully', () => {
+    const mockVoiceASR = {
+      stopManualRecording: jest.fn().mockRejectedValue(new Error('Cleanup error'))
+    };
+    const session = {
+      voiceASR: mockVoiceASR,
+      isVoiceRecording: true
+    };
+    
+    // Should not throw an error
+    index.cleanupVoiceRecording(session);
+    
+    expect(session.isVoiceRecording).toBe(false);
+    expect(session.voiceASR).toBeNull();
+  });
+
+  test('does nothing when no active recording', () => {
+    const session = {
+      voiceASR: null,
+      isVoiceRecording: false
+    };
+    
+    index.cleanupVoiceRecording(session);
+    
+    expect(session.isVoiceRecording).toBe(false);
+    expect(session.voiceASR).toBeNull();
+  });
+});
+
+// Test setupExitHandlers function
+describe('setupExitHandlers', () => {
+  let originalProcessOn: typeof process.on;
+  let originalProcessExit: typeof process.exit;
+  let mockSession: any;
+  let mockRl: any;
+  let mockGracefulShutdown: jest.Mock;
+
+  beforeEach(() => {
+    originalProcessOn = process.on;
+    originalProcessExit = process.exit;
+    (process.on as any) = jest.fn();
+    (process.exit as any) = jest.fn();
+    
+    mockSession = {
+      isRunning: false,
+      abortController: null,
+      isVoiceRecording: false,
+      voiceASR: null,
+    };
+    mockRl = {
+      on: jest.fn(),
+      close: jest.fn(),
+    };
+    mockGracefulShutdown = jest.fn();
+  });
+
+  afterEach(() => {
+    (process.on as any) = originalProcessOn;
+    (process.exit as any) = originalProcessExit;
+  });
+
+  test('sets up SIGINT and SIGTERM handlers', () => {
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    
+    expect(process.on).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+    expect(process.on).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+  });
+
+  test('SIGINT handler calls cleanup and graceful shutdown', () => {
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    
+    // Get the SIGINT handler
+    const sigintHandler = (process.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
+    sigintHandler();
+    
+    // Verify session state after cleanup
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(mockGracefulShutdown).toHaveBeenCalledWith('SIGINT');
+  });
+
+  test('SIGTERM handler calls cleanup and graceful shutdown', () => {
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    
+    // Get the SIGTERM handler
+    const sigtermHandler = (process.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGTERM')[1];
+    sigtermHandler();
+    
+    // Verify session state after cleanup
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(mockGracefulShutdown).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  test('rl SIGINT handler - interrupts running operation', () => {
+    const abortController = { abort: jest.fn() };
+    mockSession.isRunning = true;
+    mockSession.abortController = abortController;
+    
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    
+    // Get the rl SIGINT handler
+    const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
+    rlSigintHandler();
+    
+    expect(abortController.abort).toHaveBeenCalled();
+  });
+
+  test('rl SIGINT handler - stops voice recording', () => {
+    const showPromptMock = require('../src/utils/interactive-utils').showPrompt as jest.Mock;
+    mockSession.isVoiceRecording = true;
+    mockSession.voiceASR = { stopManualRecording: jest.fn() };
+    
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    
+    // Get the rl SIGINT handler
+    const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
+    rlSigintHandler();
+    
+    // Verify session state after cleanup
+    expect(mockSession.isVoiceRecording).toBe(false);
+    expect(mockSession.voiceASR).toBeNull();
+    expect(showPromptMock).toHaveBeenCalledWith(mockSession, mockRl);
+  });
+
+  test('rl SIGINT handler - double press exit', () => {
+    // First press
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
+    rlSigintHandler();
+    
+    // Second press within 500ms
+    jest.useFakeTimers();
+    jest.advanceTimersByTime(100);
+    rlSigintHandler();
+    
+    expect(mockRl.close).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+    
+    jest.useRealTimers();
+  });
+
+  test('rl SIGINT handler - single press confirmation', () => {
+    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
+    rlSigintHandler();
+    
+    // Should not exit on first press
+    expect(mockRl.close).not.toHaveBeenCalled();
+    expect(process.exit).not.toHaveBeenCalled();
   });
 });

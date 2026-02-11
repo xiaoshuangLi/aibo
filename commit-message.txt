@@ -1,8 +1,0 @@
-feat: 修复测试脚本问题并提升测试可靠性
-
-- 修复 keyboard-shortcut.test.ts 中的 TypeScript 类型错误，添加 KeyEvent 接口定义
-- 在 index.test.ts 和 index-coverage-simple.test.ts 中正确模拟 readline.emitKeypressEvents 方法
-- 修复 tencent-asr-manual.test.ts 中的状态管理问题，使用独立实例和 Object.defineProperty 安全设置私有状态
-- 正确处理同步抛出的错误，使用 expect(() => {}).toThrow() 而不是 expect().rejects.toThrow()
-- 保持 SRC 目录代码完全不变，只修改测试脚本
-- 所有 175 个测试用例现在都能稳定通过

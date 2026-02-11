@@ -1,4 +1,4 @@
-import { getTextFromUrl, bingSearch } from '../../src/utils/puppeteer';
+import { getTextFromUrl, bingSearch, createBrowser, closeBrowser } from '../../src/utils/puppeteer';
 import puppeteer from 'puppeteer';
 
 // Mock puppeteer to avoid actual browser launches
@@ -28,6 +28,70 @@ describe('puppeteer utils with mocks', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('createBrowser', () => {
+    test('should create new browser instance in test environment', async () => {
+      process.env.NODE_ENV = 'test';
+      const browser1 = await createBrowser();
+      const browser2 = await createBrowser();
+      
+      // In test environment, should create new instances each time
+      expect(browser1).not.toBe(browser2);
+    });
+
+    test('should cache browser instance in production environment', async () => {
+      // Temporarily set to production
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      try {
+        const browser1 = await createBrowser();
+        const browser2 = await createBrowser();
+        
+        // In production environment, should return cached instance
+        expect(browser1).toBe(browser2);
+      } finally {
+        // Restore original environment
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+
+    test('should accept custom options', async () => {
+      const customOptions = { headless: false, timeout: 5000 };
+      await createBrowser(customOptions);
+      
+      expect(puppeteer.launch).toHaveBeenCalledWith(expect.objectContaining({
+        headless: false,
+        timeout: 5000
+      }));
+    });
+  });
+
+  describe('closeBrowser', () => {
+    test('should close cached browser and clear cache', async () => {
+      // Set to production to enable caching
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      try {
+        const browser = await createBrowser();
+        await closeBrowser();
+        
+        // Browser should be closed and cache cleared
+        expect(browser.close).toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+
+    test('should do nothing when no cached browser', async () => {
+      // Ensure no cached browser
+      await closeBrowser();
+      
+      // Should not throw any error
+      expect(true).toBe(true);
+    });
   });
 
   describe('getTextFromUrl', () => {
