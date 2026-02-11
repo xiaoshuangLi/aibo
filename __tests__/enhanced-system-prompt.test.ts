@@ -99,7 +99,15 @@ describe('Enhanced System Prompt', () => {
   test('should contain English instructions for understanding requirements', () => {
     const prompt = ENHANCED_SYSTEM_PROMPT;
     
-    expect(prompt).toContain('You can ONLY understand functional requirements by finding file changes through git, and you are PROHIBITED from directly reading original files. Pay special attention that git returns relative paths, not absolute paths, so you must concatenate with the current working directory to find the corresponding address');
+    expect(prompt).toContain('IMMEDIATELY upon startup, read README.md and all features/*.md files in the working directory to understand the project architecture, features, and conventions');
+    expect(prompt).toContain('Focus on reading documentation files (README.md, features/*.md) rather than code files during initial project understanding phase');
+  });
+
+  test('should contain English instructions for technical proposal approval', () => {
+    const prompt = ENHANCED_SYSTEM_PROMPT;
+    
+    expect(prompt).toContain('PRESENT THIS TECHNICAL PROPOSAL TO THE USER FOR EXPLICIT APPROVAL BEFORE PROCEEDING WITH ANY IMPLEMENTATION');
+    expect(prompt).toContain('NEVER implement any solution without user confirmation of the technical proposal');
   });
 
   test('should not contain any template placeholders', () => {

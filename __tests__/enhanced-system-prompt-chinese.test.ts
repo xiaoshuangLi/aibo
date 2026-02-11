@@ -39,4 +39,16 @@ describe('Enhanced System Prompt - Chinese Version', () => {
     expect(prompt).toContain('编写全面测试');
     expect(prompt).toContain('创建功能文档');
   });
+
+  test('should contain Chinese instructions for understanding requirements', () => {
+    const prompt = ENHANCED_SYSTEM_PROMPT_ZH;
+    expect(prompt).toContain('启动后立即读取工作目录中的README.md和所有features/*.md文件，以了解项目架构、功能和约定');
+    expect(prompt).toContain('在初始项目理解阶段，专注于阅读文档文件（README.md, features/*.md），而不是代码文件');
+  });
+
+  test('should contain Chinese instructions for technical proposal approval', () => {
+    const prompt = ENHANCED_SYSTEM_PROMPT_ZH;
+    expect(prompt).toContain('在进行任何实施之前，必须向用户提交此技术方案以获得明确批准');
+    expect(prompt).toContain('未经用户确认技术方案，绝不实施任何解决方案');
+  });
 });

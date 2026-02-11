@@ -14,6 +14,8 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **Comprehensive Testing**: 95%+ test coverage with unit, integration, and edge case testing
 - ✅ **Problem-Solving Methodology**: 7-step structured approach including research best practices
 - ✅ **Feature Development Workflow**: Strict workflow ensuring quality with documentation and proper commits
+- ✅ **Enhanced Startup Documentation Reading**: Automatically reads README.md and features/*.md at startup to understand project architecture
+- ✅ **Mandatory Technical Proposal Approval**: Requires user approval for all technical implementations after comprehensive research
 
 ## Environment Variables
 
