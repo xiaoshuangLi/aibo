@@ -39,7 +39,7 @@
 # 运行以下命令查看详细变更统计：
 # git diff --stat main
 ```
-- **.husky/pre-commit**: 集成构建检查、测试覆盖率生成和阈值验证
+- **.husky/pre-commit**: 按正确顺序执行：1) 测试覆盖率生成，2) 覆盖率阈值验证，3) 构建检查
 - **scripts/check-coverage-threshold.js**: 解析 coverage-final.json 并验证覆盖率阈值
 - **.husky/post-commit**: 实现自动推送功能
 - **README.md**: 添加 Git Hooks 功能文档
@@ -90,10 +90,10 @@ git commit -m "message"  # 自动验证覆盖率并推送
 ## 验证要求 (Verification Requirements)
 
 ### 必须验证的场景
-1. 当覆盖率 >= 85% 时，commit 应该成功并通过 post-commit 自动推送
-2. 当覆盖率 < 85% 时，commit 应该被阻止并显示错误信息
-3. 构建失败时，commit 应该被阻止
-4. 测试生成失败时，commit 应该被阻止
+1. 当所有测试通过且覆盖率 >= 85% 时，commit 应该成功并通过 post-commit 自动推送
+2. 当测试失败时，commit 应该被阻止（不会执行覆盖率检查和构建）
+3. 当测试通过但覆盖率 < 85% 时，commit 应该被阻止（不会执行构建）
+4. 当测试通过且覆盖率 >= 85% 但构建失败时，commit 应该被阻止
 5. post-commit 钩子应该正确推送到当前分支
 
 ### 测试覆盖标准
