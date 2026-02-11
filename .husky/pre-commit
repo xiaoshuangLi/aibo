@@ -4,27 +4,27 @@
 # Run pre-commit checks
 echo "🔍 Pre-commit checks started..."
 
-# 1. Run build check
-echo "📦 Running build check..."
-./scripts/pre-commit-build.sh
-if [ $? -ne 0 ]; then
-    echo "❌ Build check failed!"
-    exit 1
-fi
-
-# 2. Run test coverage check
+# 1. Run test coverage check (must pass all tests)
 echo "🧪 Running test coverage check..."
 npm run test:coverage
 if [ $? -ne 0 ]; then
-    echo "❌ Test coverage generation failed!"
+    echo "❌ Test coverage generation failed! Please fix test failures before committing."
     exit 1
 fi
 
-# 3. Check coverage threshold
+# 2. Check coverage threshold (must be >= 85%)
 echo "📊 Checking coverage threshold..."
 node ./scripts/check-coverage-threshold.js
 if [ $? -ne 0 ]; then
-    echo "❌ Coverage threshold check failed!"
+    echo "❌ Coverage threshold check failed! Coverage must be at least 85%."
+    exit 1
+fi
+
+# 3. Run build check (only if tests pass and coverage is sufficient)
+echo "📦 Running build check..."
+./scripts/pre-commit-build.sh
+if [ $? -ne 0 ]; then
+    echo "❌ Build check failed! Please fix build errors before committing."
     exit 1
 fi
 
