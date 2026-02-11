@@ -1,10 +1,11 @@
 import bash from './bash';
 import utils from './utils';
-import web from './web';
-import puppeteerWeb from './puppeteer-web';
+import webSearch from './web-search';
+import githubFetch from './github-fetch';
 
 export default [
   ...bash,
   ...utils,
-  ...puppeteerWeb,
+  ...webSearch,
+  ...githubFetch,
 ];

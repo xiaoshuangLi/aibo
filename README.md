@@ -8,8 +8,7 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **SubAgent Delegation**: Spawn specialized SubAgents for complex, isolated tasks with parallel execution
 - ✅ **Error Recovery & Retry Strategy**: Systematic error analysis, strategy adjustment, and fallback plans
 - ✅ **Full System Access**: Complete read/write access to local filesystem and terminal commands
-- ✅ **Enhanced Web Tools**: Automatic search engine detection (Google/Bing China) with HTML content cleaning
-- ✅ **Puppeteer Web Tools**: Advanced anti-bot bypass capabilities using real browser automation with stealth plugins
+- ✅ **Enhanced Web Tools**: Puppeteer-based WebSearch and WebFetch tools with proper error handling, resource management, and anti-bot bypass capabilities
 - ✅ **Bilingual System Prompt**: Full English and Chinese support with comprehensive methodology
 - ✅ **Interactive Chat Mode**: Real-time interactive mode with command shortcuts and session management
 - ✅ **Comprehensive Testing**: 95%+ test coverage with unit, integration, and edge case testing
@@ -48,12 +47,13 @@ aibo/
 │   ├── logging.ts              # Logging utilities
 │   ├── tools/                  # AI tool implementations
 │   │   ├── bash.ts            # Terminal/bash command execution
+│   │   ├── github-fetch.ts    # GitHub repository content fetching
 │   │   ├── utils.ts           # Utility functions for tools
-│   │   ├── web.ts             # Web search and fetch tools (HTTP-based)
-│   │   └── puppeteer-web.ts   # Web search and fetch tools with Puppeteer anti-bot bypass
+│   │   └── web-search.ts      # Puppeteer-based web search and fetch tools
 │   └── utils/                 # Utility functions
 │       ├── interactive-utils.ts  # Interactive mode utilities
-│       └── search-engine-detector.ts # Automatic search engine detection
+│       ├── logging.ts         # Logging utilities
+│       └── puppeteer.ts       # Puppeteer browser automation utilities
 ├── __tests__/                 # Comprehensive test suite
 │   ├── agent-interaction.test.ts
 │   ├── config.test.ts
@@ -66,14 +66,13 @@ aibo/
 │   ├── validators.test.ts
 │   ├── tools/                 # Tool-specific tests
 │   │   ├── bash.test.ts
+│   │   ├── github-fetch.test.ts
 │   │   ├── utils.test.ts
-│   │   ├── web.test.ts
-│   │   └── puppeteer-web.test.ts
+│   │   └── web-search.test.ts
 │   └── utils/                 # Utility function tests
 │       ├── interactive-utils.test.ts
 │       ├── interactive-utils-basic.test.ts
-│       ├── simple-coverage.test.ts
-│       └── search-engine-detector.test.ts
+│       └── puppeteer.test.ts
 ├── features/                  # Feature documentation (numbered sequentially)
 ├── templates/                 # Documentation templates
 ├── .env                       # Environment variables (gitignored)
@@ -99,7 +98,7 @@ All tests are located in the `__tests__` directory and use Jest with TypeScript 
 
 ### Test Coverage Requirements
 - **Minimum Coverage**: 90% statement, branch, function, and line coverage
-- **Current Coverage**: 95.67% statements, 83.15% branches, 97.26% functions, 96.94% lines
+- **Current Coverage**: 88.14% statements, 76.84% branches, 83.75% functions, 89.09% lines
 - **Test Types**: Unit tests, integration tests, and edge case scenarios
 - **Validation**: All new features must pass comprehensive test suite before acceptance
 
@@ -108,51 +107,7 @@ All tests are located in the `__tests__` directory and use Jest with TypeScript 
 - `npm run test:watch` - Run tests in watch mode  
 - `npm run test:coverage` - Run tests with detailed coverage report
 
-## Puppeteer Web Tools
 
-AIBO now includes advanced Web tools powered by Puppeteer browser automation with stealth plugins to bypass modern anti-bot detection systems.
-
-### Features
-- **Real Browser Environment**: Uses actual Chrome/Chromium browser instead of HTTP requests
-- **Anti-Bot Bypass**: Integrates puppeteer-extra-plugin-stealth to evade detection
-- **Dynamic Content Support**: Handles JavaScript-rendered content and SPAs
-- **Search Engine Integration**: Supports both Google and Bing search engines
-- **Element Waiting**: Can wait for specific CSS selectors before capturing content
-- **HTML Cleaning**: Automatic removal of scripts, styles, and non-essential elements
-
-### Available Tools
-- `WebSearchByKeywordPuppeteer`: Perform web searches using real browser automation
-- `WebFetchByURLPuppeteer`: Fetch any URL content with anti-bot bypass capabilities
-
-### Usage Examples
-```javascript
-// Search with Puppeteer (bypasses anti-bot measures)
-const searchResult = await webSearchByKeywordPuppeteerTool.invoke({
-  keyword: "advanced AI programming",
-  searchEngine: "google",
-  timeout: 15000
-});
-
-// Fetch dynamic content with element waiting
-const fetchResult = await webFetchByURLPuppeteerTool.invoke({
-  url: "https://example.com/dynamic-page",
-  waitForSelector: "#main-content",
-  cleanHtml: true,
-  timeout: 20000
-});
-```
-
-### Performance Considerations
-- **Resource Intensive**: Puppeteer tools consume more memory and CPU than HTTP-based tools
-- **Slower Execution**: Real browser automation takes longer than simple HTTP requests
-- **Platform Compatibility**: Best performance on matching architecture (arm64 Node.js on Mac Silicon)
-- **Integration Tests**: Skipped by default; set `SKIP_PUPPETEER_INTEGRATION_TESTS=false` to run
-
-### When to Use
-- When standard Web tools are blocked by anti-bot systems
-- When you need to interact with dynamic, JavaScript-heavy websites
-- When dealing with sites that require real browser behavior
-- For critical scraping tasks where reliability is paramount
 
 ## Configuration
 
