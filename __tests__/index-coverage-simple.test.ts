@@ -36,7 +36,8 @@ const createMockReadline = () => {
 };
 
 jest.mock('readline', () => ({
-  createInterface: jest.fn()
+  createInterface: jest.fn(),
+  emitKeypressEvents: jest.fn(), // Add this to fix the TypeError
 }));
 
 jest.mock('../src/config', () => ({

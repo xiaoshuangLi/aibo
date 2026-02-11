@@ -17,6 +17,7 @@ jest.mock('readline', () => ({
     on: jest.fn(),
     close: jest.fn(),
   }),
+  emitKeypressEvents: jest.fn(), // Add this to fix the TypeError
 }));
 
 jest.mock('../src/config', () => ({
