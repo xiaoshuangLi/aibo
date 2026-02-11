@@ -19,6 +19,7 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **Filesystem Access Optimization**: Strategic guidance to avoid reading unnecessary directories (dist, node_modules, __tests__, coverage) to minimize token consumption and improve performance
 - ✅ **AI Thinking Capability**: Enhanced reasoning and problem-solving through enabled thinking mode in all AI Agent interactions
 - ✅ **Tencent Cloud ASR Voice Input**: Real-time voice input support using Tencent Cloud's official ASR service with microphone audio capture and speech-to-text conversion. Supports both `/voice` command (5-second fixed recording) and double-click spacebar for intuitive voice input (double-click to start recording, double-click again to stop)
+- ✅ **Tencent Cloud WSA Web Search**: Default integrated web search functionality using Tencent Cloud's official WSA (Web Search API) service based on Sogou search's public web resources. Provides structured search results with titles, summaries, URLs, and publication dates. Automatically available when Tencent Cloud credentials are configured.
 
 ## Environment Variables
 
@@ -37,10 +38,10 @@ CHECKPOINTER_TYPE=memory
 # Memory Configuration
 MEMORY_WINDOW_SIZE=5
 
-# Tencent Cloud ASR Configuration
-TENCENTCLOUD_APP_ID=your-app-id          # Required for voice input
-TENCENTCLOUD_SECRET_ID=your-secret-id    # Required for voice input  
-TENCENTCLOUD_SECRET_KEY=your-secret-key  # Required for voice input
+# Tencent Cloud ASR and WSA Configuration
+TENCENTCLOUD_APP_ID=your-app-id          # Required for voice input and web search
+TENCENTCLOUD_SECRET_ID=your-secret-id    # Required for voice input and web search
+TENCENTCLOUD_SECRET_KEY=your-secret-key  # Required for voice input and web search
 TENCENTCLOUD_REGION=ap-shanghai          # Optional, default: ap-shanghai
 ```
 

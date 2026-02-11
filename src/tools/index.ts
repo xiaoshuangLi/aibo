@@ -1,11 +1,11 @@
 import bash from './bash';
 import utils from './utils';
-import webSearch from './web-search';
 import githubFetch from './github-fetch';
+import { tencentWsaSearchTool } from './tencent-wsa';
 
 export default [
   ...bash,
   ...utils,
-  ...webSearch,
   ...githubFetch,
+  tencentWsaSearchTool,
 ];

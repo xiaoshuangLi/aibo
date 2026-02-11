@@ -36,11 +36,11 @@ const envSchema = z.object({
   CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite']).default('memory'),
   MEMORY_WINDOW_SIZE: z.coerce.number().int().positive().default(5),
   VERBOSE_OUTPUT: z.coerce.boolean().default(false),
-  // Tencent Cloud ASR Configuration
+  // Tencent Cloud ASR and WSA Configuration
   TENCENTCLOUD_APP_ID: z.string().optional(),
   TENCENTCLOUD_SECRET_ID: z.string().optional(),
   TENCENTCLOUD_SECRET_KEY: z.string().optional(),
-  TENCENTCLOUD_REGION: z.string().default('ap-shanghai'),
+  TENCENTCLOUD_REGION: z.string().default('ap-guangzhou'),
 });
 
 // Parse and validate environment variables

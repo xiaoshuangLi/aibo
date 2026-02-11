@@ -1,4 +1,4 @@
-import { getTextFromUrl, bingSearch, createBrowser, closeBrowser } from '../../src/utils/puppeteer';
+import { getTextFromUrl, createBrowser, closeBrowser } from '../../src/utils/puppeteer';
 import puppeteer from 'puppeteer';
 
 // Mock puppeteer to avoid actual browser launches
@@ -197,23 +197,6 @@ describe('puppeteer utils with mocks', () => {
       await expect(getTextFromUrl('https://example.com')).rejects.toThrow(
         /获取页面文本失败: Evaluation failed/
       );
-    });
-  });
-
-  describe('bingSearch', () => {
-    test('should construct correct Bing URL and return content', async () => {
-      const keyword = 'test search';
-      const result = await bingSearch(keyword);
-      
-      expect(result).toBe('Mocked page content');
-      // We can't easily verify the URL construction with current mock setup,
-      // but the function should complete successfully
-    });
-
-    test('should handle empty keyword', async () => {
-      const result = await bingSearch('');
-      
-      expect(result).toBe('Mocked page content');
     });
   });
 });
