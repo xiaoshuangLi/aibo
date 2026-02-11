@@ -17,6 +17,7 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **Enhanced Startup Documentation Reading**: Automatically reads README.md and features/*.md at startup to understand project architecture
 - ✅ **Mandatory Technical Proposal Approval**: Requires user approval for all technical implementations after comprehensive research
 - ✅ **Filesystem Access Optimization**: Strategic guidance to avoid reading unnecessary directories (dist, node_modules, __tests__, coverage) to minimize token consumption and improve performance
+- ✅ **AI Thinking Capability**: Enhanced reasoning and problem-solving through enabled thinking mode in all AI Agent interactions
 
 ## Environment Variables
 
