@@ -1,5 +1,32 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-# Run pre-commit build script
+# Run pre-commit checks
+echo "🔍 Pre-commit checks started..."
+
+# 1. Run build check
+echo "📦 Running build check..."
 ./scripts/pre-commit-build.sh
+if [ $? -ne 0 ]; then
+    echo "❌ Build check failed!"
+    exit 1
+fi
+
+# 2. Run test coverage check
+echo "🧪 Running test coverage check..."
+npm run test:coverage
+if [ $? -ne 0 ]; then
+    echo "❌ Test coverage generation failed!"
+    exit 1
+fi
+
+# 3. Check coverage threshold
+echo "📊 Checking coverage threshold..."
+node ./scripts/check-coverage-threshold.js
+if [ $? -ne 0 ]; then
+    echo "❌ Coverage threshold check failed!"
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed! Ready to commit."
+exit 0

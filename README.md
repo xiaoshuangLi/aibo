@@ -150,4 +150,4 @@ AIBO follows a 7-step structured approach:
 - **Code Quality**: Follow TypeScript best practices and maintain clean, readable code
 - **Error Handling**: Implement comprehensive error recovery with user communication
 - **Security**: Never run destructive commands without explicit confirmation
-- **Documentation**: Maintain up-to-date documentation for all features
+- **Documentation**: Maintain up-to-date documentation for all features// Test comment for commit hook testing
