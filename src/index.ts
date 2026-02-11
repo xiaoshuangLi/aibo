@@ -70,7 +70,7 @@ export const createHandleInternalCommand = (session: any, rl: any) => {
    /verbose     - 切换详细/简略输出模式
    /new         - 开始新会话（清除对话历史）
    /voice       - 启动语音输入（5秒录音）
-   Cmd/Ctrl+R   - 按住开始语音输入，松开结束（推荐使用）
+   双击空格键   - 开始/结束语音输入（推荐使用）
    Ctrl+C       - 强制中断当前操作（任何时刻可用）
 `);
         return true;
@@ -225,7 +225,7 @@ export async function startInteractiveMode() {
   console.log("🚀 AI Assistant 启动成功 | " + config.openai.modelName);
   console.log(`📁 工作目录: ${process.cwd()}`);
   console.log(`🛡️  安全模式: ${config.output.verbose ? '详细输出' : '简略输出（自动截断长内容）'}`);
-  console.log("⌨️  快捷键: Ctrl+C 强制退出 | Cmd/Ctrl+R 语音输入 | /help 查看命令 | /verbose 切换输出模式");
+  console.log("⌨️  快捷键: Ctrl+C 强制退出 | 双击空格键语音输入 | /help 查看命令 | /verbose 切换输出模式");
   console.log("=".repeat(70));
 
   // Create graceful shutdown handler using extracted utility
@@ -269,7 +269,7 @@ export async function startInteractiveMode() {
   const startRecord = async () => {
     isRecordingShortcutActive = true;
     try {
-      console.log('\n🎙️ 开始语音输入... (松开 Cmd/Ctrl + R 结束)');
+      console.log('\n🎙️ 开始语音输入... (再次双击空格键结束)');
       session.isVoiceRecording = true;
       session.voiceASR = createTencentASR();
       
@@ -318,8 +318,7 @@ export async function startInteractiveMode() {
                 }, 10 * i);
               }
             } else {
-              const more = result.slice(0, -4);
-              const content = rl.line + more;
+              const content = rl.line + result;
 
               await handleUserInput(content, session, agent, rl);
             }
