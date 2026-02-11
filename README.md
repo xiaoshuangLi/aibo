@@ -104,6 +104,12 @@ All tests are located in the `__tests__` directory and use Jest with TypeScript 
 - **Test Types**: Unit tests, integration tests, and edge case scenarios
 - **Validation**: All new features must pass comprehensive test suite before acceptance
 
+### Git Hooks
+- **Pre-commit Hook**: Automatically validates that test coverage is at least 85% before allowing commits
+- **Post-commit Hook**: Automatically pushes successful commits to the remote repository
+- **Build Validation**: Ensures TypeScript compilation succeeds before commit
+- **Coverage Check**: Runs `npm run test:coverage` and validates threshold using custom script
+
 ### Test Commands
 - `npm test` - Run all tests
 - `npm run test:watch` - Run tests in watch mode  
@@ -151,3 +157,4 @@ AIBO follows a 7-step structured approach:
 - **Error Handling**: Implement comprehensive error recovery with user communication
 - **Security**: Never run destructive commands without explicit confirmation
 - **Documentation**: Maintain up-to-date documentation for all features// Test comment for commit hook testing
+// Test commit with corrected hook order
