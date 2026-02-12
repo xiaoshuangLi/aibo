@@ -20,6 +20,7 @@ An advanced autonomous programming AI assistant with full local filesystem acces
 - ✅ **AI Thinking Capability**: Enhanced reasoning and problem-solving through enabled thinking mode in all AI Agent interactions
 - ✅ **Tencent Cloud ASR Voice Input**: Real-time voice input support using Tencent Cloud's official ASR service with microphone audio capture and speech-to-text conversion. Supports both `/voice` command (5-second fixed recording) and double-click spacebar for intuitive voice input (double-click to start recording, double-click again to stop)
 - ✅ **Tencent Cloud WSA Web Search**: Default integrated web search functionality using Tencent Cloud's official WSA (Web Search API) service based on Sogou search's public web resources. Provides structured search results with titles, summaries, URLs, and publication dates. Automatically available when Tencent Cloud credentials are configured.
+- ✅ **Fixed Interactive Utils Test Cases**: Corrected test cases in interactive-utils module to match actual implementation behavior, ensuring reliable testing and CI/CD pipelines.
 
 ## Environment Variables
 

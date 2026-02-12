@@ -35,7 +35,15 @@ export const styled = {
    * @param args - 工具参数对象
    * @returns 格式化的工具调用消息字符串
    */
-  toolCall: (name: string, args: any) => `\n🔧 正在调用工具: ${name}\n   参数: ${JSON.stringify(args, null, 2).split('\n').map(l => '   ' + l).join('\n').trim()}`,
+  toolCall: (name: string, args: any) => {
+    if (name === 'task' && args?.subagent_type) {
+      // 优化 task 工具的展示形式
+      const subagentType = args.subagent_type;
+      const description = args.description || '执行复杂任务';
+      return `\n🧠 正在委派任务给 ${subagentType} 代理\n   任务描述: ${description}`;
+    }
+    return `\n🔧 正在调用工具: ${name}\n   参数: ${JSON.stringify(args, null, 2).split('\n').map(l => '   ' + l).join('\n').trim()}`;
+  },
   
   /**
    * 工具结果样式
@@ -76,6 +84,50 @@ export const styled = {
    */
   truncated: (original: string, limit: number) => 
     original.length > limit ? original.substring(0, limit) + `... [已截断 ${original.length - limit} 字符]` : original,
+  
+  /**
+   * 深度思考过程样式
+   * 
+   * 中文名称：深度思考过程样式
+   * 
+   * 预期行为：
+   * - 接收思考步骤数组作为输入
+   * - 为每个思考步骤添加适当的前缀和格式
+   * - 返回格式化的深度思考过程字符串
+   * 
+   * 行为分支：
+   * 1. 空数组：返回空字符串
+   * 2. 单个步骤：显示单个思考步骤
+   * 3. 多个步骤：显示编号的思考步骤列表
+   * 
+   * @param steps - 思考步骤数组，每个步骤包含内容和可选的状态
+   * @returns 格式化的深度思考过程字符串
+   */
+  thinkingProcess: (steps: Array<{ content: string; status?: string }>) => {
+    if (!steps || steps.length === 0) return '';
+    
+    const formattedSteps = steps.map((step, index) => {
+      const emoji = step.status === 'completed' ? '✅' : step.status === 'in_progress' ? '🔄' : '💭';
+      return `\n${emoji} 步骤 ${index + 1}: ${step.content}`;
+    });
+    
+    return `\n🧠 深度思考过程:${formattedSteps.join('')}`;
+  },
+  
+  /**
+   * 详细思考模式提示
+   * 
+   * 中文名称：详细思考模式提示
+   * 
+   * 预期行为：
+   * - 显示进入详细思考模式的提示信息
+   * - 返回格式化的提示字符串
+   * 
+   * @param mode - 思考模式类型（如"干活模式"）
+   * @returns 格式化的详细思考模式提示字符串
+   */
+  detailedThinkingMode: (mode: string = "干活模式") => 
+    `\n🔍 进入${mode} - 展示完整思考过程...`,
 };
 
 // ============ 消息提取模块 ============
@@ -240,6 +292,7 @@ export function handleToolResult(msg: any, state: StreamState) {
  * - 解析JSON并提取关键信息（命令、文件路径、标准输出、标准错误等）
  * - 根据详细输出模式设置不同的截断长度
  * - 使用样式化输出显示工具结果
+ * - 特别优化 task 工具的结果展示
  * 
  * 行为分支：
  * 1. JSON解析成功：提取并格式化相关信息，显示成功/失败状态
@@ -247,6 +300,7 @@ export function handleToolResult(msg: any, state: StreamState) {
  * 3. 无输出内容：显示"无输出"提示
  * 4. 详细模式：使用更长的截断长度（200-300字符）
  * 5. 简略模式：使用较短的截断长度（60-150字符）
+ * 6. task工具结果：提供专门的友好展示格式
  * 
  * @param result - JSON格式的工具结果字符串
  * @param lastToolCall - 最后一次工具调用信息，用于获取工具名称
@@ -257,6 +311,24 @@ export function handleJsonToolResult(result: string, lastToolCall: any) {
     const parsed = JSON.parse(result);
     const success = parsed.success !== false;
     let preview = "";
+
+    // 特别处理 task 工具的结果
+    if (lastToolCall?.name === 'task') {
+      if (parsed.message) {
+        preview = `▸ 结果: ${styled.truncated(parsed.message, config.output.verbose ? 300 : 150)}`;
+      } else if (typeof parsed === 'string') {
+        preview = `▸ 结果: ${styled.truncated(parsed, config.output.verbose ? 300 : 150)}`;
+      } else {
+        preview = `▸ 任务已完成`;
+      }
+
+      console.log(styled.toolResult(
+        '子代理任务',
+        success,
+        preview
+      ));
+      return;
+    }
 
     if (parsed.command) {
       preview = `▸ 命令: ${styled.truncated(parsed.command, 80)}`;
@@ -296,21 +368,33 @@ export function handleJsonToolResult(result: string, lastToolCall: any) {
  * - 根据内容判断执行是否成功（检查是否包含错误标识符）
  * - 应用截断处理以控制输出长度
  * - 使用样式化输出显示工具结果
+ * - 特别优化 task 工具的文本结果展示
  * 
  * 行为分支：
  * 1. 包含"❌"或"失败"：标记为失败
  * 2. 不包含错误标识符：标记为成功
  * 3. 详细模式：截断长度为300字符
  * 4. 简略模式：截断长度为150字符
+ * 5. task工具结果：提供专门的友好展示格式
  * 
  * @param result - 文本格式的工具结果字符串
  * @param lastToolCall - 最后一次工具调用信息，用于获取工具名称
  * @returns void - 无返回值
  */
 export function handleTextToolResult(result: string, lastToolCall: any) {
-  const preview = styled.truncated(result, config.output.verbose ? 300 : 150);
+  // 特别处理 task 工具的结果
+  if (lastToolCall?.name === 'task') {
+    const name = lastToolCall?.args?.subagent_type === 'general-purpose'
+      ? '🧠 深度思考结果'
+      : '子代理任务';
+    const success = !result.includes("❌") && !result.includes("失败");
+    console.log(styled.toolResult(name, success, result));
+    console.log('\n');
+    return;
+  }
+  
   const success = !result.includes("❌") && !result.includes("失败");
-  console.log(styled.toolResult(lastToolCall?.name || "unknown", success, preview));
+  console.log(styled.toolResult(lastToolCall?.name || "unknown", success, result));
 }
 
 /**
@@ -365,16 +449,17 @@ export async function handleAIContent(msg: any, state: StreamState, userInput?: 
  * 预期行为：
  * - 接收消息对象和流状态
  * - 检查是否包含待办事项数组
- * - 过滤出非pending状态的待办事项（completed或in_progress）
+ * - 显示完整的思考过程，包括所有状态的待办事项
  * - 避免重复显示已显示的待办事项
- * - 显示AI思考提示和待办事项列表
+ * - 使用不同的图标表示不同状态的思考步骤
  * 
  * 行为分支：
  * 1. 无待办事项或已被中断：直接返回
- * 2. 无非pending状态的待办事项：直接返回
+ * 2. 无新待办事项：直接返回
  * 3. 首次显示待办事项：显示"AI正在思考..."提示
  * 4. 待办事项状态为completed：显示✅图标
- * 5. 待办事项状态为in_progress：显示🔄图标
+ * 5. 待办事项状态为in_progress：显示🔄图标  
+ * 6. 待办事项状态为pending：显示💭图标
  * 
  * @param msg - 消息对象，可能包含todos数组
  * @param state - 流状态对象，包含完整响应、思考提示状态和中断信号
@@ -383,21 +468,25 @@ export async function handleAIContent(msg: any, state: StreamState, userInput?: 
 export function handleTodos(msg: any, state: StreamState) {
   if (!Array.isArray(msg.todos) || state.abortSignal.aborted) return;
 
-  // 只显示非pending状态的todo（completed或in_progress），避免显示过多的pending任务
-  const nonPendingTodos = msg.todos.filter((todo: any) => 
-    (todo.status === 'completed' || todo.status === 'in_progress') && 
-    !state.fullResponse.includes(todo.content)
+  // 显示所有状态的待办事项（completed, in_progress, pending），提供完整的思考过程
+  const newTodos = msg.todos.filter((todo: any) => 
+    todo && todo.content && !state.fullResponse.includes(todo.content)
   );
 
-  if (nonPendingTodos.length === 0) return;
+  if (newTodos.length === 0) return;
 
   if (!state.hasDisplayedThinking) {
-    console.log('\n💭 AI 正在思考...');
+    console.log('\n🧠 AI 深度思考过程:');
     state.hasDisplayedThinking = true;
   }
 
-  nonPendingTodos.forEach((todo: any) => {
-    const emoji = todo.status === 'completed' ? '✅' : '🔄';
+  newTodos.forEach((todo: any) => {
+    let emoji = '💭'; // 默认为pending状态
+    if (todo.status === 'completed') {
+      emoji = '✅';
+    } else if (todo.status === 'in_progress') {
+      emoji = '🔄';
+    }
     console.log(`\n${emoji} ${todo.content}`);
   });
 }
@@ -484,9 +573,22 @@ export async function processStreamChunks(
         // 跳过用户消息，只处理 AI 助手、工具调用等消息
         if (msg.role === 'user') continue;
         
+        // 标记消息是否已被处理，避免重复处理
+        let processedAsToolResult = false;
+        
         handleToolCall(msg, state);
-        handleToolResult(msg, state);
-        await handleAIContent(msg, state, userInput);
+        
+        // 如果是工具结果消息，处理后标记为已处理
+        if (msg.tool_call_id) {
+          handleToolResult(msg, state);
+          processedAsToolResult = true;
+        }
+        
+        // 只有不是工具结果的消息才进行AI内容流处理
+        if (!processedAsToolResult) {
+          await handleAIContent(msg, state, userInput);
+        }
+        
         if (todos.length) handleTodos({ ...msg, todos }, state);
       }
     }
