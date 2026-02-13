@@ -1,26 +1,30 @@
+import { styled } from '../../src/presentation/styling/output-styler';
+import { extractMessagesAndTodos } from '../../src/core/agent/message-processor';
 import { 
-  styled, 
-  extractMessagesAndTodos, 
   handleToolCall, 
   handleToolResult, 
   handleJsonToolResult, 
   handleTextToolResult, 
   handleAIContent, 
   handleTodos,
+  processStreamChunks,
+  StreamState
+} from '../../src/core/agent/stream-handler';
+import { 
   showPrompt,
   handleUserInput,
-  processStreamChunks,
-  createGracefulShutdown,
   startInputLoop,
-} from '../../src/utils/interactive-utils';
+  Session
+} from '../../src/presentation/console/user-input-handler';
+import { createGracefulShutdown } from '../../src/core/session/graceful-shutdown';
 
 import { HumanMessage } from 'langchain';
-import { config } from '../../src/config';
-import { structuredLog } from '../../src/utils/logging';
-import { shouldExitInteractiveMode, isEmptyInput } from '../../src/interactive-logic';
+import { config } from '../../src/core/config/config';
+import { structuredLog } from '../../src/shared/utils/logging';
+import { shouldExitInteractiveMode, isEmptyInput } from '../../src/core/session/interactive-logic';
 
 // ===== 模拟外部依赖 =====
-jest.mock('../../src/config', () => ({
+jest.mock('../../src/core/config/Config', () => ({
   config: {
     output: {
       verbose: false,
@@ -29,14 +33,14 @@ jest.mock('../../src/config', () => ({
 }));
 
 const setVerboseMode = (verbose: boolean) => {
-  jest.mocked(require('../../src/config')).config.output.verbose = verbose;
+  jest.mocked(require('../../src/core/config/Config')).config.output.verbose = verbose;
 };
 
-jest.mock('../../src/utils/logging', () => ({
+jest.mock('../../src/shared/utils/logging', () => ({
   structuredLog: jest.fn(),
 }));
 
-jest.mock('../../src/interactive-logic', () => ({
+jest.mock('../../src/core/session/interactive-logic', () => ({
   shouldExitInteractiveMode: jest.fn(),
   isEmptyInput: jest.fn(),
   createConsoleThreadId: jest.fn(),
@@ -888,8 +892,8 @@ describe('Edge Cases for 100% Coverage', () => {
 
     it('should use longer truncation limits in verbose mode', () => {
       // Set verbose mode
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = true;
       
       try {
         const lastToolCall = { name: 'verboseTool' };
@@ -913,14 +917,14 @@ describe('Edge Cases for 100% Coverage', () => {
         expect(logCall).toBeTruthy();
       } finally {
         // Restore original config
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should use shorter truncation limits in non-verbose mode', () => {
       // Ensure non-verbose mode
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = false;
       
       try {
         const lastToolCall = { name: 'normalTool' };
@@ -942,13 +946,13 @@ describe('Edge Cases for 100% Coverage', () => {
         expect(logCall).toBeTruthy();
       } finally {
         // Restore original config
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle stderr in verbose mode', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = true;
       
       try {
         const lastToolCall = { name: 'stderrTool' };
@@ -967,13 +971,13 @@ describe('Edge Cases for 100% Coverage', () => {
           expect.stringContaining('[已截断')
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle invalid JSON in catch block', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = true;
       
       try {
         const lastToolCall = { name: 'invalidJson' };
@@ -989,7 +993,7 @@ describe('Edge Cases for 100% Coverage', () => {
         // But we should still verify it goes to catch block
         expect(mockConsoleLog).toHaveBeenCalled();
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
   });
@@ -1130,8 +1134,8 @@ describe('Missing Coverage Tests', () => {
     });
 
     it('should handle stderr with non-empty content', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = false;
       
       try {
         const lastToolCall = { name: 'errorTool' };
@@ -1149,13 +1153,13 @@ describe('Missing Coverage Tests', () => {
           expect.stringContaining('Error: command not found')
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle stderr with verbose mode', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = true;
       
       try {
         const lastToolCall = { name: 'verboseErrorTool' };
@@ -1175,15 +1179,15 @@ describe('Missing Coverage Tests', () => {
           expect.stringContaining('[已截断')
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
   });
 
   describe('handleTextToolResult', () => {
     it('should handle text tool result in verbose mode', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = true;
       
       try {
         const lastToolCall = { name: 'textToolVerbose' };
@@ -1202,13 +1206,13 @@ describe('Missing Coverage Tests', () => {
           expect.stringContaining(longResult)
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle text tool result with failure indicators', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = false;
       
       try {
         const lastToolCall = { name: 'failingTextTool' };
@@ -1226,13 +1230,13 @@ describe('Missing Coverage Tests', () => {
           expect.stringContaining('失败')
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle text tool result in non-verbose mode', () => {
-      const originalConfig = { ...require('../../src/config').config };
-      require('../../src/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config/Config').config };
+      require('../../src/core/config/Config').config.output.verbose = false;
       
       try {
         const lastToolCall = { name: 'textToolNormal' };
@@ -1251,7 +1255,7 @@ describe('Missing Coverage Tests', () => {
           expect.stringContaining(longResult)
         );
       } finally {
-        require('../../src/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config/Config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
@@ -1440,3 +1444,4 @@ describe('processStreamChunks completion indicator', () => {
       expect(mockStdoutWrite).not.toHaveBeenCalledWith('.');
     });
   });
+;

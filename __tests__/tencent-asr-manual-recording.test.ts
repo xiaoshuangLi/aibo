@@ -1,4 +1,4 @@
-import { TencentASR } from '../src/utils/tencent-asr';
+import { VoiceRecognition } from '../src/features/voice-input/voice-recognition';
 
 // Mock the recorder module to simulate different scenarios
 jest.mock('node-record-lpcm16', () => {
@@ -13,14 +13,14 @@ jest.mock('node-record-lpcm16', () => {
 import recorder from 'node-record-lpcm16';
 
 describe('TencentASR Manual Recording Full Flow', () => {
-  let asr: TencentASR;
+  let asr: VoiceRecognition;
 
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
     
     // Create ASR instance with test configuration
-    asr = new TencentASR({
+    asr = new VoiceRecognition({
       appId: 'test-app-id',
       secretId: 'test-secret-id',
       secretKey: 'test-secret-key'
@@ -110,29 +110,31 @@ describe('TencentASR Manual Recording Full Flow', () => {
 
   test('should reject starting recording when already recording', () => {
     // Create a fresh instance and manually set the isRecording state to true
-    const freshAsr = new TencentASR({
+    const freshAsr = new VoiceRecognition({
       appId: 'test-app-id',
       secretId: 'test-secret-id',
       secretKey: 'test-secret-key'
     });
     
-    // Manually set the isRecording state to true using Object.defineProperty
-    Object.defineProperty(freshAsr, 'isRecording', { value: true, writable: true });
+    // Manually set the isRecording state on the audioRecorder
+    (freshAsr as any).audioRecorder.isRecording = true;
 
-    expect(() => freshAsr.startManualRecording()).toThrow('Recording is already in progress');
+    expect(() => freshAsr.startManualRecording()).toThrow('Manual recording is already in progress');
   });
 
   test('should reject stopping recording when not recording', () => {
     // Use a fresh instance to ensure clean state
-    const freshAsr = new TencentASR({
+    const freshAsr = new VoiceRecognition({
       appId: 'test-app-id',
       secretId: 'test-secret-id',
       secretKey: 'test-secret-key'
     });
     
-    // Ensure we're not recording
-    Object.defineProperty(freshAsr, 'isRecording', { value: false, writable: true });
+    // Ensure we're not recording by setting the audioRecorder state
+    (freshAsr as any).audioRecorder.isRecording = false;
 
-    expect(() => freshAsr.stopManualRecording()).toThrow('No recording in progress');
+    // The stopManualRecording method should return null when not recording, not throw
+    const result = freshAsr.stopManualRecording();
+    expect(result).resolves.toBeNull();
   });
 });

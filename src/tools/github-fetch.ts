@@ -99,6 +99,8 @@ export const webFetchFromGithubTool = tool(
   async ({ owner, repo, path, branch = "main" }) => {
     try {
       const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/ref/heads/${branch}/${path}`;
+
+      console.log('🐧', githubUrl);
       
       const response = await axios.get(githubUrl, {
         timeout: 10000,
@@ -106,7 +108,7 @@ export const webFetchFromGithubTool = tool(
           'User-Agent': 'Mozilla/5.0 (compatible; AIBO Bot/1.0; +https://github.com/your-repo/aibo)'
         }
       });
-      
+
       // Limit response size to prevent memory issues
       const content = response.data.substring(0, 100000); // Limit to 100KB
       

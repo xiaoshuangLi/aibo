@@ -1,4 +1,4 @@
-import { TencentASR } from '../src/utils/tencent-asr';
+import { VoiceRecognition } from '../src/features/voice-input/voice-recognition';
 
 // Mock the recorder module to simulate different scenarios
 jest.mock('node-record-lpcm16', () => {
@@ -13,14 +13,14 @@ jest.mock('node-record-lpcm16', () => {
 import recorder from 'node-record-lpcm16';
 
 describe('TencentASR Manual Recording Core Functionality', () => {
-  let asr: TencentASR;
+  let asr: VoiceRecognition;
 
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
     
     // Create ASR instance with test configuration
-    asr = new TencentASR({
+    asr = new VoiceRecognition({
       appId: 'test-app-id',
       secretId: 'test-secret-id',
       secretKey: 'test-secret-key'

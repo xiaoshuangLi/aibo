@@ -3,7 +3,7 @@ jest.mock('dotenv', () => ({
   config: jest.fn()
 }));
 
-import { config } from '../src/config';
+import { config } from '../src/core/config/Config';
 
 describe('Configuration Module', () => {
   // 保存原始环境变量
@@ -27,7 +27,7 @@ describe('Configuration Module', () => {
     process.env.OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     
     // 重新导入配置模块
-    const { config: testConfig } = require('../src/config');
+    const { config: testConfig } = require('../src/core/config/Config');
     
     expect(testConfig.openai.apiKey).toBe('sk-test12345678901234567890123456789012');
     expect(testConfig.openai.modelName).toBe('gpt-4o'); // 默认值
@@ -46,7 +46,7 @@ describe('Configuration Module', () => {
     process.env.MEMORY_WINDOW_SIZE = '10';
     process.env.VERBOSE_OUTPUT = 'true';
     
-    const { config: testConfig } = require('../src/config');
+    const { config: testConfig } = require('../src/core/config/Config');
     
     expect(testConfig.openai.apiKey).toBe('sk-custom12345678901234567890123456789012');
     expect(testConfig.openai.baseURL).toBe('https://custom-api.example.com/v1');
@@ -61,7 +61,7 @@ describe('Configuration Module', () => {
     delete process.env.OPENAI_API_KEY;
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
   });
 
@@ -69,7 +69,7 @@ describe('Configuration Module', () => {
     process.env.OPENAI_API_KEY = '';
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
   });
 
@@ -78,7 +78,7 @@ describe('Configuration Module', () => {
     process.env.OPENAI_BASE_URL = 'not-a-url';
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
   });
 
@@ -86,7 +86,7 @@ describe('Configuration Module', () => {
     process.env.OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     process.env.OPENAI_BASE_URL = 'https://api.openai.com/v1';
     
-    const { config: testConfig } = require('../src/config');
+    const { config: testConfig } = require('../src/core/config/Config');
     
     expect(testConfig.openai.baseURL).toBe('https://api.openai.com/v1');
   });
@@ -96,17 +96,17 @@ describe('Configuration Module', () => {
     process.env.RECURSION_LIMIT = '0';
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
     
     process.env.RECURSION_LIMIT = '-100';
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
     
     process.env.RECURSION_LIMIT = 'abc';
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
   });
 
@@ -115,7 +115,7 @@ describe('Configuration Module', () => {
     process.env.MEMORY_WINDOW_SIZE = '0';
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
   });
 
@@ -124,17 +124,17 @@ describe('Configuration Module', () => {
     process.env.CHECKPOINTER_TYPE = 'invalid';
     
     expect(() => {
-      require('../src/config');
+      require('../src/core/config/Config');
     }).toThrow();
     
     process.env.CHECKPOINTER_TYPE = 'memory';
-    const { config: testConfig1 } = require('../src/config');
+    const { config: testConfig1 } = require('../src/core/config/Config');
     expect(testConfig1.langgraph.checkpointerType).toBe('memory');
     
     // 重置模块缓存
     jest.resetModules();
     process.env.CHECKPOINTER_TYPE = 'sqlite';
-    const { config: testConfig2 } = require('../src/config');
+    const { config: testConfig2 } = require('../src/core/config/Config');
     expect(testConfig2.langgraph.checkpointerType).toBe('sqlite');
   });
 });

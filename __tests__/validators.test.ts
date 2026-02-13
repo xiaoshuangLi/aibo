@@ -3,7 +3,7 @@ import {
   isValidUrl, 
   isValidModelName, 
   isValidPositiveInteger 
-} from '../src/validators';
+} from '../src/shared/utils/validators';
 
 describe('Validation Utilities', () => {
   describe('isValidApiKey', () => {

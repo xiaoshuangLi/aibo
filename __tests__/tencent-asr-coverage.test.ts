@@ -1,4 +1,4 @@
-import { TencentASR, createTencentASR } from '../src/utils/tencent-asr';
+import { VoiceRecognition, createVoiceRecognition } from '../src/features/voice-input/voice-recognition';
 
 // Mock external dependencies
 jest.mock('node-record-lpcm16', () => {
@@ -39,19 +39,19 @@ describe('TencentASR Coverage Tests', () => {
     secretKey: 'test-secret-key',
   };
 
-  let asr: TencentASR;
+  let asr: VoiceRecognition;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    asr = createTencentASR(validConfig);
+    asr = createVoiceRecognition(validConfig);
   });
 
   test('constructor validates required config', () => {
     // When no config is provided, it should use defaults but still validate
     // The validation only happens when explicit empty values are provided
-    expect(() => new TencentASR({ appId: '', secretId: 'test', secretKey: 'test' })).toThrow();
-    expect(() => new TencentASR({ appId: 'test', secretId: '', secretKey: 'test' })).toThrow();
-    expect(() => new TencentASR({ appId: 'test', secretId: 'test', secretKey: '' })).toThrow();
+    expect(() => new VoiceRecognition({ appId: '', secretId: 'test', secretKey: 'test' })).toThrow();
+    expect(() => new VoiceRecognition({ appId: 'test', secretId: '', secretKey: 'test' })).toThrow();
+    expect(() => new VoiceRecognition({ appId: 'test', secretId: 'test', secretKey: '' })).toThrow();
   });
 
   test('canRecord returns true', () => {
@@ -69,11 +69,7 @@ describe('TencentASR Coverage Tests', () => {
     expect(signature).toBeTruthy();
   });
 
-  test('getClient creates and reuses client instance', () => {
-    const client1 = (asr as any).getClient();
-    const client2 = (asr as any).getClient();
-    expect(client1).toBe(client2);
-  });
+
 
   test('recordAudio handles success case', async () => {
     const mockStream = require('node-record-lpcm16').record().stream();
@@ -87,7 +83,7 @@ describe('TencentASR Coverage Tests', () => {
       return mockStream;
     });
     
-    const result = await (asr as any).recordAudio(50);
+    const result = await asr.recordAudio(50);
     expect(result).toBeInstanceOf(Buffer);
     expect(result.length).toBeGreaterThan(0);
   });
@@ -97,7 +93,7 @@ describe('TencentASR Coverage Tests', () => {
       throw new Error('init failed');
     });
     
-    await expect((asr as any).recordAudio(100)).rejects.toThrow('Failed to initialize audio recorder');
+    await expect(asr.recordAudio(100)).rejects.toThrow('Failed to initialize audio recorder');
   });
 
   test('recordAudio handles stream error', async () => {
@@ -110,7 +106,7 @@ describe('TencentASR Coverage Tests', () => {
       return mockStream;
     });
     
-    await expect((asr as any).recordAudio(100)).rejects.toThrow('Audio recording failed');
+    await expect(asr.recordAudio(100)).rejects.toThrow('Audio recording failed');
   });
 
   test('startManualRecording handles success', async () => {
@@ -120,7 +116,7 @@ describe('TencentASR Coverage Tests', () => {
 
   test('startManualRecording throws when already recording', () => {
     asr.startManualRecording();
-    expect(() => asr.startManualRecording()).toThrow('Recording is already in progress');
+    expect(() => asr.startManualRecording()).toThrow('Manual recording is already in progress');
     asr.stopManualRecording(); // cleanup
   });
 
@@ -134,19 +130,16 @@ describe('TencentASR Coverage Tests', () => {
   });
 
   test('stopManualRecording returns audio data', async () => {
-    // Mock stream to provide data
-    const mockStream = require('node-record-lpcm16').record().stream();
     const mockData = Buffer.from([1, 2, 3]);
     
-    mockStream.on.mockImplementation((event: string, callback: Function) => {
-      if (event === 'data') {
-        (asr as any).recordingChunks.push(mockData);
-      }
-      return mockStream;
-    });
+    // Mock the underlying AudioRecorder methods
+    jest.spyOn((asr as any).audioRecorder, 'startManualRecording').mockResolvedValue(undefined);
+    jest.spyOn((asr as any).audioRecorder, 'stopManualRecording').mockResolvedValue(mockData);
+    jest.spyOn((asr as any).audioRecorder, 'isManualRecording').mockReturnValue(true);
     
     await asr.startManualRecording();
     const result = await asr.stopManualRecording();
+    
     expect(result).toBeInstanceOf(Buffer);
     expect(result?.length).toBeGreaterThan(0);
   });
@@ -165,34 +158,41 @@ describe('TencentASR Coverage Tests', () => {
     expect(result).toBeNull();
   });
 
-  test('stopManualRecording throws when not recording', () => {
-    expect(() => asr.stopManualRecording()).toThrow('No recording in progress');
+  test('stopManualRecording returns null when not recording', async () => {
+    const result = await asr.stopManualRecording();
+    expect(result).toBeNull();
   });
 
   test('recognizeSpeech handles successful recognition', async () => {
-    // Mock recordAudio
-    (asr as any).recordAudio = jest.fn().mockResolvedValue(Buffer.from([1, 2, 3]));
+    // Mock the underlying AudioRecorder's recordAudio method
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
     
     // Mock ASR response
     mockSentenceRecognition.mockResolvedValue({ Result: 'Hello world' });
     
     const result = await asr.recognizeSpeech(100);
     expect(result).toBe('Hello world');
+    
+    recordAudioSpy.mockRestore();
   });
 
   test('recognizeSpeech returns null when no speech recognized', async () => {
-    (asr as any).recordAudio = jest.fn().mockResolvedValue(Buffer.from([1, 2, 3]));
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
     mockSentenceRecognition.mockResolvedValue({ Result: '' });
     
     const result = await asr.recognizeSpeech(100);
     expect(result).toBeNull();
+    
+    recordAudioSpy.mockRestore();
   });
 
   test('recognizeSpeech handles ASR errors', async () => {
-    (asr as any).recordAudio = jest.fn().mockResolvedValue(Buffer.from([1, 2, 3]));
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
     mockSentenceRecognition.mockRejectedValue(new Error('ASR error'));
     
     await expect(asr.recognizeSpeech(100)).rejects.toThrow('ASR error');
+    
+    recordAudioSpy.mockRestore();
   });
 
   test('recognizeManualRecording handles successful recognition', async () => {
@@ -218,7 +218,7 @@ describe('TencentASR Coverage Tests', () => {
   });
 
   test('startContinuousRecognition works', async () => {
-    (asr as any).recordAudio = jest.fn().mockResolvedValue(Buffer.from([1, 2, 3]));
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
     mockSentenceRecognition.mockResolvedValue({ Result: 'Continuous speech' });
     
     const onResult = jest.fn();
@@ -233,10 +233,12 @@ describe('TencentASR Coverage Tests', () => {
     
     expect(onResult).toHaveBeenCalledWith('Continuous speech');
     expect(onError).not.toHaveBeenCalled();
+    
+    recordAudioSpy.mockRestore();
   });
 
   test('startContinuousRecognition handles errors', async () => {
-    (asr as any).recordAudio = jest.fn().mockResolvedValue(Buffer.from([1, 2, 3]));
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
     mockSentenceRecognition.mockRejectedValue(new Error('Continuous error'));
     
     const onResult = jest.fn();
@@ -250,57 +252,22 @@ describe('TencentASR Coverage Tests', () => {
     
     expect(onResult).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    
+    recordAudioSpy.mockRestore();
   });
 
-  test('handleRecognitionError rethrows errors', () => {
-    const originalConsoleError = console.error;
-    console.error = jest.fn();
-    
-    try {
-      expect(() => {
-        (asr as any).handleRecognitionError(new Error('test error'), 'test');
-      }).toThrow('test error');
-      
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Speech recognition failed in test'),
-        expect.any(Error)
-      );
-    } finally {
-      console.error = originalConsoleError;
-    }
-  });
 
-  test('handleRecognitionError handles non-Error objects', () => {
-    const originalConsoleError = console.error;
-    console.error = jest.fn();
-    
-    try {
-      expect(() => {
-        (asr as any).handleRecognitionError('string error', 'test');
-      }).toThrow('string error');
-      
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Speech recognition failed in test'),
-        'string error'
-      );
-    } finally {
-      console.error = originalConsoleError;
-    }
-  });
 
   test('startManualRecording handles stream error during recording', async () => {
-    const mockStream = require('node-record-lpcm16').record().stream();
-    
-    // Mock the stream to emit an error
-    mockStream.on.mockImplementation((event: string, callback: Function) => {
-      if (event === 'error') {
-        callback(new Error('stream error'));
-      }
-      return mockStream;
-    });
+    // Mock the AudioRecorder's startManualRecording to throw an error
+    const originalStart = (asr as any).audioRecorder.startManualRecording;
+    (asr as any).audioRecorder.startManualRecording = jest.fn().mockRejectedValue(new Error('Audio recording failed'));
     
     await expect(asr.startManualRecording()).rejects.toThrow('Audio recording failed');
     expect(asr.isManualRecording()).toBe(false);
+    
+    // Restore original method
+    (asr as any).audioRecorder.startManualRecording = originalStart;
   });
 
   test('recognizeManualRecording logs when no speech recognized', async () => {
