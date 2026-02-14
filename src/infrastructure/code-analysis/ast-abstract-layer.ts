@@ -20,9 +20,9 @@
  * @class AstAbstractLayer
  */
 import path from 'path';
-import { LspTool } from './lsp-tool';
-import { TreeSitterTool } from './tree-sitter-tool';
-import { SymbolTable, SymbolInfo } from './symbol-table';
+import { LspTool } from '@/infrastructure/code-analysis/lsp-tool';
+import { TreeSitterTool } from '@/infrastructure/code-analysis/tree-sitter-tool';
+import { SymbolTable, SymbolInfo } from '@/infrastructure/code-analysis/symbol-table';
 
 /**
  * AST抽象层配置

@@ -1,7 +1,7 @@
-import { AstAbstractLayer } from '../../../src/infrastructure/code-analysis/ast-abstract-layer';
-import { LspTool } from '../../../src/infrastructure/code-analysis/lsp-tool';
-import { TreeSitterTool } from '../../../src/infrastructure/code-analysis/tree-sitter-tool';
-import { SymbolTable } from '../../../src/infrastructure/code-analysis/symbol-table';
+import { AstAbstractLayer } from '@/infrastructure/code-analysis/ast-abstract-layer';
+import { LspTool } from '@/infrastructure/code-analysis/lsp-tool';
+import { TreeSitterTool } from '@/infrastructure/code-analysis/tree-sitter-tool';
+import { SymbolTable } from '@/infrastructure/code-analysis/symbol-table';
 
 // Mock all dependencies
 jest.mock('../../../src/infrastructure/code-analysis/lsp-tool');

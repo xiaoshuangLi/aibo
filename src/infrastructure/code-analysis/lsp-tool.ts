@@ -12,8 +12,8 @@
  * @module lsp-tool
  */
 import path from 'path';
-import { LspServiceManager } from './lsp-service-manager';
-import { Position } from './lsp-client';
+import { LspServiceManager } from '@/infrastructure/code-analysis/lsp-service-manager';
+import { Position } from '@/infrastructure/code-analysis/lsp-client';
 
 /**
  * LSP工具配置

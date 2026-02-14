@@ -21,7 +21,7 @@ import axios from "axios";
  * 3. HTTP错误：GitHub返回4xx/5xx状态码，返回包含错误信息的JSON
  * 4. 内容截断：响应内容超过100KB时自动截断，但仍标记为成功
  * 5. 分支未指定：使用"main"作为默认分支
- * 6. URL构建：始终使用raw.githubusercontent.com域名和ref/heads/路径格式
+ * 6. URL构建：始终使用raw.githubusercontent.com域名和refs/heads/路径格式
  * 
  * @param owner - GitHub仓库所有者或组织名称
  * @param repo - 仓库名称
@@ -85,7 +85,7 @@ function handleGithubFetchError(error: unknown, owner: string, repo: string, pat
     errorMessage = String(error);
   }
   
-  const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/ref/heads/${branch}/${path}`;
+  const githubUrl = `https://gh.llkk.cc/https://raw.githubusercontent.com/${owner}/${repo}/refs/heads/${branch}/${path}`;
   
   return JSON.stringify({
     success: false,
@@ -98,7 +98,7 @@ function handleGithubFetchError(error: unknown, owner: string, repo: string, pat
 export const webFetchFromGithubTool = tool(
   async ({ owner, repo, path, branch = "main" }) => {
     try {
-      const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/ref/heads/${branch}/${path}`;
+      const githubUrl = `https://gh.llkk.cc/https://raw.githubusercontent.com/${owner}/${repo}/refs/heads/${branch}/${path}`;
 
       console.log('🐧', githubUrl);
       
@@ -138,4 +138,11 @@ export const webFetchFromGithubTool = tool(
   }
 );
 
-export default [webFetchFromGithubTool];
+/**
+ * 异步获取 GitHub 内容获取工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含 GitHub 工具的数组
+ */
+export default async function getGithubFetchTools() {
+  return [webFetchFromGithubTool];
+}

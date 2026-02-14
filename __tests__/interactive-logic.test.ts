@@ -4,7 +4,7 @@ import {
   formatAgentResponse, 
   isValidThreadId, 
   createConsoleThreadId 
-} from '../src/core/session/interactive-logic';
+} from '@/core/utils';
 
 describe('Interactive Logic Utilities', () => {
   describe('shouldExitInteractiveMode', () => {

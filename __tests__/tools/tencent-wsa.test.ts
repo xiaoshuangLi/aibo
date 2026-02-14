@@ -1,4 +1,4 @@
-import { tencentWsaSearchTool } from '../../src/tools/tencent-wsa';
+import { tencentWsaSearchTool } from '@/tools/tencent-wsa';
 
 describe('Tencent WSA Search Tool', () => {
   // Skip actual API calls in tests to avoid external dependencies

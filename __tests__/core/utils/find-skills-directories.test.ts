@@ -1,4 +1,4 @@
-import { findSkillsDirectories } from '../../../src/core/utils/find-skills-directories';
+import { findSkillsDirectories } from '@/core/utils';
 import { join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';
 import { rm } from 'fs/promises';

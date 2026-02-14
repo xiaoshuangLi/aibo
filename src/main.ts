@@ -1,7 +1,7 @@
-import { config } from './core/config/config';
-import { structuredLog } from './shared/utils/logging';
-import { startInteractiveMode } from './presentation/console/interactive-mode';
-import { createAIAgent } from './core/agent/agent-factory';
+import { config } from '@/core/config/config';
+import { structuredLog } from '@/shared/utils/logging';
+import { startInteractiveMode } from '@/presentation/console/interactive-mode';
+import { createAIAgent } from '@/core/agent/agent-factory';
 
 /**
  * Main entry point module for the AIBO AI Assistant application.
@@ -60,7 +60,7 @@ export async function main() {
 
   try {
     structuredLog('info', 'AI Agent initialized successfully', { component: 'main' });
-    return createAIAgent();
+    return await createAIAgent();
   } catch (error: any) {
     structuredLog('error', 'Failed to initialize AI Agent', { 
       component: 'main', 

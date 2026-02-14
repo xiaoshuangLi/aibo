@@ -1,4 +1,4 @@
-import { structuredLog } from '../../src/shared/utils/logging';
+import { structuredLog } from '@/shared/utils/logging';
 
 describe('utils/logging', () => {
   let consoleLogSpy: jest.SpyInstance;

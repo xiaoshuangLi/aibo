@@ -1,6 +1,6 @@
-import { createConsoleThreadId } from './interactive-logic';
-import { createGracefulShutdown } from '../session/graceful-shutdown';
-import { showPrompt } from '../../presentation/console/user-input-handler';
+import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { createGracefulShutdown } from '@/core/session/graceful-shutdown';
+import { showPrompt } from '@/presentation/console/user-input-handler';
 
 /**
  * Session Manager module that handles session state management and lifecycle.
@@ -78,7 +78,7 @@ export function createSessionState(rl: any) {
  * setupExitHandlers(session, rl, gracefulShutdown); // 设置退出处理器
  * ```
  */
-export function setupExitHandlers(session: any, rl: any, gracefulShutdown: any): void {
+export function setupExitHandlers(session: any, gracefulShutdown: any): void {
   process.on('SIGINT', () => {
     if (session.voiceASR && session.isVoiceRecording) {
       try {
@@ -106,7 +106,7 @@ export function setupExitHandlers(session: any, rl: any, gracefulShutdown: any):
   
   // Handle Ctrl+C in readline with double-press confirmation
   let lastInterrupt = 0;
-  rl.on('SIGINT', () => {
+  session.rl.on('SIGINT', () => {
     const now = Date.now();
     
     if (session.isRunning && session.abortController) {
@@ -126,12 +126,12 @@ export function setupExitHandlers(session: any, rl: any, gracefulShutdown: any):
       session.voiceASR = null;
       console.log('\x1b[36m🎙️ 语音输入已取消\x1b[0m');
       // Show prompt after canceling voice input
-      showPrompt(session, rl);
+      showPrompt(session);
     } else {
       // Double-press quick exit
       if (now - lastInterrupt < 500) {
         console.log('\x1b[36m\n👋 双击确认，立即退出...\x1b[0m');
-        rl.close();
+        session.rl.close();
         process.exit(0);
       } else {
         console.log('\x1b[36m\n👋 检测到退出请求 (再次 Ctrl+C 确认退出)\x1b[0m');

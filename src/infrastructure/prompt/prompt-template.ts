@@ -3,8 +3,8 @@ import {
   SYSTEM_PROMPT_EN, 
   SYSTEM_PROMPT_ZH, 
   SYSTEM_PROMPT 
-} from '../../shared/constants/system-prompts';
-import { PromptLanguage, SystemPromptConfig, EnhancedSystemPrompt } from '../../shared/types/prompt-types';
+} from '@/shared/constants/system-prompts';
+import { PromptLanguage, SystemPromptConfig, EnhancedSystemPrompt } from '@/shared/types/prompt-types';
 
 /**
  * Prompt template manager for AIBO autonomous programming AI

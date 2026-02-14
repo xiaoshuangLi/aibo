@@ -20,7 +20,7 @@
  * @class LspServiceManager
  */
 import path from 'path';
-import { LspClient, LspClientConfig, Position } from './lsp-client';
+import { LspClient, LspClientConfig, Position } from '@/infrastructure/code-analysis/lsp-client';
 
 /**
  * 支持的语言映射

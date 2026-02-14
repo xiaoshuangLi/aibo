@@ -8,7 +8,7 @@
  * @module graceful-shutdown
  */
 
-import { structuredLog } from '../../shared/utils/logging';
+import { structuredLog } from '@/shared/utils/logging';
 
 /**
  * 会话接口（用于关闭处理器）

@@ -20,12 +20,12 @@
  * @class HybridCodeReader
  */
 import path from 'path';
-import { LspTool, LspToolConfig } from './lsp-tool';
-import { TreeSitterTool, TreeSitterToolConfig } from './tree-sitter-tool';
-import { SymbolTable, SymbolTableConfig } from './symbol-table';
-import { AstAbstractLayer, AstAbstractLayerConfig } from './ast-abstract-layer';
-import { CacheManager, CacheConfig } from './cache-manager';
-import { ContextSelector, ContextSelectorConfig, ContextRequestType } from './context-selector';
+import { LspTool, LspToolConfig } from '@/infrastructure/code-analysis/lsp-tool';
+import { TreeSitterTool, TreeSitterToolConfig } from '@/infrastructure/code-analysis/tree-sitter-tool';
+import { SymbolTable, SymbolTableConfig } from '@/infrastructure/code-analysis/symbol-table';
+import { AstAbstractLayer, AstAbstractLayerConfig } from '@/infrastructure/code-analysis/ast-abstract-layer';
+import { CacheManager, CacheConfig } from '@/infrastructure/code-analysis/cache-manager';
+import { ContextSelector, ContextSelectorConfig, ContextRequestType } from '@/infrastructure/code-analysis/context-selector';
 
 /**
  * 混合代码读取器配置

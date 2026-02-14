@@ -1,8 +1,8 @@
-import { config } from '../../core/config/config';
-import { styled } from '../styling/output-styler';
-import { createConsoleThreadId } from '../../core/session/interactive-logic';
-import { createVoiceRecognition } from '../../features/voice-input/voice-recognition';
-import { handleUserInput } from '../console/user-input-handler';
+import { config } from '@/core/config/config';
+import { styled } from '@/presentation/styling/output-styler';
+import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
+import { handleUserInput } from '@/presentation/console/user-input-handler';
 
 /**
  * Command Handlers module that provides internal command processing functionality.
@@ -227,7 +227,7 @@ export async function handleNewCommand(session: any): Promise<boolean> {
  * await handleVoiceCommand(session, agent, rl); // 启动语音输入
  * ```
  */
-export async function handleVoiceCommand(session: any, agent: any, rl: any): Promise<boolean> {
+export async function handleVoiceCommand(session: any, agent: any): Promise<boolean> {
   try {
     console.log(styled.system("🎙️ 启动语音输入模式..."));
     console.log(styled.system("🗣️ 请开始说话（5秒内）..."));
@@ -242,7 +242,7 @@ export async function handleVoiceCommand(session: any, agent: any, rl: any): Pro
     if (result) {
       console.log(styled.system(`🎯 识别结果: "${result}"`));
       // 将识别结果作为用户输入处理
-      await handleUserInput(result, session, agent, rl);
+      await handleUserInput(result, session, agent);
       return true;
     } else {
       console.log(styled.error("❌ 未识别到有效语音"));
@@ -275,9 +275,9 @@ export async function handleVoiceCommand(session: any, agent: any, rl: any): Pro
  * await handleExitCommand(rl); // 安全退出程序
  * ```
  */
-export async function handleExitCommand(rl: any): Promise<boolean> {
+export async function handleExitCommand(session: any): Promise<boolean> {
   console.log(styled.system("👋 正在安全退出..."));
-  rl.close();
+  session.rl.close();
   process.exit(0);
   return true;
 }
@@ -342,7 +342,7 @@ export async function handleUnknownCommand(command: string): Promise<boolean> {
  * await handleCommand("/help"); // 处理帮助命令
  * ```
  */
-export function createHandleInternalCommand(session: any, rl: any, agent: any): (command: string) => Promise<boolean> {
+export function createHandleInternalCommand(session: any, agent: any): (command: string) => Promise<boolean> {
   return async (command: string): Promise<boolean> => {
     switch (command) {
       case "/help":
@@ -365,13 +365,13 @@ export function createHandleInternalCommand(session: any, rl: any, agent: any): 
         
       case "/voice":
       case "/speech":
-        return await handleVoiceCommand(session, agent, rl);
+        return await handleVoiceCommand(session, agent);
         
       case "/exit":
       case "/quit":
       case "/q":
       case "/stop":
-        return await handleExitCommand(rl);
+        return await handleExitCommand(session);
         
       default:
         return await handleUnknownCommand(command);

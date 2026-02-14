@@ -19,8 +19,8 @@
  * 
  * @class ContextSelector
  */
-import { AstAbstractLayer, OptimizedContext } from './ast-abstract-layer';
-import { CacheManager } from './cache-manager';
+import { AstAbstractLayer, OptimizedContext } from '@/infrastructure/code-analysis/ast-abstract-layer';
+import { CacheManager } from '@/infrastructure/code-analysis/cache-manager';
 
 /**
  * 上下文请求类型

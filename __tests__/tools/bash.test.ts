@@ -1,4 +1,4 @@
-import { executeBashTool } from '../../src/tools/bash';
+import { executeBashTool } from '@/tools/bash';
 
 // Since the actual bash tool executes system commands, we'll test the structure
 // rather than the actual command execution for safety

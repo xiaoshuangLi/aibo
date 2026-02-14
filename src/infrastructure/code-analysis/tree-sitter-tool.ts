@@ -13,8 +13,8 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { TreeSitterParser } from './tree-sitter-parser';
-import { AstNodeInfo } from './tree-sitter-parser';
+import { TreeSitterParser } from '@/infrastructure/code-analysis/tree-sitter-parser';
+import { AstNodeInfo } from '@/infrastructure/code-analysis/tree-sitter-parser';
 
 /**
  * Tree-sitter工具配置

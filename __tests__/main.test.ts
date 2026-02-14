@@ -1,6 +1,6 @@
-import { main } from '../src/main';
-import { startInteractiveMode } from '../src/presentation/console/interactive-mode';
-import { createAIAgent } from '../src/core/agent/agent-factory';
+import { main } from '@/main';
+import { startInteractiveMode } from '@/presentation/console/interactive-mode';
+import { createAIAgent } from '@/core/agent/agent-factory';
 
 // Mock the dependencies
 jest.mock('../src/presentation/console/interactive-mode');

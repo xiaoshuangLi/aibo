@@ -4,6 +4,9 @@ export default {
   setupFiles: ['<rootDir>/jest.setup.ts'],
   roots: ['<rootDir>/__tests__'],
   moduleFileExtensions: ['ts', 'js'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
   },

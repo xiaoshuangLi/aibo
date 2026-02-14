@@ -1,41 +1,42 @@
 # [Feature Title]
 
-## 📋 功能概述 (Feature Overview)
+## 📋 Specification (规格说明)
 
-### 🎯 一句话描述
-[用一句话概括这个功能的核心价值和解决的问题]
+### 🎯 User Story
+作为[用户角色]，我想要[功能描述]，以便[业务价值]。
 
-### 💡 业务价值
-- **解决的问题**: [具体描述解决了什么问题或满足了什么需求]
-- **带来的价值**: [说明这个功能带来的主要好处]
-- **目标用户**: [明确功能的目标用户群体]
+### ✅ Acceptance Criteria
+- [ ] 条件1：具体的验收标准（必须是可测试的）
+- [ ] 条件2：具体的验收标准（必须是可测试的）  
+- [ ] 条件3：具体的验收标准（必须是可测试的）
 
-### 🔗 相关背景
-- **相关 Issue/PR**: [链接到相关的 GitHub Issue 或 PR]
-- **设计文档**: [如果有相关的设计文档链接]
-- **依赖项**: [列出此功能依赖的其他功能或服务]
+### ⚙️ Technical Constraints
+- **技术栈要求**: [指定的技术栈和版本]
+- **兼容性要求**: [浏览器/系统/设备兼容性]
+- **性能要求**: [响应时间、资源使用等具体指标]
+- **安全要求**: [安全相关的约束和标准]
 
 ---
 
-## 🏗️ 技术设计 (Technical Design)
+## 🏗️ Technical Design (技术设计)
 
-### 📐 架构概览
+### 📐 Architecture Overview
 [提供高层次的架构图或描述，说明功能在整体系统中的位置]
 
-### ⚙️ 核心实现
-#### 主要组件/模块
+### ⚙️ Core Implementation
+#### Main Components/Modules
 - **[组件名称]**: [简要描述组件职责和关键实现]
 - **[组件名称]**: [简要描述组件职责和关键实现]
 
-#### 关键技术决策
-- **决策 1**: [描述决策内容和原因]
-- **决策 2**: [描述决策内容和原因]
+#### Key Technical Decisions
+- **决策 1**: [描述决策内容、原因和替代方案]
+- **决策 2**: [描述决策内容、原因和替代方案]
 
-#### 数据流/状态管理
+#### Data Flow/State Management
 [描述数据如何在系统中流动，状态如何管理]
 
-### 🧩 API 变更
-#### 新增 API
+### 🧩 API Changes
+#### New APIs
 ```typescript
 // 示例：新增的 API 接口
 interface NewFeatureOptions {
@@ -46,7 +47,7 @@ interface NewFeatureOptions {
 function newFeature(options: NewFeatureOptions): Promise<Result>;
 ```
 
-#### 修改的 API
+#### Modified APIs
 ```typescript
 // 示例：修改的 API 接口
 // 原有:
@@ -56,17 +57,43 @@ function oldFunction(param: string): void;
 function oldFunction(param: string, options?: { newOption: boolean }): void;
 ```
 
-#### 废弃的 API
+#### Deprecated APIs
 - **[API 名称]**: [废弃原因和替代方案]
 
 ---
 
-## 🚀 使用指南 (Usage Guide)
+## 📝 Implementation Plan (实施计划)
 
-### 📦 安装/配置
+### 📋 Task Breakdown
+1. **[任务1]** - [具体描述] (预计: X小时)
+2. **[任务2]** - [具体描述] (预计: X小时)
+3. **[任务3]** - [具体描述] (预计: X小时)
+
+### 🔗 Dependencies
+- **Internal Dependencies**: [项目内其他模块]
+- **External Dependencies**: [第三方库/服务]
+- **Prerequisites**: [需要先完成的工作]
+
+### ⚠️ Risk Assessment
+| 风险 | 概率 | 影响 | 缓解措施 |
+|------|------|------|----------|
+| [风险1] | 高/中/低 | 高/中/低 | [具体措施] |
+| [风险2] | 高/中/低 | 高/中/低 | [具体措施] |
+
+### 🎯 Success Metrics
+- **功能完整性**: [完成度指标]
+- **代码质量**: [测试覆盖率/代码复杂度]
+- **性能指标**: [具体的性能目标]
+- **用户体验**: [用户满意度/易用性指标]
+
+---
+
+## 🚀 Usage Guide (使用指南)
+
+### 📦 Installation/Configuration
 [如果需要特殊的安装或配置步骤]
 
-### 🎮 基本使用
+### 🎮 Basic Usage
 ```typescript
 // 基本使用示例
 import { newFeature } from 'your-library';
@@ -77,7 +104,7 @@ const result = await newFeature({
 });
 ```
 
-### 🏆 高级用法
+### 🏆 Advanced Usage
 ```typescript
 // 高级用法示例
 // 场景 1: [描述场景]
@@ -88,30 +115,30 @@ const advancedResult = await newFeature({
 // 场景 2: [描述场景]
 ```
 
-### 🔄 迁移指南
-#### 从旧版本迁移
+### 🔄 Migration Guide
+#### Migration from Previous Versions
 [如果存在 Breaking Changes，提供详细的迁移步骤]
 
-#### 兼容性说明
-- **向后兼容**: [是/否]
-- **最低版本要求**: [版本号]
-- **已知限制**: [列出任何已知的限制或边界情况]
+#### Compatibility Notes
+- **Backward Compatible**: [是/否]
+- **Minimum Version Requirements**: [版本号]
+- **Known Limitations**: [列出任何已知的限制或边界情况]
 
 ---
 
-## 📊 影响分析 (Impact Analysis)
+## 📊 Impact Analysis (影响分析)
 
-### 📈 性能影响
+### 📈 Performance Impact
 - **内存使用**: [增加/减少/无变化] + [具体数值或百分比]
 - **CPU 使用**: [增加/减少/无变化] + [具体数值或百分比]
 - **加载时间**: [增加/减少/无变化] + [具体数值或百分比]
 
-### 🧪 测试覆盖
+### 🧪 Test Coverage
 - **单元测试**: [覆盖率百分比] - [测试文件路径]
 - **集成测试**: [覆盖率百分比] - [测试文件路径]
 - **端到端测试**: [覆盖率百分比] - [测试文件路径]
 
-### 📁 文件变更
+### 📁 File Changes
 ```bash
 # 通过以下命令查看详细变更:
 # git diff --name-status main
@@ -131,28 +158,28 @@ const advancedResult = await newFeature({
 
 ---
 
-## 🧪 验证要求 (Verification Requirements)
+## ✅ Verification Requirements (验证要求)
 
-### ✅ 必须验证的场景
-1. **[场景 1]**: [具体的验证场景描述]
-   - 预期结果: [预期的行为或输出]
-   - 验证方法: [如何验证]
+### 🧪 Test Strategy
+- **Unit Tests**: [覆盖哪些逻辑和边界条件]
+- **Integration Tests**: [覆盖哪些集成点和交互]
+- **End-to-End Tests**: [覆盖哪些用户场景]
+- **Performance Tests**: [性能测试的具体要求]
 
-2. **[场景 2]**: [具体的验证场景描述]
-   - 预期结果: [预期的行为或输出]
-   - 验证方法: [如何验证]
+### 🚪 Quality Gates
+- **[ ] Code Review Passed**
+- **[ ] Test Coverage ≥ 90%**
+- **[ ] Performance Tests Passed**
+- **[ ] Security Scan Passed**
+- **[ ] Documentation Updated**
 
-3. **[边界情况]**: [边界情况的验证]
-   - 预期结果: [预期的行为或输出]
-   - 验证方法: [如何验证]
+### 📊 Performance Requirements
+- **Response Time**: ≤ [X]ms
+- **Memory Usage**: ≤ [X]MB
+- **Concurrent Users**: ≥ [X]
+- **Error Rate**: ≤ [X]%
 
-### 📏 测试覆盖标准
-- **总体覆盖率**: ≥ 90%
-- **关键路径**: 100% 覆盖
-- **错误处理**: 必须有对应的测试用例
-- **性能基准**: [如果有性能要求，列出基准测试]
-
-### 🧪 验证命令
+### 🧪 Verification Commands
 ```bash
 # 运行完整测试套件
 npm test
@@ -169,26 +196,26 @@ npm run test:coverage
 
 ---
 
-## 🛠️ 维护指南 (Maintenance Guide)
+## 🛠️ Maintenance Guide (维护指南)
 
-### 🔍 调试技巧
+### 🔍 Debugging Tips
 - **常见问题 1**: [问题描述和解决方案]
 - **常见问题 2**: [问题描述和解决方案]
 - **日志级别**: [建议的日志级别和关键日志点]
 
-### 📈 监控指标
+### 📈 Monitoring Metrics
 - **关键指标 1**: [指标名称和正常范围]
 - **关键指标 2**: [指标名称和正常范围]
 - **告警阈值**: [触发告警的阈值]
 
-### 🔄 未来扩展
+### 🔄 Future Extensions
 - **计划中的功能**: [列出计划中的扩展功能]
 - **架构限制**: [当前架构的限制和改进方向]
 - **技术债务**: [识别的技术债务和解决计划]
 
 ---
 
-## 📝 变更日志 (Changelog)
+## 📝 Changelog (变更日志)
 
 | 版本 | 日期 | 作者 | 变更描述 |
 |------|------|------|----------|

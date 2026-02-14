@@ -1,5 +1,5 @@
-import { LspServiceManager } from '../../../src/infrastructure/code-analysis/lsp-service-manager';
-import { LspClient } from '../../../src/infrastructure/code-analysis/lsp-client';
+import { LspServiceManager } from '@/infrastructure/code-analysis/lsp-service-manager';
+import { LspClient } from '@/infrastructure/code-analysis/lsp-client';
 
 // Mock LspClient
 jest.mock('../../../src/infrastructure/code-analysis/lsp-client');

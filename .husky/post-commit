@@ -1,5 +1,4 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+#!/usr/bin/env sh
 
 # Auto-push to remote after successful commit
 echo "🚀 Auto-pushing to remote repository..."

@@ -1,4 +1,4 @@
-import githubFetch from '../../src/tools/github-fetch';
+import githubFetch from '@/tools/github-fetch';
 import axios from 'axios';
 
 // Mock axios to prevent actual network calls during testing
@@ -9,8 +9,9 @@ describe('GitHub Fetch Tool', () => {
     jest.clearAllMocks();
   });
 
-  test('should have correct tool schema', () => {
-    const tool = githubFetch[0];
+  test('should have correct tool schema', async () => {
+    const tools = await githubFetch();
+    const tool = tools[0];
     expect(tool.name).toBe('WebFetchFromGithub');
     expect(tool.description).toContain('Fetches content from a GitHub repository file');
     
@@ -30,7 +31,8 @@ describe('GitHub Fetch Tool', () => {
       headers: { 'content-type': 'text/plain' }
     });
 
-    const tool = githubFetch[0];
+    const tools = await githubFetch();
+    const tool = tools[0];
     const result = await tool.invoke({ 
       owner: 'testuser', 
       repo: 'testrepo', 
@@ -39,7 +41,7 @@ describe('GitHub Fetch Tool', () => {
     const parsedResult = JSON.parse(result);
 
     expect(parsedResult.success).toBe(true);
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/ref/heads/main/test.js');
+    expect(parsedResult.github_url).toBe('https://gh.llkk.cc/https://raw.githubusercontent.com/testuser/testrepo/refs/heads/main/test.js');
     expect(parsedResult.owner).toBe('testuser');
     expect(parsedResult.repo).toBe('testrepo');
     expect(parsedResult.path).toBe('test.js');
@@ -57,7 +59,8 @@ describe('GitHub Fetch Tool', () => {
       headers: { 'content-type': 'text/plain' }
     });
 
-    const tool = githubFetch[0];
+    const tools = await githubFetch();
+    const tool = tools[0];
     const result = await tool.invoke({ 
       owner: 'testuser', 
       repo: 'testrepo', 
@@ -66,7 +69,7 @@ describe('GitHub Fetch Tool', () => {
     });
     const parsedResult = JSON.parse(result);
 
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/testuser/testrepo/ref/heads/develop/test.txt');
+    expect(parsedResult.github_url).toBe('https://gh.llkk.cc/https://raw.githubusercontent.com/testuser/testrepo/refs/heads/develop/test.txt');
     expect(parsedResult.branch).toBe('develop');
   });
 
@@ -76,7 +79,8 @@ describe('GitHub Fetch Tool', () => {
       message: 'File not found'
     });
 
-    const tool = githubFetch[0];
+    const tools = await githubFetch();
+    const tool = tools[0];
     const result = await tool.invoke({ 
       owner: 'nonexistent', 
       repo: 'nonexistent', 
@@ -87,6 +91,6 @@ describe('GitHub Fetch Tool', () => {
     expect(parsedResult.success).toBe(false);
     expect(parsedResult.error).toBe('GITHUB_FETCH_ERROR');
     expect(parsedResult.message).toBe('File not found');
-    expect(parsedResult.github_url).toBe('https://raw.githubusercontent.com/nonexistent/nonexistent/ref/heads/main/nonexistent.txt');
+    expect(parsedResult.github_url).toBe('https://gh.llkk.cc/https://raw.githubusercontent.com/nonexistent/nonexistent/refs/heads/main/nonexistent.txt');
   });
 });

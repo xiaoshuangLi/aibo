@@ -1,4 +1,4 @@
-import { LspMessageParser } from '../../../src/infrastructure/code-analysis/lsp-message-parser';
+import { LspMessageParser } from '@/infrastructure/code-analysis/lsp-message-parser';
 
 describe('LspMessageParser', () => {
   let parser: LspMessageParser;

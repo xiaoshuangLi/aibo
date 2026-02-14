@@ -141,5 +141,11 @@ Dangerous commands: rm -rf, dd, mkfs, chmod 777, any command with sudo.`,
   }
 );
 
-// 导出工具数组（方便批量导入）
-export default [executeBashTool];
+/**
+ * 异步获取 Bash 工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含 Bash 工具的数组
+ */
+export default async function getBashTools() {
+  return [executeBashTool];
+}

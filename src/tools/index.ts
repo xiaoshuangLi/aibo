@@ -1,13 +1,38 @@
-import bash from './bash';
-import utils from './utils';
-import githubFetch from './github-fetch';
-import { tencentWsaSearchTool } from './tencent-wsa';
-import hybridCodeReader from './hybrid-code-reader';
+import getBashTools from '@/tools/bash';
+import getUtilsTools from '@/tools/utils';
+import getGithubFetchTools from '@/tools/github-fetch';
+import getTencentWsaTools from '@/tools/tencent-wsa';
+import getHybridCodeReaderTools from '@/tools/hybrid-code-reader';
+import getComposioTools from '@/tools/composio';
 
-export default [
-  ...bash,
-  ...utils,
-  ...githubFetch,
-  tencentWsaSearchTool,
-  ...hybridCodeReader,
-];
+/**
+ * 异步获取所有工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含所有工具的数组
+ */
+export default async function getTools() {
+  const [
+    bashTools,
+    utilsTools,
+    githubFetchTools,
+    tencentWsaTools,
+    hybridCodeReaderTools,
+    composioTools
+  ] = await Promise.all([
+    getBashTools(),
+    getUtilsTools(),
+    getGithubFetchTools(),
+    getTencentWsaTools(),
+    getHybridCodeReaderTools(),
+    getComposioTools()
+  ]);
+  
+  return [
+    ...bashTools,
+    ...utilsTools,
+    ...githubFetchTools,
+    ...tencentWsaTools,
+    ...hybridCodeReaderTools,
+    ...composioTools,
+  ];
+}

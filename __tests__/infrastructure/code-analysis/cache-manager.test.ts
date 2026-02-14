@@ -1,4 +1,4 @@
-import { CacheManager } from '../../../src/infrastructure/code-analysis/cache-manager';
+import { CacheManager } from '@/infrastructure/code-analysis/cache-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 

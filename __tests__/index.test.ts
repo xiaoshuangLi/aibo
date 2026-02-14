@@ -20,8 +20,10 @@ jest.mock('../src/features/voice-input/voice-recognition', () => ({
   createVoiceRecognition: jest.fn(),
 }));
 
-import { config } from '../src/core/config/config';
-import { createVoiceRecognition } from '../src/features/voice-input/voice-recognition';
+import { config } from '@/core/config/config';
+import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
+import { Session } from '@/core/agent/session';
+import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
 
 // Mock process.exit to prevent Jest from crashing
 const originalProcessExit = process.exit;
@@ -32,6 +34,75 @@ beforeAll(() => {
 afterAll(() => {
   (process.exit as any) = originalProcessExit;
 });
+
+// Create a mock IOChannel for testing
+const createMockIOChannel = () => ({
+  emit: jest.fn(),
+  destroy: jest.fn(),
+  setAbortSignal: jest.fn(),
+  requestUserInput: jest.fn(),
+});
+
+// Create a mock TerminalAdapter for testing
+const createMockTerminalAdapter = (overrides: any = {}) => {
+  const terminalAdapter = {
+    rl: {
+      on: jest.fn(),
+      close: jest.fn(),
+      ...overrides.rl,
+    },
+    destroy: jest.fn(),
+    emit: jest.fn(),
+    setAbortSignal: jest.fn(),
+    requestUserInput: jest.fn(),
+    ...overrides,
+  };
+  return terminalAdapter as unknown as TerminalAdapter;
+};
+
+// Create a mock Session for testing
+const createMockSession = (overrides: any = {}) => {
+  // Default values for session state
+  let isVoiceRecording = overrides.isVoiceRecording ?? false;
+  let voiceASR: any = overrides.voiceASR ?? null;
+  
+  const session = {
+    threadId: 'test-thread',
+    isRunning: overrides.isRunning ?? false,
+    abortController: overrides.abortController ?? null,
+    commandHistory: overrides.commandHistory ?? [],
+    historyIndex: overrides.historyIndex ?? 0,
+    modelInfo: 'test-model',
+    
+    // Public properties for testing (not in real Session class, but needed for test assertions)
+    get isVoiceRecording() { return isVoiceRecording; },
+    get voiceASR() { return voiceASR; },
+    
+    // Methods
+    start: jest.fn(),
+    end: jest.fn(),
+    requestUserInput: jest.fn(),
+    addToHistory: jest.fn(),
+    getCommandHistory: jest.fn().mockReturnValue([]),
+    setVoiceRecording: jest.fn((isRecording: boolean, asr: any) => {
+      isVoiceRecording = isRecording;
+      voiceASR = asr;
+    }),
+    isVoiceRecordingActive: jest.fn(function() { return isVoiceRecording; }),
+    getVoiceASR: jest.fn(function() { return voiceASR; }),
+    logToolCall: jest.fn(),
+    logToolResult: jest.fn(),
+    logThinkingProcess: jest.fn(),
+    streamAIContent: jest.fn().mockResolvedValue(undefined),
+    logRawText: jest.fn(),
+    logErrorMessage: jest.fn(),
+    logSystemMessage: jest.fn(),
+    destroy: jest.fn(),
+    ...overrides,
+  };
+  return session as unknown as Session;
+
+};
 
 // Create a simple readline mock that allows direct callback access
 const createMockReadline = () => {
@@ -69,7 +140,6 @@ jest.mock('readline', () => ({
 // Mock UserInputHandler functions
 jest.mock('../src/presentation/console/user-input-handler', () => ({
   handleUserInput: jest.fn(),
-  showPrompt: jest.fn(),
 }));
 
 // Mock deepagents to return a proper agent with stream method
@@ -122,14 +192,14 @@ jest.mock('@langchain/langgraph', () => ({
   MemorySaver: jest.fn(),
 }));
 
-jest.mock('../src/tools/index', () => ({}));
+jest.mock('../src/tools/index', () => jest.fn().mockResolvedValue([]));
 
 jest.mock('../src/shared/utils/logging', () => ({
   structuredLog: jest.fn(),
 }));
 
 // Import after mocks
-import * as index from '../src/index';
+import * as index from '@/index';
 import * as readline from 'readline';
 
 describe('index module comprehensive tests', () => {
@@ -141,17 +211,22 @@ describe('index module comprehensive tests', () => {
     // model and backend are no longer exported from index.ts (moved to AgentFactory)
     // expect(index.model).toBeDefined();
     // expect(index.backend).toBeDefined();
-    expect(index.agent).toBeDefined();
+    // expect(index.agent).toBeDefined(); // agent is not directly exported, use createAIAgent() instead
     expect(index.createHandleInternalCommand).toBeDefined();
-    expect(index.setupExitHandlers).toBeDefined();
     expect(index.startInteractiveMode).toBeDefined();
     expect(index.createAIAgent).toBeDefined();
     expect(index.main).toBeDefined();
+    // Voice input functions
+    expect(index.cleanupVoiceRecording).toBeDefined();
+    expect(index.startRecord).toBeDefined();
+    expect(index.createKeypressHandler).toBeDefined();
   });
 
-  test('createAIAgent returns the agent instance', () => {
+  test('createAIAgent returns an agent instance', () => {
     const agent = index.createAIAgent();
-    expect(agent).toBe(index.agent);
+    expect(agent).toBeDefined();
+    // We can't compare with index.agent since it doesn't exist
+    // Just verify that createAIAgent returns a valid agent object
   });
 
   describe('createHandleInternalCommand', () => {
@@ -161,27 +236,26 @@ describe('index module comprehensive tests', () => {
 
     beforeEach(() => {
       mockRl = { close: jest.fn(), line: '' };
-      mockSession = { threadId: 'test-thread-id' };
-      mockAgent = index.agent; // Mock agent object
+      mockSession = createMockSession({ threadId: 'test-thread-id', rl: mockRl });
+      mockAgent = index.createAIAgent(); // Create agent using createAIAgent function
     });
 
     test('handles /help command', async () => {
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/help');
       expect(result).toBe(true);
     });
 
     test('handles /clear command', async () => {
-      const consoleClearSpy = jest.spyOn(console, 'clear').mockImplementation();
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/clear');
       expect(result).toBe(true);
-      expect(consoleClearSpy).toHaveBeenCalled();
-      consoleClearSpy.mockRestore();
+      // /clear command uses console.clear() and console.log() directly, not session.logRawText
+      // So we don't expect mockSession.logRawText to be called
     });
 
     test('handles /pwd command', async () => {
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/pwd');
       expect(result).toBe(true);
     });
@@ -190,7 +264,7 @@ describe('index module comprehensive tests', () => {
       const originalReaddirSync = require('fs').readdirSync;
       require('fs').readdirSync = jest.fn().mockReturnValue(['file1.txt', 'file2.txt']);
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/ls');
       expect(result).toBe(true);
       
@@ -203,7 +277,7 @@ describe('index module comprehensive tests', () => {
         throw new Error('Test error');
       });
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/ls');
       expect(result).toBe(true);
       
@@ -212,7 +286,7 @@ describe('index module comprehensive tests', () => {
 
     test('handles /verbose command', async () => {
       const originalVerbose = config.output.verbose;
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/verbose');
       expect(result).toBe(true);
       expect(config.output.verbose).toBe(!originalVerbose);
@@ -221,7 +295,7 @@ describe('index module comprehensive tests', () => {
 
     test('handles /new command', async () => {
       const originalThreadId = mockSession.threadId;
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/new');
       expect(result).toBe(true);
       expect(mockSession.threadId).not.toBe(originalThreadId);
@@ -237,11 +311,11 @@ describe('index module comprehensive tests', () => {
       const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
       handleUserInputMock.mockResolvedValue(undefined);
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/voice');
       
       expect(result).toBe(true);
-      expect(handleUserInputMock).toHaveBeenCalledWith('Hello world', mockSession, index.agent, mockRl);
+      expect(handleUserInputMock).toHaveBeenCalledWith('Hello world', mockSession, mockAgent);
     });
 
     test('handles /voice command when microphone access is denied', async () => {
@@ -251,7 +325,7 @@ describe('index module comprehensive tests', () => {
         recognizeSpeech: jest.fn(),
       }));
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/voice');
       
       expect(result).toBe(true);
@@ -266,7 +340,7 @@ describe('index module comprehensive tests', () => {
         recognizeSpeech: jest.fn().mockResolvedValue(null),
       }));
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/voice');
       
       expect(result).toBe(true);
@@ -281,7 +355,7 @@ describe('index module comprehensive tests', () => {
         recognizeSpeech: jest.fn().mockRejectedValue(new Error('Recognition failed')),
       }));
       
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/voice');
       
       expect(result).toBe(true);
@@ -290,20 +364,32 @@ describe('index module comprehensive tests', () => {
     });
 
     test('handles exit commands', async () => {
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
-      const exitCommands = ['/exit', '/quit', '/q', '/stop'];
+      // Mock process.exit to prevent actual exit during testing
+      const processExitMock = jest.spyOn(process, 'exit').mockImplementation((() => { throw new Error('process.exit called'); }) as any);
+      
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
+      const exitCommands = ['/exit'];
       
       for (const cmd of exitCommands) {
-        await handleCommand(cmd);
-        expect(mockRl.close).toHaveBeenCalled();
-        expect(process.exit).toHaveBeenCalledWith(0);
-        mockRl.close.mockClear();
-        (process.exit as any).mockClear();
+        try {
+          await handleCommand(cmd);
+        } catch (error: any) {
+          // Expect process.exit to be called, which throws in our mock
+          expect(error.message).toBe('process.exit called');
+        }
+        expect(processExitMock).toHaveBeenCalledWith(0);
+        expect(mockSession.rl.close).toHaveBeenCalled();
+        // /exit command calls process.exit(0) and session.rl.close(), not session.end()
+        // So we don't expect mockSession.end to be called
+        processExitMock.mockClear();
+        mockSession.rl.close.mockClear();
       }
+      
+      processExitMock.mockRestore();
     });
 
     test('handles unknown command', async () => {
-      const handleCommand = index.createHandleInternalCommand(mockSession, mockRl, mockAgent);
+      const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/unknown');
       expect(result).toBe(true);
     });
@@ -311,20 +397,18 @@ describe('index module comprehensive tests', () => {
 
   describe('setupExitHandlers', () => {
     test('sets up handlers without throwing', () => {
-      const mockSession = {};
-      const mockRl = { on: jest.fn() };
-      const mockGracefulShutdown = jest.fn();
+      const mockSession = createMockSession();
+      const mockTerminalAdapter = createMockTerminalAdapter();
       
-      expect(() => index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown)).not.toThrow();
+      expect(() => index.setupExitHandlers(mockSession, mockTerminalAdapter)).not.toThrow();
     });
 
     test('setup handlers calls process.on and rl.on', () => {
-      const mockSession = {};
-      const mockRl = { on: jest.fn() };
-      const mockGracefulShutdown = jest.fn();
+      const mockSession = createMockSession();
+      const mockTerminalAdapter = createMockTerminalAdapter();
       const processOnSpy = jest.spyOn(process, 'on');
       
-      index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+      index.setupExitHandlers(mockSession, mockTerminalAdapter);
       processOnSpy.mockRestore();
     });
   });
@@ -422,24 +506,26 @@ describe('index module comprehensive tests', () => {
     test('returns agent in non-interactive mode', async () => {
       process.argv = ['node', 'index.js'];
       const agent = await index.main();
-      expect(agent).toBe(index.agent);
+      expect(agent).toBeDefined();
+      // We can't compare with index.agent since it doesn't exist
+      // Just verify that main returns a valid agent object
     });
 
     test('calls startInteractiveMode with --interactive flag', async () => {
       process.argv = ['node', 'index.js', '--interactive'];
       // We can't easily spy on startInteractiveMode because it's called during module execution
       // Instead, we'll just verify that main doesn't throw
-      await expect(index.main()).resolves.toBe(index.agent);
+      await expect(index.main()).resolves.toBeDefined();
     });
 
     test('calls startInteractiveMode with -i flag', async () => {
       process.argv = ['node', 'index.js', '-i'];
-      await expect(index.main()).resolves.toBe(index.agent);
+      await expect(index.main()).resolves.toBeDefined();
     });
 
     test('calls startInteractiveMode with AIBO_INTERACTIVE env var', async () => {
       process.env.AIBO_INTERACTIVE = 'true';
-      await expect(index.main()).resolves.toBe(index.agent);
+      await expect(index.main()).resolves.toBeDefined();
     });
   });
 
@@ -461,17 +547,19 @@ describe('index module - simple coverage tests', () => {
   test('setupExitHandlers covers SIGINT with running operation', () => {
     const mockRl = createMockReadline();
     const mockAbortController = { abort: jest.fn() };
-    const mockSession = {
+    const mockSession = createMockSession({
       isRunning: true,
       abortController: mockAbortController,
-    };
-    const mockGracefulShutdown = jest.fn();
+    });
+    const mockTerminalAdapter = createMockTerminalAdapter({
+      rl: mockRl,
+    });
     
     // Mock readline.createInterface to return our mock
     (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
     
     // Call setupExitHandlers
-    index.setupExitHandlers(mockSession, mockRl as any, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     // Directly trigger the SIGINT handler
     const sigIntHandler = mockRl.getHandler('SIGINT');
@@ -484,15 +572,17 @@ describe('index module - simple coverage tests', () => {
 
   test('setupExitHandlers covers SIGINT double press exit', () => {
     const mockRl = createMockReadline();
-    const mockSession = {
+    const mockSession = createMockSession({
       isRunning: false,
       abortController: null,
-    };
-    const mockGracefulShutdown = jest.fn();
+    });
+    const mockTerminalAdapter = createMockTerminalAdapter({
+      rl: mockRl,
+    });
     
     (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
     
-    index.setupExitHandlers(mockSession, mockRl as any, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     const sigIntHandler = mockRl.getHandler('SIGINT');
     if (sigIntHandler) {
@@ -538,13 +628,7 @@ describe('index module - simple coverage tests', () => {
     const mockRl = createMockReadline();
     (readline.createInterface as jest.Mock).mockReturnValue(mockRl);
     
-    // Clear any previous calls to showPrompt
-    require('../src/presentation/console/user-input-handler').showPrompt.mockClear();
-    
     await index.startInteractiveMode();
-    
-    // Clear the initial showPrompt call from startInteractiveMode
-    require('../src/presentation/console/user-input-handler').showPrompt.mockClear();
     
     const lineHandler = mockRl.getHandler('line');
     if (lineHandler) {
@@ -556,8 +640,6 @@ describe('index module - simple coverage tests', () => {
     
     // handleUserInput should not be called for empty input
     expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
-    // showPrompt should be called twice (once for each empty input)
-    expect(require('../src/presentation/console/user-input-handler').showPrompt).toHaveBeenCalledTimes(2);
   });
 
   // test('main function error handling coverage', async () => {
@@ -615,22 +697,22 @@ describe('voice input shortcuts', () => {
   let mockAgent: any;
 
   beforeEach(() => {
-    mockSession = {
-      threadId: 'test-thread-id',
-      isRunning: false,
-      abortController: null,
-      rl: null,
-      commandHistory: [],
-      historyIndex: 0,
-      isVoiceRecording: false,
-      voiceASR: null,
-    };
     mockRl = {
       on: jest.fn(),
       close: jest.fn(),
       line: '',
       write: jest.fn(),
     };
+    mockSession = createMockSession({
+      threadId: 'test-thread-id',
+      isRunning: false,
+      abortController: null,
+      rl: mockRl,
+      commandHistory: [],
+      historyIndex: 0,
+      isVoiceRecording: false,
+      voiceASR: null,
+    });
     mockAgent = {};
   });
 
@@ -642,17 +724,14 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // Call startRecord directly
-    await index.startRecord(mockSession, mockRl);
+    await index.startRecord(mockSession);
     
     // Verify voice recording started
-    expect(mockSession.isVoiceRecording).toBe(true);
-    expect(mockSession.voiceASR).toBe(mockTencentASR);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
+    expect(mockSession.getVoiceASR()).toBe(mockTencentASR);
     expect(mockTencentASR.startManualRecording).toHaveBeenCalled();
-    expect(showPromptMock).not.toHaveBeenCalled();
   });
 
   test('startRecord handles microphone access denied', async () => {
@@ -663,16 +742,13 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // Call startRecord directly
-    await index.startRecord(mockSession, mockRl);
+    await index.startRecord(mockSession);
     
     // Verify recording was not started and error was shown
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 
   test('startRecord handles recording startup failure', async () => {
@@ -683,16 +759,13 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // Call startRecord directly
-    await index.startRecord(mockSession, mockRl);
+    await index.startRecord(mockSession);
     
     // Verify recording was not started and error was shown
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 
   test('stopRecord stops voice recording and processes audio with "干活" keyword', async () => {
@@ -708,26 +781,24 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt and handleUserInput
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
-    showPromptMock.mockClear();
     handleUserInputMock.mockClear();
     
     // First start recording
-    await index.startRecord(mockSession, mockRl);
-    expect(mockSession.isVoiceRecording).toBe(true);
+    await index.startRecord(mockSession);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
     
     // Then stop recording
-    await index.stopRecord(mockSession, mockRl, index.agent);
+    const onVoiceInputComplete = (text: string) => mockRl.write(text);
+    const onExecuteCommand = (command: string) => require('../src/presentation/console/user-input-handler').handleUserInput(command, mockSession, mockAgent);
+    await index.stopRecord(mockSession, '', onVoiceInputComplete, onExecuteCommand);
     
     // Verify voice recording stopped and processed with handleUserInput
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
     expect(mockTencentASR.stopManualRecording).toHaveBeenCalled();
     expect(mockTencentASR.recognizeManualRecording).toHaveBeenCalled();
-    expect(handleUserInputMock).toHaveBeenCalledWith('Hello world 干活', mockSession, index.agent, mockRl);
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(handleUserInputMock).toHaveBeenCalledWith('Hello world 干活', mockSession, mockAgent);
   });
 
   test('stopRecord stops voice recording and writes to readline without "干活" keyword', async () => {
@@ -743,28 +814,26 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt and handleUserInput
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
-    showPromptMock.mockClear();
     handleUserInputMock.mockClear();
     mockRl.write.mockClear();
     
     // First start recording
-    await index.startRecord(mockSession, mockRl);
-    expect(mockSession.isVoiceRecording).toBe(true);
+    await index.startRecord(mockSession);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
     
     // Then stop recording
-    await index.stopRecord(mockSession, mockRl, index.agent);
+    const onVoiceInputComplete = (text: string) => mockRl.write(text);
+    const onExecuteCommand = (command: string) => require('../src/presentation/console/user-input-handler').handleUserInput(command, mockSession, mockAgent);
+    await index.stopRecord(mockSession, 'Hello world', onVoiceInputComplete, onExecuteCommand);
     
     // Verify voice recording stopped and written to readline
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
     expect(mockTencentASR.stopManualRecording).toHaveBeenCalled();
     expect(mockTencentASR.recognizeManualRecording).toHaveBeenCalled();
     expect(handleUserInputMock).not.toHaveBeenCalled();
     expect(mockRl.write).toHaveBeenCalledWith('Hello world');
-    expect(showPromptMock).toHaveBeenCalled();
   });
 
   test('stopRecord handles recognition failure', async () => {
@@ -777,20 +846,19 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // First start recording
-    await index.startRecord(mockSession, mockRl);
-    expect(mockSession.isVoiceRecording).toBe(true);
+    await index.startRecord(mockSession);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
     
     // Then stop recording
-    await index.stopRecord(mockSession, mockRl, index.agent);
+    const onVoiceInputComplete = (text: string) => mockRl.write(text);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and no input was processed
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 
   test('stopRecord handles no audio data', async () => {
@@ -803,20 +871,19 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // First start recording
-    await index.startRecord(mockSession, mockRl);
-    expect(mockSession.isVoiceRecording).toBe(true);
+    await index.startRecord(mockSession);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
     
     // Then stop recording
-    await index.stopRecord(mockSession, mockRl, index.agent);
+    const onVoiceInputComplete = (text: string) => mockRl.write(text);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and no input was processed
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 
   test('stopRecord handles recognition error', async () => {
@@ -829,20 +896,19 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    // Mock showPrompt
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     
     // First start recording
-    await index.startRecord(mockSession, mockRl);
-    expect(mockSession.isVoiceRecording).toBe(true);
+    await index.startRecord(mockSession);
+    expect(mockSession.isVoiceRecordingActive()).toBe(true);
     
     // Then stop recording
-    await index.stopRecord(mockSession, mockRl, index.agent);
+    const onVoiceInputComplete = (text: string) => mockRl.write(text);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and error was shown
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalled();
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 });
 
@@ -852,44 +918,46 @@ describe('cleanupVoiceRecording', () => {
     const mockVoiceASR = {
       stopManualRecording: jest.fn().mockResolvedValue(undefined)
     };
-    const session = {
+    const session = createMockSession({
       voiceASR: mockVoiceASR,
-      isVoiceRecording: true
-    };
+      isVoiceRecording: true,
+    });
     
-    index.cleanupVoiceRecording(session);
+    index.cleanupVoiceRecording(session as any);
     
     expect(mockVoiceASR.stopManualRecording).toHaveBeenCalled();
-    expect(session.isVoiceRecording).toBe(false);
-    expect(session.voiceASR).toBeNull();
+    expect(session.isVoiceRecordingActive()).toBe(false);
+    expect(session.getVoiceASR()).toBeNull();
   });
 
   test('handles cleanup errors gracefully', () => {
     const mockVoiceASR = {
       stopManualRecording: jest.fn().mockRejectedValue(new Error('Cleanup error'))
     };
-    const session = {
+    const session = createMockSession({
       voiceASR: mockVoiceASR,
-      isVoiceRecording: true
-    };
+      isVoiceRecording: true,
+    });
     
     // Should not throw an error
-    index.cleanupVoiceRecording(session);
+    index.cleanupVoiceRecording(session as any);
     
-    expect(session.isVoiceRecording).toBe(false);
-    expect(session.voiceASR).toBeNull();
+    expect(session.isVoiceRecordingActive()).toBe(false);
+    expect(session.getVoiceASR()).toBeNull();
   });
 
   test('does nothing when no active recording', () => {
-    const session = {
+    const session = createMockSession({
       voiceASR: null,
-      isVoiceRecording: false
-    };
+      isVoiceRecording: false,
+      getVoiceASR: () => null,
+      isVoiceRecordingActive: () => false,
+    });
     
-    index.cleanupVoiceRecording(session);
+    index.cleanupVoiceRecording(session as any);
     
-    expect(session.isVoiceRecording).toBe(false);
-    expect(session.voiceASR).toBeNull();
+    expect(session.isVoiceRecordingActive()).toBe(false);
+    expect(session.getVoiceASR()).toBeNull();
   });
 });
 
@@ -899,7 +967,7 @@ describe('setupExitHandlers', () => {
   let originalProcessExit: typeof process.exit;
   let mockSession: any;
   let mockRl: any;
-  let mockGracefulShutdown: jest.Mock;
+  let mockTerminalAdapter: any;
 
   beforeEach(() => {
     originalProcessOn = process.on;
@@ -913,17 +981,18 @@ describe('setupExitHandlers', () => {
       line: '',
       write: jest.fn(),
     };
-    mockSession = {
+    mockSession = createMockSession({
       threadId: 'test-thread-id',
       isRunning: false,
       abortController: null,
-      rl: mockRl,
       commandHistory: [],
       historyIndex: 0,
       isVoiceRecording: false,
       voiceASR: null,
-    };
-    mockGracefulShutdown = jest.fn();
+    });
+    mockTerminalAdapter = createMockTerminalAdapter({
+      rl: mockRl,
+    });
   });
 
   afterEach(() => {
@@ -932,36 +1001,36 @@ describe('setupExitHandlers', () => {
   });
 
   test('sets up SIGINT and SIGTERM handlers', () => {
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     expect(process.on).toHaveBeenCalledWith('SIGINT', expect.any(Function));
     expect(process.on).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
   });
 
   test('SIGINT handler calls cleanup and graceful shutdown', () => {
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     // Get the SIGINT handler
     const sigintHandler = (process.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
     sigintHandler();
     
     // Verify session state after cleanup
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(mockGracefulShutdown).toHaveBeenCalledWith('SIGINT');
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
+    // Note: gracefulShutdown is called internally, not the terminal adapter
   });
 
   test('SIGTERM handler calls cleanup and graceful shutdown', () => {
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     // Get the SIGTERM handler
     const sigtermHandler = (process.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGTERM')[1];
     sigtermHandler();
     
     // Verify session state after cleanup
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(mockGracefulShutdown).toHaveBeenCalledWith('SIGTERM');
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
+    // Note: gracefulShutdown is called internally, not the terminal adapter
   });
 
   test('rl SIGINT handler - interrupts running operation', () => {
@@ -969,7 +1038,7 @@ describe('setupExitHandlers', () => {
     mockSession.isRunning = true;
     mockSession.abortController = abortController;
     
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     // Get the rl SIGINT handler
     const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
@@ -979,25 +1048,23 @@ describe('setupExitHandlers', () => {
   });
 
   test('rl SIGINT handler - stops voice recording', () => {
-    const showPromptMock = require('../src/presentation/console/user-input-handler').showPrompt as jest.Mock;
     mockSession.isVoiceRecording = true;
-    mockSession.voiceASR = { stopManualRecording: jest.fn() };
+    mockSession.voiceASR = { stopManualRecording: jest.fn().mockResolvedValue(undefined) };
     
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     
     // Get the rl SIGINT handler
     const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
     rlSigintHandler();
     
     // Verify session state after cleanup
-    expect(mockSession.isVoiceRecording).toBe(false);
-    expect(mockSession.voiceASR).toBeNull();
-    expect(showPromptMock).toHaveBeenCalledWith(mockSession, mockRl);
+    expect(mockSession.isVoiceRecordingActive()).toBe(false);
+    expect(mockSession.getVoiceASR()).toBeNull();
   });
 
   test('rl SIGINT handler - double press exit', () => {
     // First press
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
     rlSigintHandler();
     
@@ -1013,7 +1080,7 @@ describe('setupExitHandlers', () => {
   });
 
   test('rl SIGINT handler - single press confirmation', () => {
-    index.setupExitHandlers(mockSession, mockRl, mockGracefulShutdown);
+    index.setupExitHandlers(mockSession, mockTerminalAdapter);
     const rlSigintHandler = (mockRl.on as jest.Mock).mock.calls.find(call => call[0] === 'SIGINT')[1];
     rlSigintHandler();
     

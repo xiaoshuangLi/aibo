@@ -1,4 +1,4 @@
-import { VoiceRecognition, createVoiceRecognition } from '../src/features/voice-input/voice-recognition';
+import { VoiceRecognition, createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 
 // Mock external dependencies
 jest.mock('node-record-lpcm16', () => {

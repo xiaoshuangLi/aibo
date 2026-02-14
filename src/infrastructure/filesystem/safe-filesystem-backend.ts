@@ -63,7 +63,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       '.html', '.css', '.scss', '.sass', '.less', '.xml', '.csv', '.sql',
       '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go', '.rs', '.rb',
       '.php', '.swift', '.kt', '.gradle', '.properties', '.env', '.gitignore',
-      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log'
+      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log', '.example'
     ]);
 
     // Blocked extensions for binary files, models, and sensitive content
@@ -83,7 +83,9 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       // Database files
       '.db', '.sqlite', '.sqlite3', '.mdb', '.accdb', '.dbf',
       // Virtual machine files
-      '.vdi', '.vhd', '.vhdx', '.qcow2', '.raw'
+      '.vdi', '.vhd', '.vhdx', '.qcow2', '.raw',
+      // Font files
+      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt'
     ]);
   }
 
@@ -272,6 +274,51 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       // Handle permission errors gracefully
       if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
         return `Permission denied: Cannot access ${dirPath}`;
+      }
+      
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced globInfo operation with safety checks and filtering
+   */
+  async globInfo(pattern: string, searchPath: string = process.cwd()): Promise<import('deepagents').FileInfo[]> {
+    try {
+      // Security checks for the base directory
+      if (!this.isWithinProjectRoot(searchPath)) {
+        throw new Error(`Access denied: ${searchPath} is outside project root`);
+      }
+      
+      if (!this.isWithinDepthLimit(searchPath)) {
+        throw new Error(`Access denied: ${searchPath} exceeds maximum depth limit of ${this.maxDepth}`);
+      }
+
+      // Get results from parent method
+      const allFiles = await super.globInfo(pattern, searchPath);
+      
+      // Filter out files that are in ignored directories or have blocked extensions
+      return allFiles.filter((file: any) => {
+        const fullPath = file.path;
+        
+        // Check if file is in an ignored directory
+        const fileDir = path.dirname(fullPath);
+        if (this.shouldIgnoreDirectory(fileDir)) {
+          return false;
+        }
+        
+        // Check if file has allowed extension
+        return this.isAllowedExtension(fullPath);
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Access denied')) {
+        throw error;
+      }
+      
+      // Handle permission errors gracefully
+      if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
+        throw new Error(`Permission denied: Cannot access ${searchPath}`);
       }
       
       // Re-throw other errors

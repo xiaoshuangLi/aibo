@@ -1,4 +1,4 @@
-import { hybridCodeReaderTool } from '../../src/tools/hybrid-code-reader';
+import { hybridCodeReaderTool } from '@/tools/hybrid-code-reader';
 
 describe('Hybrid Code Reader Tool', () => {
   // 测试正常场景

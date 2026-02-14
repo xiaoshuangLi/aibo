@@ -107,4 +107,11 @@ export const echoTool = tool(
   }
 );
 
-export default [sleepTool, echoTool];
+/**
+ * 异步获取通用工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含通用工具的数组
+ */
+export default async function getUtilsTools() {
+  return [sleepTool, echoTool];
+}

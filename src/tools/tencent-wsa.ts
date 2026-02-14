@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createTencentWSA } from '../infrastructure/tencent-cloud/wsa-service';
+import { createTencentWSA } from '@/infrastructure/tencent-cloud/wsa-service';
 
 /**
  * 腾讯云WSA网络搜索工具模块
@@ -103,3 +103,12 @@ Supports natural search results, multimodal VR results, and mixed results.`,
     })
   }
 );
+
+/**
+ * 异步获取腾讯云 WSA 网络搜索工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含腾讯云 WSA 工具的数组
+ */
+export default async function getTencentWsaTools() {
+  return [tencentWsaSearchTool];
+}

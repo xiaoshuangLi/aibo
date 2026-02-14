@@ -1,4 +1,4 @@
-import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '../../../src/infrastructure/agents/agent-loader';
+import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/agent-loader';
 import { SubAgent } from 'deepagents';
 import { join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';

@@ -20,8 +20,8 @@
  * @class SymbolTable
  */
 import path from 'path';
-import { LspTool } from './lsp-tool';
-import { TreeSitterTool, AstNodeInfo } from './tree-sitter-tool';
+import { LspTool } from '@/infrastructure/code-analysis/lsp-tool';
+import { TreeSitterTool, AstNodeInfo } from '@/infrastructure/code-analysis/tree-sitter-tool';
 
 /**
  * 符号类型

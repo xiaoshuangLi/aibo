@@ -1,6 +1,6 @@
-import { SymbolTable, SymbolType } from '../../../src/infrastructure/code-analysis/symbol-table';
-import { LspTool } from '../../../src/infrastructure/code-analysis/lsp-tool';
-import { TreeSitterTool } from '../../../src/infrastructure/code-analysis/tree-sitter-tool';
+import { SymbolTable, SymbolType } from '@/infrastructure/code-analysis/symbol-table';
+import { LspTool } from '@/infrastructure/code-analysis/lsp-tool';
+import { TreeSitterTool } from '@/infrastructure/code-analysis/tree-sitter-tool';
 
 // Mock implementations
 jest.mock('../../../src/infrastructure/code-analysis/lsp-tool');

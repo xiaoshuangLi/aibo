@@ -32,7 +32,7 @@ let hybridCodeReader: HybridCodeReader | null = null;
 /**
  * 获取或创建混合代码读取器实例
  */
-function getHybridCodeReader(): HybridCodeReader {
+export function getHybridCodeReader(): HybridCodeReader {
   if (!hybridCodeReader) {
     hybridCodeReader = new HybridCodeReader({
       workingDirectory: process.cwd(),
@@ -156,8 +156,11 @@ export const hybridCodeReaderTool = tool(
   }
 );
 
-// 导出工具数组
-export default [hybridCodeReaderTool];
-
-// 为了测试目的导出内部函数
-export { getHybridCodeReader };
+/**
+ * 异步获取混合代码读取器工具的方法
+ * 
+ * @returns Promise<Array<any>> - 包含混合代码读取器工具的数组
+ */
+export default async function getHybridCodeReaderTools() {
+  return [hybridCodeReaderTool];
+}

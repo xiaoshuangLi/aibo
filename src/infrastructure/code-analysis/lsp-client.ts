@@ -23,7 +23,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { Readable, Writable } from 'stream';
-import { LspMessageParser } from './lsp-message-parser';
+import { LspMessageParser } from '@/infrastructure/code-analysis/lsp-message-parser';
 
 /**
  * JSON-RPC消息接口

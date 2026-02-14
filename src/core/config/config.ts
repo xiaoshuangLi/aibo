@@ -12,7 +12,7 @@ import { z } from 'zod';
  */
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * Schema definition for required and optional environment variables.
@@ -41,6 +41,9 @@ const envSchema = z.object({
   TENCENTCLOUD_SECRET_ID: z.string().optional(),
   TENCENTCLOUD_SECRET_KEY: z.string().optional(),
   TENCENTCLOUD_REGION: z.string().default('ap-guangzhou'),
+  // Composio Configuration
+  COMPOSIO_API_KEY: z.string().min(1).default('test-composio-api-key'),
+  COMPOSIO_EXTERNAL_USER_ID: z.string().min(1).default('test-external-user-id'),
 });
 
 // Parse and validate environment variables
@@ -92,5 +95,9 @@ export const config = {
     secretId: env.TENCENTCLOUD_SECRET_ID,
     secretKey: env.TENCENTCLOUD_SECRET_KEY,
     region: env.TENCENTCLOUD_REGION,
+  },
+  composio: {
+    apiKey: env.COMPOSIO_API_KEY,
+    externalUserId: env.COMPOSIO_EXTERNAL_USER_ID,
   },
 };

@@ -1,170 +1,122 @@
-# AIBO - Advanced Multi-Agent Autonomous Programming AI Assistant
+# AIBO - 高级多智能体自主编程AI助手
 
-An advanced autonomous programming AI assistant powered by a sophisticated multi-agent architecture with specialized skills system, deep code intelligence, and full local filesystem access. Built with TypeScript, Jest, and DeepAgents.
+一个由复杂多智能体架构驱动的高级自主编程AI助手，具备专业技能系统、深度代码智能和完整的本地文件系统访问能力。使用TypeScript、Jest和DeepAgents构建。
 
-## Features
+## 功能特性
 
-- ✅ **Advanced Multi-Agent Architecture**: 7 specialized agent types (coder, coordinator, documentation, innovator, researcher, testing, validator) working in collaboration
-- ✅ **Skills System Framework**: 15+ standardized skill modules providing reusable, domain-specific capabilities with progressive disclosure
-- ✅ **Hybrid Code Intelligence**: Advanced code analysis combining LSP (semantic analysis) and Tree-sitter (syntax analysis) for deep code understanding with 60-90% token savings
-- ✅ **Voice Input Integration**: Real-time voice input support using Tencent Cloud's official ASR service with microphone audio capture and speech-to-text conversion
-- ✅ **Advanced Autonomous Programming**: Write, edit, debug, and optimize code across any language with intelligent context awareness
-- ✅ **SubAgent Delegation**: Spawn specialized SubAgents for complex, isolated tasks with parallel execution and coordinated results
-- ✅ **Error Recovery & Retry Strategy**: Systematic error analysis, strategy adjustment, and fallback plans with graceful degradation
-- ✅ **Full System Access**: Complete read/write access to local filesystem and terminal commands with safety-first design
-- ✅ **Enhanced Web Tools**: Puppeteer-based WebSearch and WebFetch tools with proper error handling, resource management, and anti-bot bypass capabilities
-- ✅ **Bilingual System Prompt**: Full English and Chinese support with comprehensive methodology and cultural context
-- ✅ **Interactive Chat Mode**: Real-time interactive mode with command shortcuts, session management, and voice input support
-- ✅ **Comprehensive Testing**: 86.5%+ test coverage with unit, integration, and edge case testing across all modules
-- ✅ **Problem-Solving Methodology**: 7-step structured approach including research best practices and multi-agent collaboration
-- ✅ **Feature Development Workflow**: Strict workflow ensuring quality with documentation and proper commits
-- ✅ **Enhanced Startup Documentation Reading**: Automatically reads README.md and features/*.md at startup to understand project architecture and capabilities
-- ✅ **Mandatory Technical Proposal Approval**: Requires user approval for all technical implementations after comprehensive research
-- ✅ **Filesystem Access Optimization**: Strategic guidance to avoid reading unnecessary directories (dist, node_modules, __tests__, coverage) to minimize token consumption and improve performance
-- ✅ **Mandatory Hybrid Code Reader Usage**: **ALWAYS** use the hybrid_code_reader tool for code analysis tasks - this is a non-negotiable requirement that must be followed without exception. Direct file reading should only be used as a last resort when hybrid_code_reader cannot provide the required information.
-- ✅ **AI Thinking Capability**: Enhanced reasoning and problem-solving through enabled thinking mode in all AI Agent interactions
-- ✅ **Tencent Cloud WSA Web Search**: Default integrated web search functionality using Tencent Cloud's official WSA (Web Search API) service based on Sogou search's public web resources. Provides structured search results with titles, summaries, URLs, and publication dates. Automatically available when Tencent Cloud credentials are configured.
-- ✅ **Safe Filesystem Backend**: Security-first file system operations with validation and protection against accidental destructive operations
+- ✅ **高级多智能体架构**: 7种专业智能体类型（编码器、协调器、文档、创新者、研究员、测试员、验证器）协同工作
+- ✅ **技能系统框架**: 31+个标准化技能模块，提供可重用的领域特定能力，支持渐进式披露
+- ✅ **混合代码智能**: 结合LSP（语义分析）和Tree-sitter（语法分析）的高级代码分析，实现60-90%的token节省
+- ✅ **语音输入集成**: 使用腾讯云官方ASR服务的实时语音输入支持，支持麦克风音频捕获和语音转文本
+- ✅ **高级自主编程**: 跨任何语言编写、编辑、调试和优化代码，具备智能上下文感知
+- ✅ **子智能体委托**: 为复杂、独立的任务生成专业子智能体，支持并行执行和协调结果
+- ✅ **错误恢复与重试策略**: 系统性错误分析、策略调整和后备方案，支持优雅降级
+- ✅ **完整系统访问**: 对本地文件系统和终端命令的完整读写访问，采用安全优先设计
+- ✅ **增强型Web工具**: 基于Puppeteer的WebSearch和WebFetch工具，具备适当的错误处理、资源管理和反机器人绕过能力
+- ✅ **双语系统提示**: 完整的中英文支持，包含全面的方法论和文化背景
+- ✅ **交互式聊天模式**: 支持实时交互模式，包含命令快捷键、会话管理和语音输入支持
+- ✅ **I/O 解耦架构**: 通过 `IOChannel` 接口实现终端依赖与核心逻辑的完全分离，提高可测试性和可扩展性
+- ✅ **全面测试**: 86.5%+的测试覆盖率，涵盖所有模块的单元测试、集成测试和边界情况测试
+- ✅ **问题解决方法论**: 7步结构化方法，包括最佳实践研究和多智能体协作
+- ✅ **功能开发工作流**: 严格的工流程确保质量，包含文档和正确提交
 
-## Environment Variables
+## 核心身份与目标
 
-The application supports the following environment variables (defined in `.env`):
+您是' Aibo'，一个具有完整本地文件系统和终端访问权限的高级自主编程AI，以及复杂的子智能体委托能力。
 
-```env
-# AI Configuration
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
-MODEL_NAME=gpt-4o
+### 🎯 身份与核心目标
+您是一个高度能力的自主编程助手，旨在通过系统性问题解决、全面研究和精确执行来帮助用户解决复杂的软件开发挑战。
 
-# LangChain Configuration  
-RECURSION_LIMIT=25
-CHECKPOINTER_TYPE=memory
+### 🛡️ 增强型错误重试机制
+- **自动重试**: 工具调用失败时自动重试最多3次（可配置）
+- **指数退避**: 重试间隔使用指数退避策略，避免系统过载
+- **详细错误上下文**: 失败时提供包含原始输入、错误消息、堆栈跟踪的结构化上下文
+- **智能策略调整**: AI模型可基于错误上下文分析失败原因并调整后续策略
+- **透明集成**: 对现有工具完全透明，无需修改工具代码即可获得重试能力
 
-# Memory Configuration
-MEMORY_WINDOW_SIZE=5
+### 🖥️ 环境上下文
+- 操作系统: darwin x64
+- Node.js 版本: v22.15.0
+- 当前工作目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
+- 项目根目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
 
-# Tencent Cloud ASR and WSA Configuration
-TENCENTCLOUD_APP_ID=your-app-id          # Required for voice input and web search
-TENCENTCLOUD_SECRET_ID=your-secret-id    # Required for voice input and web search
-TENCENTCLOUD_SECRET_KEY=your-secret-key  # Required for voice input and web search
-TENCENTCLOUD_REGION=ap-shanghai          # Optional, default: ap-shanghai
+## 快速开始
+
+### 先决条件
+- Node.js 18+
+- npm 或 yarn
+
+### 安装
+```bash
+npm install
 ```
 
-## Project Structure
-
-```
-aibo/
-├── src/                    # Source code directory (completely refactored with multi-agent architecture)
-│   ├── core/               # Core application infrastructure
-│   │   ├── agent/          # Multi-agent system (NEW - 7 specialized agent types)
-│   │   ├── config/         # Configuration management
-│   │   ├── session/        # Session and graceful shutdown management
-│   │   └── utils/          # Core utilities
-│   ├── features/           # Feature-specific modules
-│   │   ├── voice-input/    # Voice input integration (NEW - Tencent Cloud ASR)
-│   │   └── ...             # Other feature modules
-│   ├── infrastructure/     # External service integrations (MAJOR REFACTOR)
-│   │   ├── agents/         # Agent loading and management (NEW)
-│   │   ├── audio/          # Audio recording and processing (NEW)
-│   │   ├── browser/        # Puppeteer-based web tools
-│   │   ├── code-analysis/  # Hybrid code intelligence (NEW - LSP + Tree-sitter)
-│   │   ├── filesystem/     # Safe filesystem operations (NEW - security-first)
-│   │   └── tencent-cloud/  # Tencent Cloud services (ASR + WSA)
-│   ├── presentation/       # User interface and interaction layer
-│   │   ├── console/        # Console command handlers and interactive mode
-│   │   └── styling/        # Output styling and formatting
-│   └── shared/             # Shared utilities and types
-│       ├── constants/      # System prompts and constants
-│       └── utils/          # Shared utility functions
-├── skills/                 # Skills system framework (NEW - 15+ standardized skill modules)
-├── agents/                 # Agent definitions (NEW - 7 specialized agent types)
-├── __tests__/              # Comprehensive test suite
-├── features/               # Feature documentation (numbered sequentially)
-├── templates/              # Documentation templates
-├── .env                    # Environment variables (gitignored)
-├── .env.example            # Environment variables template
-├── package.json            # Dependencies and scripts
-├── tsconfig.json           # TypeScript configuration
-├── jest.config.ts          # Jest configuration
-└── README.md               # Project documentation
+### 配置
+复制示例环境文件并配置您的API密钥：
+```bash
+cp .env.example .env
+# 编辑 .env 文件添加您的 API 密钥
 ```
 
-### Key Architectural Changes
+### 运行
+```bash
+# 开发模式
+npm run dev
 
-- **Multi-Agent Architecture**: Introduced 7 specialized agent types for different domains
-- **Skills System**: Added standardized skill modules with progressive disclosure pattern
-- **Hybrid Code Analysis**: Combined LSP and Tree-sitter for deep code intelligence
-- **Voice Input Support**: Integrated Tencent Cloud ASR for real-time voice commands
-- **Safe Filesystem Operations**: Security-first approach to file system access
-- **Modular Infrastructure**: Complete reorganization of external service integrations
+# 构建
+npm run build
 
-## Scripts
+# 测试
+npm test
+```
 
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm test` - Run all tests
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:coverage` - Run tests with coverage report
-- `npm start` - Start the compiled application
-- `npm run dev` - Run the application in development mode (using ts-node)
+## 交互模式架构
 
-## Testing
+### I/O 解耦设计
+AIBO 采用 `IOChannel` 接口实现 I/O 操作与核心逻辑的完全解耦：
 
-All tests are located in the `__tests__` directory and use Jest with TypeScript support. The test environment automatically loads environment variables from the `.env` file.
+- **IOChannel 接口**: 定义标准的 I/O 操作接口，支持多种输出事件类型
+- **TerminalAdapter**: 终端适配器实现，处理所有具体的终端输出逻辑  
+- **Session 类**: 会话管理类，通过依赖注入使用 IOChannel
+- **可扩展性**: 可轻松添加新的 I/O 适配器（如 Web UI、API、移动端等）
+- **可测试性**: 核心逻辑不再直接依赖终端 API，可以轻松创建 mock 进行单元测试
 
-### Test Coverage Requirements
-- **Minimum Coverage**: 85% overall test coverage (statement, branch, function, and line)
-- **Current Coverage**: 86.55% statements, 72.65% branches, 83.09% functions, 86.64% lines
-- **Test Types**: Unit tests, integration tests, and edge case scenarios
-- **Validation**: All new features must pass comprehensive test suite before acceptance
+### 工具函数模块化
+- 所有交互模式相关的工具函数已从 `agent` 目录移动到 `utils` 目录
+- 统一导出接口，简化导入路径
+- 提高代码复用性和维护性
 
-### Git Hooks
-- **Pre-commit Hook**: Automatically validates that test coverage is at least 85% before allowing commits
-- **Post-commit Hook**: Automatically pushes successful commits to the remote repository
-- **Build Validation**: Ensures TypeScript compilation succeeds before commit
-- **Coverage Check**: Runs `npm run test:coverage` and validates threshold using custom script
+## 错误处理与恢复策略
 
-### Test Commands
-- `npm test` - Run all tests
-- `npm run test:watch` - Run tests in watch mode  
-- `npm run test:coverage` - Run tests with detailed coverage report
+### 错误分类与响应
+1. **工具执行失败**: 立即分析根本原因，检查命令语法，验证权限
+2. **文件系统错误**: 验证文件路径，检查权限，优雅处理竞态条件
+3. **网络/API失败**: 实施指数退避，提供替代数据源
+4. **逻辑/实现错误**: 跟踪执行流程，验证假设，测试边界情况
+5. **资源限制**: 优化内存使用，实施分页，建议替代方案
 
-## Configuration
+### 恢复协议
+1. **即时分析**: 诊断确切的故障点和根本原因
+2. **策略调整**: 修改方法 - 尝试替代方法、工具、参数或工作流
+3. **系统性重试**: 尝试修复并提供清晰推理，限制重试以防止无限循环（最多3次尝试）
+4. **后备实现**: 如果主要方法失败，提出并实施替代解决方案
+5. **透明沟通**: 向用户清楚解释错误、分析、调整策略和后续步骤
+6. **持续执行**: 当单个工具失败时，绝不中断整个工作流。始终尝试恢复并继续执行剩余任务。
 
-The `src/config.ts` file uses Zod for schema validation of environment variables, ensuring that required variables are present and optional variables have sensible defaults.
+## 贡献指南
 
-## AI Parameters
+我们欢迎贡献！请遵循以下步骤：
 
-All AI parameters can be configured via environment variables:
+1. Fork 仓库
+2. 创建您的功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
 
-- `OPENAI_API_KEY` - Required API key
-- `OPENAI_BASE_URL` - Optional base URL (useful for custom endpoints or proxies)
-- `MODEL_NAME` - Model name to use (defaults to 'gpt-4o')
+## 许可证
 
-The configuration is validated at startup and will throw descriptive errors if required variables are missing.
+此项目在 MIT 许可证下发布 - 有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
 
-## Development Workflow
+## 联系方式
 
-### Feature Implementation Process
-Every feature implementation MUST follow this strict workflow:
-
-1. **Write Comprehensive Tests**: Create test scripts in `__tests__` directory with 90%+ coverage
-2. **Implement Functionality**: Write code that passes all tests
-3. **Create Feature Documentation**: Add numbered documentation file in `features/` directory using template
-4. **Update Main Documentation**: Update this README.md to reflect new capabilities
-5. **Commit Code Properly**: Use standardized commit message template from `templates/git-commit-template.md`
-
-### Problem-Solving Methodology
-AIBO follows a 7-step structured approach:
-1. **Understand**: Analyze requirements through git diff and project documentation
-2. **Research Best Practices**: Search online for current standards and patterns
-3. **Plan**: Break down into logical steps with potential pitfalls identified
-4. **Execute**: Implement step-by-step with appropriate tools and SubAgents
-5. **Verify**: Test and validate results at each critical step
-6. **Recover**: Analyze issues, adjust strategy, and retry systematically  
-7. **Deliver**: Provide complete solution with clear documentation
-
-### Quality Standards
-- **Code Quality**: Follow TypeScript best practices and maintain clean, readable code
-- **Error Handling**: Implement comprehensive error recovery with user communication
-- **Security**: Never run destructive commands without explicit confirmation
-- **Documentation**: Maintain up-to-date documentation for all features
+如有问题或建议，请创建 GitHub Issue 或联系项目维护者。

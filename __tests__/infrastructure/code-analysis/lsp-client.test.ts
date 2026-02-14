@@ -1,4 +1,4 @@
-import { LspClient } from '../../../src/infrastructure/code-analysis/lsp-client';
+import { LspClient } from '@/infrastructure/code-analysis/lsp-client';
 import { ChildProcess } from 'child_process';
 
 // Mock child_process.spawn

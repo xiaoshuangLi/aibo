@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT_EN, SYSTEM_PROMPT_ZH, SYSTEM_PROMPT } from '../src/shared/constants/system-prompts';
+import { SYSTEM_PROMPT_EN, SYSTEM_PROMPT_ZH, SYSTEM_PROMPT } from '@/shared/constants/system-prompts';
 
 describe('Enhanced System Prompt Tests', () => {
   test('should export SYSTEM_PROMPT_EN', () => {

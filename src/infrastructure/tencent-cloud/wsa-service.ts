@@ -14,7 +14,7 @@ import { ClientConfig } from 'tencentcloud-sdk-nodejs/tencentcloud/common/interf
 import { BasicCredential } from 'tencentcloud-sdk-nodejs/tencentcloud/common/credential';
 
 // Import configuration
-import { config } from '../../core/config/config';
+import { config } from '@/core/config/config';
 
 /**
  * 腾讯云WSA配置接口

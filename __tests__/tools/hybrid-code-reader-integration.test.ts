@@ -1,4 +1,4 @@
-import { hybridCodeReaderTool } from '../../src/tools/hybrid-code-reader';
+import { hybridCodeReaderTool } from '@/tools/hybrid-code-reader';
 
 describe('Hybrid Code Reader Integration Tests', () => {
   // 测试完整的端到端工作流

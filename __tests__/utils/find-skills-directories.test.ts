@@ -1,5 +1,7 @@
-import { findSkillsDirectories } from '../../src/core/utils/find-skills-directories';
+import { findSkillsDirectories } from '@/core/utils';
 import { join } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 
 describe('findSkillsDirectories', () => {
   test('should find root skills directory', () => {
@@ -10,8 +12,12 @@ describe('findSkillsDirectories', () => {
 
   test('should return default path when no skills directories found', () => {
     // Create a temporary directory without skills
-    const tempDir = '/tmp';
-    const result = findSkillsDirectories(tempDir);
-    expect(result).toEqual(['./skills/']);
+    const tempDir = mkdtempSync(join(tmpdir(), 'test-no-skills-'));
+    try {
+      const result = findSkillsDirectories(tempDir);
+      expect(result).toEqual(['./skills/']);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

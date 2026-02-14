@@ -8,7 +8,7 @@
  * @module output-styler
  */
 
-import { config } from '../../core/config/config';
+import { config } from '@/core/config/config';
 
 /**
  * 样式化输出函数接口
@@ -101,6 +101,29 @@ export interface OutputStyler {
    * @returns 格式化的详细思考模式提示字符串
    */
   detailedThinkingMode: (mode: string) => string;
+  
+  /**
+   * 格式化 task 工具结果预览
+   * @param result - 工具结果（可以是字符串或对象）
+   * @param verbose - 是否详细模式
+   * @returns 格式化的预览字符串
+   */
+  formatTaskResultPreview: (result: any, verbose: boolean) => string;
+  
+  /**
+   * 获取 task 工具显示名称
+   * @param subagentType - 子代理类型
+   * @returns 显示名称
+   */
+  getTaskDisplayName: (subagentType?: string) => string;
+  
+  /**
+   * 格式化通用工具结果预览
+   * @param parsed - 解析后的工具结果对象
+   * @param verbose - 是否详细模式
+   * @returns 格式化的预览字符串
+   */
+  formatToolResultPreview: (parsed: any, verbose: boolean) => string;
 }
 
 /**
@@ -139,8 +162,16 @@ export const styled: OutputStyler = {
    * @param preview - 结果预览文本
    * @returns 格式化的工具结果消息字符串
    */
-  toolResult: (name: string, success: boolean, preview: string) => 
-    `\n${success ? '✅' : '❌'} 工具执行 ${name}: ${success ? '成功' : '失败'}\n${preview}`,
+  toolResult: (name: string, success: boolean, preview: string) => {
+    // 智能检测 task 工具的结果（使用正则表达式而不是硬编码）
+    const isTaskResult = /^子代理任务$|^🧠\s+\w+\s+结果$/.test(name);
+    
+    if (isTaskResult) {
+      return `\n${success ? '✅' : '❌'} ${name}: ${success ? '完成' : '失败'}\n${preview}`;
+    }
+    
+    return `\n${success ? '✅' : '❌'} 工具执行 ${name}: ${success ? '成功' : '失败'}\n${preview}`;
+  },
   
   /**
    * 系统消息样式
@@ -164,13 +195,100 @@ export const styled: OutputStyler = {
   hint: (text: string) => `\n💡 ${text}`,
   
   /**
+   * 格式化 task 工具结果预览
+   * @param result - 工具结果（可以是字符串或对象）
+   * @param verbose - 是否详细模式
+   * @returns 格式化的预览字符串
+   */
+  formatTaskResultPreview: (result: any, verbose: boolean) => {
+    const limit = verbose ? 300 : 150;
+    
+    if (typeof result === 'object' && result !== null) {
+      // Check if stdout and stderr are both "(empty)"
+      if (result.stdout === "(empty)" && result.stderr === "(empty)") {
+        return "无输出";
+      }
+      
+      if (result.message) {
+        return `▸ 结果: ${styled.truncated(result.message, limit)}`;
+      } else {
+        return `▸ 任务已完成`;
+      }
+    } else if (typeof result === 'string') {
+      return `▸ 结果: ${styled.truncated(result, limit)}`;
+    } else {
+      return `▸ 任务已完成`;
+    }
+  },
+  
+  /**
+   * 获取 task 工具显示名称
+   * @param subagentType - 子代理类型
+   * @returns 显示名称
+   */
+  getTaskDisplayName: (subagentType?: string) => {
+    if (subagentType) {
+      return `🧠 ${subagentType} 结果`;
+    }
+    return '子代理任务';
+  },
+  
+  /**
+   * 格式化通用工具结果预览
+   * @param parsed - 解析后的工具结果对象
+   * @param verbose - 是否详细模式
+   * @returns 格式化的预览字符串
+   */
+  formatToolResultPreview: (parsed: any, verbose: boolean) => {
+    let preview = "";
+    
+    if (parsed.command) {
+      preview = `▸ 命令: ${styled.truncated(parsed.command, 80)}`;
+    } else if (parsed.filepath) {
+      preview = `▸ 文件: ${parsed.filepath}`;
+    }
+
+    if (parsed.stdout) {
+      const out = String(parsed.stdout).trim();
+      if (out && out !== "(empty)") {
+        const limit = verbose ? 200 : 80;
+        preview += `\n▸ 输出: ${styled.truncated(out.split('\n')[0] || out, limit)}`;
+      }
+    }
+
+    if (parsed.stderr && parsed.stderr.trim() !== "(empty)") {
+      const limit = verbose ? 100 : 60;
+      preview += `\n▸ 错误: ${styled.truncated(parsed.stderr.split('\n')[0], limit)}`;
+    }
+    
+    return preview || "无输出";
+  },
+  
+  /**
    * 截断文本样式
    * @param original - 原始文本
    * @param limit - 截断限制长度
    * @returns 如果原文本超过限制则返回截断后的文本，否则返回原文本
    */
-  truncated: (original: string, limit: number) => 
-    original.length > limit ? original.substring(0, limit) + `... [已截断 ${original.length - limit} 字符]` : original,
+  truncated: (original: string, limit: number) => {
+    if (original.length <= limit) {
+      return original;
+    }
+    
+    const truncatedText = original.substring(0, limit);
+    const truncatedChars = original.length - limit;
+    const originalLines = original.split('\n').length;
+    const truncatedLines = truncatedText.split('\n').length;
+    const truncatedLineCount = originalLines - truncatedLines;
+    
+    let truncationInfo = `[已截断 ${truncatedChars} 字符`;
+    if (truncatedLineCount > 0) {
+      truncationInfo += `, ${truncatedLineCount} 行`;
+    }
+    truncationInfo += ']';
+    
+    return truncatedText + `... ${truncationInfo}`;
+  },
   
   /**
    * 深度思考过程样式

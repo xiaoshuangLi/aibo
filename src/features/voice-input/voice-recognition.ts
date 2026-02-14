@@ -9,8 +9,8 @@
  * @module VoiceRecognition
  */
 
-import { AudioRecorder } from '../../infrastructure/audio/audio-recorder';
-import { TencentAsrService, TencentAsrConfig } from '../../infrastructure/tencent-cloud/asr-service';
+import { AudioRecorder } from '@/infrastructure/audio/audio-recorder';
+import { TencentAsrService, TencentAsrConfig } from '@/infrastructure/tencent-cloud/asr-service';
 
 /**
  * 语音识别配置
@@ -318,7 +318,7 @@ export class VoiceRecognition {
 }
 
 // Import configuration at the top level
-import { config as appConfig } from '../../core/config/config';
+import { config as appConfig } from '@/core/config/config';
 
 /**
  * 创建语音识别实例的工厂函数

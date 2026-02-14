@@ -1,4 +1,4 @@
-import { sleepTool, echoTool } from '../../src/tools/utils';
+import { sleepTool, echoTool } from '@/tools/utils';
 
 describe('Utility Tools', () => {
   describe('sleepTool', () => {
