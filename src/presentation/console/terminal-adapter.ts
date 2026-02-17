@@ -249,9 +249,12 @@ export class TerminalAdapter implements IOChannel {
     if (this._rl.line) {
       const max = Math.max(this._rl.line.length - 8, 0);
       if (this._rl.line.slice(max, this._rl.line.length).includes('干活')) {
+        const rlRef = this._rl; // Capture reference to avoid null reference in setTimeout
         for (let i = 0; i < this._rl.line.length + 4; i++) {
           setTimeout(() => {
-            this._rl!.write('', { name: 'backspace', ctrl: false, meta: false, shift: false });
+            if (rlRef) {
+              rlRef.write('', { name: 'backspace', ctrl: false, meta: false, shift: false });
+            }
           }, 10 * i);
         }
       }
@@ -278,6 +281,9 @@ export class TerminalAdapter implements IOChannel {
     this.listeners.clear();
     
     // 清理进程监听器（简化处理，实际可能需要更精细的管理）
-    process.exit(0);
+    // 在测试环境中不退出进程
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
   }
 }

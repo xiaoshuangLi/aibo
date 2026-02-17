@@ -56,6 +56,10 @@ export interface SymbolInfo {
   }>;
   /** 依赖的符号 */
   dependencies: string[];
+  /** 完整的符号文本内容 */
+  text?: string;
+  /** 容器名称（对于类成员） */
+  containerName?: string;
 }
 
 /**
@@ -133,8 +137,11 @@ export class SymbolTable {
    */
   private async processFileWithLsp(filePath: string): Promise<void> {
     try {
-      // 获取工作区符号（简化实现，实际需要更精确的文件级符号提取）
-      const workspaceSymbols = await this.config.lspTool.getWorkspaceSymbols('');
+      console.log('this.config', this.config);
+      console.log('filePath', filePath);
+      // 使用文件名作为查询参数，以减少返回的符号数量
+      const relativeFilePath = filePath.replace(this.config.workingDirectory, '').replace(/^[\/\\]/, '');
+      const workspaceSymbols = await this.config.lspTool.getWorkspaceSymbols(filePath);
       
       // 这里简化处理，实际应用中需要过滤出当前文件的符号
       if (workspaceSymbols && Array.isArray(workspaceSymbols)) {
@@ -178,6 +185,9 @@ export class SymbolTable {
 
       // 处理函数
       for (const func of functions) {
+        // 检查是否包含装饰器
+        const hasDecorator = func.text && func.text.trim().startsWith('@');
+        
         const symbolInfo: SymbolInfo = {
           name: this.extractNameFromAstNode(func),
           type: 'function',
@@ -186,9 +196,10 @@ export class SymbolTable {
             line: func.startPosition.row,
             character: func.startPosition.column
           },
-          isExported: this.isExported(func.text), // 简化处理
+          isExported: this.isExported(func.text),
           references: [],
-          dependencies: []
+          dependencies: [],
+          text: func.text
         };
         this.addSymbol(symbolInfo);
       }
@@ -205,7 +216,8 @@ export class SymbolTable {
           },
           isExported: this.isExported(cls.text),
           references: [],
-          dependencies: []
+          dependencies: [],
+          text: cls.text
         };
         this.addSymbol(symbolInfo);
       }
@@ -222,7 +234,8 @@ export class SymbolTable {
           },
           isExported: this.isExported(iface.text),
           references: [],
-          dependencies: []
+          dependencies: [],
+          text: iface.text
         };
         this.addSymbol(symbolInfo);
       }
@@ -239,7 +252,8 @@ export class SymbolTable {
           },
           isExported: this.isExported(type.text),
           references: [],
-          dependencies: []
+          dependencies: [],
+          text: type.text
         };
         this.addSymbol(symbolInfo);
       }
@@ -266,6 +280,38 @@ export class SymbolTable {
    */
   private isExported(text: string): boolean {
     return text.trim().startsWith('export ');
+  }
+  
+  /**
+   * 从文本中提取装饰器信息
+   * @param text 节点文本
+   * @returns 装饰器信息数组
+   */
+  private extractDecorators(text: string): any[] {
+    if (!text) return [];
+    
+    const decorators: any[] = [];
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('@')) {
+        // 提取装饰器名称和参数
+        const match = trimmed.match(/@([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(\([^)]*\))?/);
+        if (match) {
+          decorators.push({
+            name: match[1],
+            arguments: match[2] ? match[2].slice(1, -1) : '',
+            fullText: trimmed
+          });
+        }
+      } else if (trimmed.length > 0 && !trimmed.startsWith('@')) {
+        // 遇到非装饰器行，停止提取
+        break;
+      }
+    }
+    
+    return decorators;
   }
 
   /**

@@ -29,3 +29,6 @@ coverage/
 
 # Misc
 .DS_Store
+
+# TS
+.tsbuildinfo

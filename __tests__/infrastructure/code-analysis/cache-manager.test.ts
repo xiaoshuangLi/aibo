@@ -6,6 +6,8 @@ import * as path from 'path';
 jest.mock('fs', () => ({
   existsSync: jest.fn(),
   mkdirSync: jest.fn(),
+  readdirSync: jest.fn(),
+  statSync: jest.fn(),
   promises: {
     readFile: jest.fn(),
     writeFile: jest.fn(),
@@ -44,6 +46,20 @@ describe('CacheManager', () => {
     test('should create cache directory when file cache is enabled', () => {
       expect(fs.mkdirSync).toHaveBeenCalledWith(cacheDir, { recursive: true });
     });
+
+    test('should not create cache directory when file cache is disabled', () => {
+      // Clear all mocks to ensure clean state
+      jest.clearAllMocks();
+      
+      const config = {
+        maxMemorySize: 1024,
+        cacheDirectory: cacheDir,
+        defaultTtl: 1000,
+        enableFileCache: false
+      };
+      const manager = new CacheManager(config);
+      expect(fs.mkdirSync).not.toHaveBeenCalled();
+    });
   });
 
   describe('get', () => {
@@ -71,6 +87,48 @@ describe('CacheManager', () => {
       expect(result).toBeNull();
       expect((cacheManager as any).stats.memoryMisses).toBe(1);
       expect((cacheManager as any).stats.fileMisses).toBe(1);
+    });
+
+    test('should clean up expired memory cache items', async () => {
+      const testData = 'test-data';
+      cacheManager.set('expired-key', testData, -1); // Expired immediately
+      
+      // Verify it's in memory cache initially
+      expect((cacheManager as any).memoryCache.has('expired-key')).toBe(true);
+      
+      const result = await cacheManager.get<string>('expired-key');
+      expect(result).toBeNull();
+      
+      // Should be removed from memory cache after access
+      expect((cacheManager as any).memoryCache.has('expired-key')).toBe(false);
+    });
+
+    test('should handle file cache read errors gracefully', async () => {
+      (fs.promises.readFile as jest.Mock).mockRejectedValue(new Error('Read error'));
+      
+      const result = await cacheManager.get<string>('error-key');
+      expect(result).toBeNull();
+      expect((cacheManager as any).stats.fileMisses).toBe(1);
+    });
+
+    test('should clean up expired file cache items', async () => {
+      const expiredItem = {
+        data: 'expired-data',
+        createdAt: Date.now() - 2000,
+        expiresAt: Date.now() - 1000,
+        size: 100
+      };
+
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.promises.readFile as jest.Mock).mockResolvedValue(JSON.stringify(expiredItem));
+      
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      const result = await cacheManager.get<string>('expired-file-key');
+      expect(result).toBeNull();
+      expect(unlinkSpy).toHaveBeenCalledWith(expect.stringContaining('expired-file-key.json'));
+      
+      unlinkSpy.mockRestore();
     });
   });
 
@@ -102,6 +160,60 @@ describe('CacheManager', () => {
       await new Promise(setImmediate); // Wait for async file write
       
       expect(fs.promises.writeFile).toHaveBeenCalled();
+    });
+
+    test('should handle file cache write errors gracefully', async () => {
+      (fs.promises.writeFile as jest.Mock).mockRejectedValue(new Error('Write error'));
+      
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const testData = 'error-test-data';
+      cacheManager.set('error-test-key', testData);
+      
+      await new Promise(setImmediate); // Wait for async file write
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to write file cache'),
+        expect.any(Error)
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    test('should evict items when memory limit is exceeded', () => {
+      // Create a manager with very small memory limit
+      const config = {
+        maxMemorySize: 10, // Very small limit
+        cacheDirectory: cacheDir,
+        defaultTtl: 1000,
+        enableFileCache: false
+      };
+      const manager = new CacheManager(config);
+      
+      // Add items that exceed the limit
+      manager.set('key1', 'large data that exceeds limit');
+      manager.set('key2', 'another large data item');
+      
+      // Check that eviction happened
+      expect((manager as any).memorySize).toBeLessThanOrEqual(10);
+    });
+
+    test('should load file cache into memory on hit', async () => {
+      const testData = 'file-cache-data';
+      const cacheItem = {
+        data: testData,
+        createdAt: Date.now() - 500,
+        expiresAt: Date.now() + 500,
+        size: Buffer.byteLength(JSON.stringify(testData), 'utf8')
+      };
+
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.promises.readFile as jest.Mock).mockResolvedValue(JSON.stringify(cacheItem));
+
+      const result = await cacheManager.get<string>('file-hit-key');
+      
+      expect(result).toBe(testData);
+      expect((cacheManager as any).stats.fileHits).toBe(1);
+      // Should also be in memory cache now
+      expect((cacheManager as any).memoryCache.has('file-hit-key')).toBe(true);
     });
   });
 
@@ -144,6 +256,14 @@ describe('CacheManager', () => {
       await cacheManager.delete('delete-key');
       expect((cacheManager as any).memoryCache.has('delete-key')).toBe(false);
     });
+
+    test('should handle file cache delete errors gracefully', async () => {
+      (fs.promises.unlink as jest.Mock).mockRejectedValue(new Error('Delete error'));
+      
+      await cacheManager.delete('error-key');
+      // Should not throw an error
+      expect(true).toBe(true);
+    });
   });
 
   describe('clear', () => {
@@ -163,6 +283,14 @@ describe('CacheManager', () => {
       await manager.clear();
       expect((manager as any).memoryCache.size).toBe(0);
       expect((manager as any).memorySize).toBe(0);
+    });
+
+    test('should handle file cache clear errors gracefully', async () => {
+      (fs.promises.readdir as jest.Mock).mockRejectedValue(new Error('Read error'));
+      
+      await cacheManager.clear();
+      // Should not throw an error
+      expect(true).toBe(true);
     });
   });
 
@@ -189,6 +317,29 @@ describe('CacheManager', () => {
         fileItems: 0
       });
     });
+
+    test('should handle file cache size calculation errors gracefully', () => {
+      // Clear previous mocks
+      (fs.readdirSync as jest.Mock).mockImplementation(() => {
+        throw new Error('Read error');
+      });
+      (fs.statSync as jest.Mock).mockImplementation(() => {
+        return { size: 100 };
+      });
+      
+      const stats = cacheManager.getStats();
+      expect(stats.fileSize).toBe(0);
+    });
+
+    test('should handle file cache item count calculation errors gracefully', () => {
+      // Clear previous mocks
+      (fs.readdirSync as jest.Mock).mockImplementation(() => {
+        throw new Error('Read error');
+      });
+      
+      const stats = cacheManager.getStats();
+      expect(stats.fileItems).toBe(0);
+    });
   });
 
   describe('getHitRate', () => {
@@ -197,15 +348,37 @@ describe('CacheManager', () => {
     });
 
     test('should calculate correct hit rate', async () => {
+      // Create a fresh manager to avoid interference from other tests
+      const config = {
+        maxMemorySize: 1024,
+        cacheDirectory: cacheDir,
+        defaultTtl: 1000,
+        enableFileCache: true
+      };
+      const manager = new CacheManager(config);
+      
+      // Mock fs.existsSync to return false for misses
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      
       // One hit
-      cacheManager.set('hit', 'data');
-      await cacheManager.get('hit');
+      manager.set('hit', 'data');
+      await manager.get('hit');
       
       // One miss
-      await cacheManager.get('miss1');
+      await manager.get('miss1');
+      
+      const stats = manager.getStats();
+      const hitRate = manager.getHitRate();
+      
+      // Debug output
+      console.log('DEBUG - memoryHits:', stats.memoryHits);
+      console.log('DEBUG - fileHits:', stats.fileHits);  
+      console.log('DEBUG - memoryMisses:', stats.memoryMisses);
+      console.log('DEBUG - fileMisses:', stats.fileMisses);
+      console.log('DEBUG - hitRate:', hitRate);
       
       // Hit rate should be 1 / (1 + 1 + 1) = 0.333... (memory hit + memory miss + file miss)
-      expect(cacheManager.getHitRate()).toBeCloseTo(1/3, 2);
+      expect(hitRate).toBeCloseTo(1/3, 2);
     });
   });
 });

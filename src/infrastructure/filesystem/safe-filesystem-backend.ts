@@ -14,11 +14,11 @@ import * as fs from 'fs';
  * - Proper error handling for permission issues
  */
 export class SafeFilesystemBackend extends FilesystemBackend {
-  private readonly allowedExtensions: Set<string>;
-  private readonly blockedExtensions: Set<string>;
-  private readonly ignoredDirectories: Set<string>;
-  private readonly maxDepth: number;
-  private readonly projectRoot: string;
+  readonly allowedExtensions: Set<string>;
+  readonly blockedExtensions: Set<string>;
+  readonly ignoredDirectories: Set<string>;
+  readonly maxDepth: number;
+  readonly projectRoot: string;
 
   constructor(options: {
     rootDir: string;
@@ -40,6 +40,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
     // Directories to ignore during grep operations
     this.ignoredDirectories = new Set([
       'node_modules',
+      'coverage',
       'autos',
       '.git',
       '.cache',
@@ -92,7 +93,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   /**
    * Check if a file path is within the allowed project root
    */
-  private isWithinProjectRoot(filePath: string): boolean {
+  isWithinProjectRoot(filePath: string): boolean {
     const resolvedPath = path.resolve(filePath);
     const normalizedProjectRoot = path.resolve(this.projectRoot);
     
@@ -106,7 +107,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   /**
    * Check if a file extension is allowed
    */
-  private isAllowedExtension(filePath: string): boolean {
+  isAllowedExtension(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
     
     // If it's in blocked extensions, reject immediately
@@ -126,7 +127,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   /**
    * Check if the file depth is within limits
    */
-  private isWithinDepthLimit(filePath: string): boolean {
+  isWithinDepthLimit(filePath: string): boolean {
     const relativePath = path.relative(this.projectRoot, filePath);
     
     // If the path is the same as project root, depth is 0
@@ -146,7 +147,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   /**
    * Check if a directory path contains any ignored directories
    */
-  private shouldIgnoreDirectory(dirPath: string): boolean {
+  shouldIgnoreDirectory(dirPath: string): boolean {
     const relativePath = path.relative(this.projectRoot, dirPath);
     
     // If it's the root directory, don't ignore

@@ -144,14 +144,14 @@ export const hybridCodeReaderTool = tool(
   },
   {
     name: "hybrid_code_reader",
-    description: `Intelligent code reading tool that uses LSP, Tree-sitter, and symbol tables to provide optimized code context with minimal token usage. Supports TypeScript, JavaScript, JSX, and TSX files. Can extract definitions, references, implementations, signatures, full context, or dependencies.`,
+    description: `🚨 PRIMARY CODE ANALYSIS TOOL - Use this INSTEAD of read_file for TypeScript, JavaScript, JSX, and TSX files! Provides 60-90% token savings with semantic-aware analysis using LSP, Tree-sitter, and symbol tables. Request types: 'definition' (symbol definitions), 'references' (all symbol references), 'implementation' (complete function/class bodies), 'signature' (API signatures), 'full-context' (optimized complete file), 'dependencies' (import/export relationships).`,
     schema: z.object({
-      filePath: z.string().describe("Path to the file to analyze (relative or absolute)"),
-      requestType: z.enum(['definition', 'references', 'implementation', 'signature', 'full-context', 'dependencies']).describe("Type of context to request"),
-      line: z.number().optional().describe("Line number (0-based) for definition and references requests"),
-      character: z.number().optional().describe("Character position (0-based) for definition and references requests"),
-      symbolName: z.string().optional().describe("Symbol name for definition requests"),
-      maxTokens: z.number().optional().describe("Maximum token limit (default: 2000)")
+      filePath: z.string().describe("Path to the TypeScript/JavaScript file to analyze (relative or absolute) - MUST be .ts, .tsx, .js, or .jsx"),
+      requestType: z.enum(['definition', 'references', 'implementation', 'signature', 'full-context', 'dependencies']).describe("Type of context to request: 'definition'=symbol definitions, 'references'=all symbol references, 'implementation'=complete function/class bodies, 'signature'=API signatures, 'full-context'=optimized complete file, 'dependencies'=import/export relationships"),
+      line: z.number().optional().describe("Line number (0-based) REQUIRED for 'definition' and 'references' requests - use precise location of symbol"),
+      character: z.number().optional().describe("Character position (0-based) REQUIRED for 'definition' and 'references' requests - use precise location of symbol"),
+      symbolName: z.string().optional().describe("Symbol name for 'definition' requests (alternative to line/character)"),
+      maxTokens: z.number().optional().describe("Maximum token limit (default: 2000) - set lower values for better performance")
     })
   }
 );

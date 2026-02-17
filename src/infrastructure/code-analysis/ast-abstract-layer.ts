@@ -23,6 +23,8 @@ import path from 'path';
 import { LspTool } from '@/infrastructure/code-analysis/lsp-tool';
 import { TreeSitterTool } from '@/infrastructure/code-analysis/tree-sitter-tool';
 import { SymbolTable, SymbolInfo } from '@/infrastructure/code-analysis/symbol-table';
+import { TokenCounter } from '@/infrastructure/code-analysis/token-counter';
+import { DependencyAnalyzer, DependencyResult } from '@/infrastructure/code-analysis/dependency-analyzer';
 
 /**
  * AST抽象层配置
@@ -107,22 +109,120 @@ export class AstAbstractLayer {
     try {
       // 优先使用LSP
       if (this.config.lspTool.isSupportedFile(filePath)) {
-        result = await this.config.lspTool.getDefinition(filePath, line, character);
-        technologiesUsed.push('lsp');
+        const lspResult = await this.config.lspTool.getDefinition(filePath, line, character);
+        if (lspResult) {
+          // 使用LSP的位置信息，但使用Tree-sitter提取完整的函数签名
+          if (this.config.treeSitterTool.isSupportedFile(filePath)) {
+            try {
+              const sourceCode = await this.readFile(filePath);
+              const allSymbols = await Promise.all([
+                this.config.treeSitterTool.queryFunctions(filePath),
+                this.config.treeSitterTool.queryClasses(filePath),
+                this.config.treeSitterTool.queryInterfaces(filePath),
+                this.config.treeSitterTool.queryTypeDefinitions(filePath),
+                this.config.treeSitterTool.queryVariables(filePath)
+              ]);
+              
+              const symbols = allSymbols.flat();
+              
+              // 使用LSP返回的位置来查找对应的符号
+              let targetSymbol = null;
+              if (Array.isArray(lspResult)) {
+                // 处理多个定义的情况
+                const firstDef = lspResult[0];
+                const lspLine = firstDef.range.start.line;
+                const lspChar = firstDef.range.start.character;
+                targetSymbol = symbols.find(symbol => 
+                  symbol.startPosition.row <= lspLine && 
+                  symbol.endPosition.row >= lspLine
+                );
+              } else if (lspResult.range) {
+                // 处理单个定义的情况
+                const lspLine = lspResult.range.start.line;
+                const lspChar = lspResult.range.start.character;
+                targetSymbol = symbols.find(symbol => 
+                  symbol.startPosition.row <= lspLine && 
+                  symbol.endPosition.row >= lspLine
+                );
+              }
+              
+              if (targetSymbol) {
+                result = {
+                  name: this.extractNameFromAstNode(targetSymbol),
+                  kind: this.mapAstNodeTypeToLspKind(targetSymbol.type),
+                  location: lspResult.range ? lspResult : lspResult[0],
+                  containerName: this.getContainerName(targetSymbol, symbols),
+                  detail: targetSymbol.text || this.extractTypeInformation(targetSymbol, sourceCode),
+                  documentation: this.extractDocumentation(targetSymbol, sourceCode)
+                };
+                technologiesUsed.push('lsp', 'tree-sitter');
+              } else {
+                // 如果找不到符号，使用LSP结果
+                result = lspResult;
+                technologiesUsed.push('lsp');
+              }
+            } catch (treeSitterError) {
+              console.warn('Tree-sitter failed to extract signature, using LSP result:', treeSitterError);
+              result = lspResult;
+              technologiesUsed.push('lsp');
+            }
+          } else {
+            result = lspResult;
+            technologiesUsed.push('lsp');
+          }
+        }
       }
     } catch (error) {
       console.warn('LSP definition failed, falling back to Tree-sitter:', error);
     }
 
     if (!result && this.config.treeSitterTool.isSupportedFile(filePath)) {
-      // 降级到Tree-sitter
+      // 降级到Tree-sitter - 实现真正的定义查找
       try {
         const sourceCode = await this.readFile(filePath);
-        const functions = await this.config.treeSitterTool.queryFunctions(filePath);
-        // 简化实现，实际需要更精确的位置匹配
-        result = functions.find(func => 
-          func.startPosition.row <= line && func.endPosition.row >= line
-        );
+        const allSymbols = await Promise.all([
+          this.config.treeSitterTool.queryFunctions(filePath),
+          this.config.treeSitterTool.queryClasses(filePath),
+          this.config.treeSitterTool.queryInterfaces(filePath),
+          this.config.treeSitterTool.queryTypeDefinitions(filePath),
+          this.config.treeSitterTool.queryVariables(filePath)
+        ]);
+        
+        const symbols = allSymbols.flat();
+        
+        // 精确的位置匹配：找到包含指定位置的符号
+        const targetSymbol = symbols.find(symbol => {
+          return symbol.startPosition.row <= line && 
+                 symbol.endPosition.row >= line &&
+                 (symbol.startPosition.row !== symbol.endPosition.row || 
+                  (symbol.startPosition.column <= character && 
+                   symbol.endPosition.column >= character));
+        });
+        
+        if (targetSymbol) {
+          // 构建完整的定义信息
+          result = {
+            name: this.extractNameFromAstNode(targetSymbol),
+            kind: this.mapAstNodeTypeToLspKind(targetSymbol.type),
+            location: {
+              uri: filePath,
+              range: {
+                start: {
+                  line: targetSymbol.startPosition.row,
+                  character: targetSymbol.startPosition.column
+                },
+                end: {
+                  line: targetSymbol.endPosition.row,
+                  character: targetSymbol.endPosition.column
+                }
+              }
+            },
+            containerName: this.getContainerName(targetSymbol, symbols),
+            // 优先使用完整的文本内容作为detail
+            detail: targetSymbol.text || this.extractTypeInformation(targetSymbol, sourceCode),
+            documentation: this.extractDocumentation(targetSymbol, sourceCode)
+          };
+        }
         technologiesUsed.push('tree-sitter');
       } catch (error) {
         console.error('Tree-sitter definition failed:', error);
@@ -133,10 +233,31 @@ export class AstAbstractLayer {
       // 最后使用符号表
       try {
         const symbols = this.config.symbolTable.getFileSymbols(filePath);
-        result = symbols.find(symbol => 
-          symbol.location.line === line
-        );
-        technologiesUsed.push('symbol-table');
+        const symbol = symbols.find(s => s.location.line === line);
+        if (symbol) {
+          // 构建包含完整文本的result对象
+          result = {
+            name: symbol.name,
+            kind: this.mapSymbolTypeToLspKind(symbol.type),
+            location: {
+              uri: filePath,
+              range: {
+                start: {
+                  line: symbol.location.line,
+                  character: symbol.location.character
+                },
+                end: {
+                  line: symbol.location.line, // 这里可能不准确，但至少有文本
+                  character: symbol.location.character
+                }
+              }
+            },
+            detail: symbol.text, // 使用完整的文本作为detail
+            containerName: symbol.containerName,
+            documentation: symbol.documentation
+          };
+          technologiesUsed.push('symbol-table');
+        }
       } catch (error) {
         console.error('Symbol table definition failed:', error);
       }
@@ -232,14 +353,172 @@ export class AstAbstractLayer {
   }
 
   /**
-   * 读取文件内容
-   * @param filePath 文件路径
-   * @returns 文件内容
+   * 从AST节点提取名称
    */
-  private async readFile(filePath: string): Promise<string> {
-    const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(this.config.workingDirectory, filePath);
-    const fs = await import('fs').then(m => m.promises);
-    return fs.readFile(absolutePath, 'utf8');
+  private extractNameFromAstNode(node: any): string {
+    if (node.name) return node.name;
+    if (node.text) {
+      // 尝试从文本中提取标识符
+      const match = node.text.match(/(?:function|class|interface|type)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
+      if (match) return match[1];
+      
+      // 对于方法定义，提取方法名
+      const methodMatch = node.text.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
+      if (methodMatch) return methodMatch[1];
+      
+      // 对于变量声明，提取第一个标识符
+      const varMatch = node.text.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s*[=:]/);
+      if (varMatch) return varMatch[1];
+      
+      // 对于箭头函数，提取变量名
+      const arrowMatch = node.text.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\(/);
+      if (arrowMatch) return arrowMatch[1];
+    }
+    return 'unknown';
+  }
+
+  /**
+   * 映射AST节点类型到LSP符号种类
+   */
+  private mapAstNodeTypeToLspKind(nodeType: string): number {
+    switch (nodeType) {
+      case 'function_declaration':
+      case 'method_definition':
+        return 12; // Function
+      case 'class_declaration':
+        return 7; // Class
+      case 'interface_declaration':
+        return 8; // Interface
+      case 'type_alias_declaration':
+        return 13; // TypeParameter
+      case 'variable_declarator':
+        return 14; // Variable
+      default:
+        return 0; // Unknown
+    }
+  }
+
+  /**
+   * 映射符号类型到LSP符号种类
+   */
+  private mapSymbolTypeToLspKind(symbolType: string): number {
+    switch (symbolType) {
+      case 'class':
+        return 7; // Class
+      case 'interface':
+        return 8; // Interface
+      case 'function':
+        return 12; // Function
+      case 'method_definition':
+        return 12; // Function
+      case 'type':
+        return 13; // TypeParameter
+      default:
+        return 0; // Unknown
+    }
+  }
+
+  /**
+   * 获取符号的容器名称
+   */
+  private getContainerName(targetSymbol: any, allSymbols: any[]): string | undefined {
+    // 查找包含目标符号的类或函数
+    const container = allSymbols.find(symbol => 
+      symbol.type === 'class_declaration' || symbol.type === 'function_declaration'
+    );
+    
+    if (container && 
+        container.startPosition.row <= targetSymbol.startPosition.row &&
+        container.endPosition.row >= targetSymbol.endPosition.row) {
+      return this.extractNameFromAstNode(container);
+    }
+    
+    return undefined;
+  }
+
+  /**
+   * 从源代码中提取类型信息
+   */
+  private extractTypeInformation(node: any, sourceCode: string): string {
+    if (!node.text) return '';
+    
+    // 提取完整的函数/方法签名，包括修饰符
+    if (node.type === 'function_declaration' || node.type === 'method_definition') {
+      const lines = node.text.split('\n');
+      const signatureLine = lines[0];
+      return signatureLine.trim();
+    }
+    
+    // 对于类方法，需要更精确的提取
+    if (node.type === 'method_definition') {
+      // 查找包含修饰符的完整行
+      const startLine = node.startPosition.row;
+      const lines = sourceCode.split('\n');
+      
+      // 向上查找可能的修饰符（async, private, protected, public, static）
+      let signatureStart = startLine;
+      for (let i = startLine; i >= Math.max(0, startLine - 3); i--) {
+        const line = lines[i].trim();
+        if (line.startsWith('async ') || 
+            line.startsWith('private ') || 
+            line.startsWith('protected ') || 
+            line.startsWith('public ') || 
+            line.startsWith('static ') ||
+            line.includes('@')) { // 装饰器
+          signatureStart = i;
+          break;
+        }
+      }
+      
+      // 向下查找直到找到完整的签名（包含参数列表）
+      let signatureEnd = startLine;
+      for (let i = startLine; i < Math.min(lines.length, startLine + 5); i++) {
+        const line = lines[i];
+        if (line.includes(')') && line.includes('{')) {
+          signatureEnd = i;
+          break;
+        }
+      }
+      
+      // 提取完整的签名
+      const fullSignature = lines.slice(signatureStart, signatureEnd + 1).join('\n');
+      return fullSignature.trim();
+    }
+    
+    // 提取类型注解
+    const typeAnnotationMatch = node.text.match(/:\s*([^;{]+)[;{]/);
+    if (typeAnnotationMatch) {
+      return typeAnnotationMatch[1].trim();
+    }
+    
+    return '';
+  }
+
+  /**
+   * 从源代码中提取文档字符串
+   */
+  private extractDocumentation(node: any, sourceCode: string): string {
+    if (!node.startPosition) return '';
+    
+    const lines = sourceCode.split('\n');
+    const nodeLineIndex = node.startPosition.row;
+    
+    // 检查前几行是否有JSDoc注释
+    for (let i = Math.max(0, nodeLineIndex - 5); i < nodeLineIndex; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('/**')) {
+        // 找到JSDoc注释的开始，收集整个注释块
+        const docLines = [];
+        for (let j = i; j < nodeLineIndex; j++) {
+          const currentLine = lines[j];
+          docLines.push(currentLine);
+          if (currentLine.includes('*/')) break;
+        }
+        return docLines.join('\n').trim();
+      }
+    }
+    
+    return '';
   }
 
   /**
@@ -274,9 +553,26 @@ export class AstAbstractLayer {
       }
     }
 
-    // 移除注释和空白（如果需要进一步优化）
-    if (optimizedContext.length > (options.maxTokens || Infinity) * 4) { // 粗略估计
-      optimizedContext = this.removeCommentsAndWhitespace(optimizedContext);
+    // 应用token限制
+    const maxTokens = options.maxTokens || Infinity;
+    const currentTokens = this.estimateTokenCount(optimizedContext);
+    
+    if (currentTokens > maxTokens) {
+      // 首先尝试移除注释和空白
+      const cleanedContext = this.removeCommentsAndWhitespace(optimizedContext);
+      const cleanedTokens = this.estimateTokenCount(cleanedContext);
+      
+      if (cleanedTokens <= maxTokens) {
+        optimizedContext = cleanedContext;
+      } else {
+        // 如果仍然超出限制，进行智能截断
+        optimizedContext = TokenCounter.truncateToTokenLimit(
+          cleanedContext, 
+          maxTokens, 
+          true // 尝试保持结构完整性
+        );
+        technologiesUsed.push('symbol-table'); // 表示使用了截断优化
+      }
     }
 
     const optimizedTokens = this.estimateTokenCount(optimizedContext);
@@ -296,13 +592,23 @@ export class AstAbstractLayer {
   }
 
   /**
-   * 估算token数量（简化实现）
+   * 估算token数量（使用精确的token计数器）
    * @param text 文本
    * @returns token数量
    */
   private estimateTokenCount(text: string): number {
-    // 简化实现，实际应用中可以使用更精确的tokenizer
-    return Math.ceil(text.length / 4);
+    return TokenCounter.estimateTokenCount(text);
+  }
+
+  /**
+   * 读取文件内容
+   * @param filePath 文件路径
+   * @returns 文件内容
+   */
+  private async readFile(filePath: string): Promise<string> {
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(this.config.workingDirectory, filePath);
+    const fs = await import('fs').then(m => m.promises);
+    return fs.readFile(absolutePath, 'utf8');
   }
 
   /**
@@ -327,14 +633,110 @@ export class AstAbstractLayer {
    * @param filePath 文件路径
    * @returns 符号列表
    */
-  async getFileSymbols(filePath: string): Promise<SymbolInfo[]> {
-    if (this.config.symbolTable.isBuiltTable()) {
-      return this.config.symbolTable.getFileSymbols(filePath);
+  async getFileSymbols(filePath: string, forceRefresh: boolean = false): Promise<SymbolInfo[]> {
+    const cacheKey = `file-symbols:${filePath}`;
+    
+    if (!forceRefresh) {
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+    }
+    
+    // 如果需要强制刷新或符号表未构建，重新构建
+    if (forceRefresh || !this.config.symbolTable.isBuiltTable()) {
+      // 清除缓存
+      this.cache.delete(cacheKey);
+      // 重新构建符号表
+      await this.config.symbolTable.build([filePath]);
+    }
+    
+    const symbols = this.config.symbolTable.getFileSymbols(filePath);
+    this.cache.set(cacheKey, symbols);
+    return symbols;
+  }
+
+  /**
+   * 获取文件的依赖关系
+   * @param filePath 文件路径
+   * @returns 依赖关系结果
+   */
+  async getFileDependencies(filePath: string): Promise<DependencyResult> {
+    const cacheKey = `dependencies:${filePath}`;
+    
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
     }
 
-    // 构建符号表
-    await this.config.symbolTable.build([filePath]);
-    return this.config.symbolTable.getFileSymbols(filePath);
+    let dependencies: DependencyResult;
+    const technologiesUsed: ('lsp' | 'tree-sitter' | 'symbol-table')[] = [];
+
+    try {
+      // 使用Tree-sitter解析依赖关系
+      if (this.config.treeSitterTool.isSupportedFile(filePath)) {
+        const rawDependencies = await this.config.treeSitterTool.queryDependencies(filePath);
+        const analyzer = new DependencyAnalyzer();
+        dependencies = analyzer.analyzeDependencies(filePath, rawDependencies);
+        technologiesUsed.push('tree-sitter');
+      } else {
+        // 降级到简单的正则表达式解析
+        const sourceCode = await this.readFile(filePath);
+        dependencies = this.fallbackDependencyAnalysis(filePath, sourceCode);
+        technologiesUsed.push('symbol-table');
+      }
+    } catch (error) {
+      console.error('Dependency analysis failed:', error);
+      // 最后的降级方案
+      const sourceCode = await this.readFile(filePath).catch(() => '');
+      dependencies = this.fallbackDependencyAnalysis(filePath, sourceCode || '');
+      technologiesUsed.push('symbol-table');
+    }
+
+    this.cache.set(cacheKey, dependencies);
+    return dependencies;
+  }
+
+  /**
+   * 降级的依赖关系分析（使用正则表达式）
+   * @param filePath 文件路径
+   * @param sourceCode 源代码
+   * @returns 依赖关系结果
+   */
+  private fallbackDependencyAnalysis(filePath: string, sourceCode: string): DependencyResult {
+    const imports: any[] = [];
+    const exports: any[] = [];
+    const externalDependencies: string[] = [];
+    const internalDependencies: string[] = [];
+
+    if (sourceCode) {
+      // 简单的正则表达式匹配
+      const importMatches = sourceCode.matchAll(/import\s+(?:[^'"]*['"]([^'"]+)['"])/g);
+      for (const match of importMatches) {
+        const source = match[1];
+        if (source.startsWith('.') || source.startsWith('/')) {
+          internalDependencies.push(source);
+        } else {
+          externalDependencies.push(source);
+        }
+      }
+
+      const exportMatches = sourceCode.matchAll(/export\s+.*from\s+['"]([^'"]+)['"]/g);
+      for (const match of exportMatches) {
+        const source = match[1];
+        if (source.startsWith('.') || source.startsWith('/')) {
+          internalDependencies.push(source);
+        } else {
+          externalDependencies.push(source);
+        }
+      }
+    }
+
+    return {
+      filePath,
+      imports,
+      exports,
+      externalDependencies: [...new Set(externalDependencies)],
+      internalDependencies: [...new Set(internalDependencies)]
+    };
   }
 
   /**

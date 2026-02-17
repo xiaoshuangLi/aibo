@@ -180,13 +180,23 @@ describe('LspClient', () => {
             references: {},
             rename: {}
           }),
-          workspace: {
-            symbol: {}
-          }
-        })
-      }));
+          workspace: expect.objectContaining({
+            symbol: {},
+            workspaceFolders: expect.objectContaining({
+              supported: true,
+              changeNotifications: true
+            })
+          })
+        }),
+        workspaceFolders: expect.arrayContaining([
+          expect.objectContaining({
+            uri: 'file:///test',
+            name: 'aibo'
+          })
+        ])
+      }), true);
       
-      expect(sendNotificationMock).toHaveBeenCalledWith('initialized', {});
+      expect(sendNotificationMock).toHaveBeenCalledWith('initialized', {}, true);
     });
   });
 

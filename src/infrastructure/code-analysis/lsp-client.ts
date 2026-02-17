@@ -73,6 +73,14 @@ export interface TextDocumentPositionParams {
 }
 
 /**
+ * LSP工作区文件夹
+ */
+interface WorkspaceFolder {
+  uri: string;
+  name: string;
+}
+
+/**
  * LSP初始化参数
  */
 interface InitializeParams {
@@ -88,8 +96,13 @@ interface InitializeParams {
     };
     workspace?: {
       symbol?: any;
+      workspaceFolders?: {
+        supported?: boolean;
+        changeNotifications?: boolean | string;
+      };
     };
   };
+  workspaceFolders?: WorkspaceFolder[];
 }
 
 /**
@@ -204,25 +217,34 @@ export class LspClient extends EventEmitter {
    * 初始化LSP服务器
    */
   private async initializeServer(): Promise<void> {
+    const workspaceUri = `file://${this.config.workingDirectory}`;
     const initParams: InitializeParams = {
       processId: process.pid,
-      rootUri: `file://${this.config.workingDirectory}`,
+      rootUri: workspaceUri,
       capabilities: {
         textDocument: {
           completion: {},
           hover: {},
           definition: {},
           references: {},
-          rename: {}
+          rename: {},
         },
         workspace: {
-          symbol: {}
+          symbol: {},
+          workspaceFolders: {
+            supported: true,
+            changeNotifications: true
+          }
         }
-      }
+      },
+      workspaceFolders: [{
+        uri: workspaceUri,
+        name: 'aibo'
+      }]
     };
 
-    const result = await this.sendRequest('initialize', initParams);
-    await this.sendNotification('initialized', {});
+    const result = await this.sendRequest('initialize', initParams, true);
+    this.sendNotification('initialized', {}, true);
     
     return result;
   }
@@ -254,10 +276,11 @@ export class LspClient extends EventEmitter {
    * 发送LSP请求
    * @param method 方法名
    * @param params 参数
+   * @param allowUninitialized 是否允许在未初始化状态下发送请求（仅用于initialize请求）
    * @returns Promise<any>
    */
-  async sendRequest(method: string, params: any): Promise<any> {
-    if (!this.isInitialized) {
+  async sendRequest(method: string, params: any, allowUninitialized: boolean = false): Promise<any> {
+    if (!this.isInitialized && !allowUninitialized) {
       throw new Error('LSP server is not initialized');
     }
 
@@ -278,7 +301,7 @@ export class LspClient extends EventEmitter {
       this.pendingRequests.set(requestId, (result) => {
         clearTimeout(timeout);
         if (result?.error) {
-          reject(new Error(`LSP request failed: ${result.error.message} (code: ${result.error.code})`));
+          reject(new Error(`LSP request failed: ${result.error.message} (code: ${result.error.code})\n${JSON.stringify(message, null, 2)}`));
         } else {
           resolve(result);
         }
@@ -292,9 +315,10 @@ export class LspClient extends EventEmitter {
    * 发送LSP通知
    * @param method 方法名
    * @param params 参数
+   * @param allowUninitialized 是否允许在未初始化状态下发送通知（仅用于initialized通知）
    */
-  sendNotification(method: string, params: any): void {
-    if (!this.isInitialized) {
+  sendNotification(method: string, params: any, allowUninitialized: boolean = false): void {
+    if (!this.isInitialized && !allowUninitialized) {
       throw new Error('LSP server is not initialized');
     }
 

@@ -215,16 +215,6 @@ npm run test:coverage
 
 ---
 
-## 📝 Changelog (变更日志)
-
-| 版本 | 日期 | 作者 | 变更描述 |
-|------|------|------|----------|
-| v1.0.0 | YYYY-MM-DD | [@author](https://github.com/author) | 初始实现 |
-| v1.0.1 | YYYY-MM-DD | [@author](https://github.com/author) | Bug 修复和性能优化 |
-
-> **最后更新**: YYYY-MM-DD  
-> **文档状态**: ✅ 已完成 / 🚧 进行中 / 📝 待完善
-
 <!--
 IMPORTANT NAMING RULES FOR DEVELOPERS (NOT PART OF FEATURE CONTENT):
 - Generated feature files must be named as `features/[###]-[feature-name].md`

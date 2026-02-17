@@ -32,6 +32,8 @@ Use this skill when you have uncommitted code changes that need to be:
    - Re-run tests after each fix to verify resolution
    - Continue until all tests pass AND coverage ≥85%
 
+**MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-test-coverage.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your implementation based on the feedback and re-run the validation until it passes.
+
 **Key Principle**: Never attempt to fix multiple issues simultaneously. Focus on one failing test or coverage gap at a time.
 
 ### Step 2: Extract Requirements from Uncommitted Changes
@@ -49,6 +51,8 @@ Use this skill when you have uncommitted code changes that need to be:
    - "As a [user role], I want [feature] so that [business value]"
    - Focus on WHAT the feature does, not HOW it's implemented
 
+**MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-requirements-extraction.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your requirements extraction based on the feedback and re-run the validation until it passes.
+
 ### Step 3: Create Feature Documentation
 
 **Objective**: Generate comprehensive feature documentation using the standard template
@@ -63,6 +67,8 @@ Use this skill when you have uncommitted code changes that need to be:
    - **Impact Analysis**: File changes from `git diff --name-status`
 3. **Assign sequential numbering**: Check existing features in `features/` directory and use next available number (e.g., if max is 042, use 043)
 
+**MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-feature-documentation.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your feature documentation based on the feedback and re-run the validation until it passes.
+
 ### Step 4: Commit with Proper Structure
 
 **Objective**: Create a clean, well-structured commit
@@ -72,6 +78,8 @@ Use this skill when you have uncommitted code changes that need to be:
 2. **Create feature file**: Save the generated feature documentation as `features/[###]-[feature-name].md`
 3. **Commit with descriptive message**: Follow conventional commit format
 4. **Verify final state**: Ensure working directory is clean and all changes are committed
+
+**MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-commit-structure.js` and ensure it passes. If the validation fails, you must adjust your commit structure based on the feedback and re-run the validation until it passes.
 
 ## Quality Gates
 
@@ -91,6 +99,18 @@ If any step fails:
 2. **Address the specific failure** without proceeding to next steps
 3. **Re-validate** the fixed step before continuing
 4. **Maintain focus** on one problem at a time
+5. **Use validation scripts**: Always run the corresponding validation script after each step to ensure correctness
+
+## Validation Scripts
+
+The following JavaScript validation scripts are provided to ensure each phase is completed correctly:
+
+- **Phase 1**: `./skills/feature-organizer/scripts/validate-test-coverage.js` - Validates test execution and coverage
+- **Phase 2**: `./skills/feature-organizer/scripts/validate-requirements-extraction.js` - Validates requirements extraction from uncommitted changes
+- **Phase 3**: `./skills/feature-organizer/scripts/validate-feature-documentation.js` - Validates feature documentation structure and content
+- **Phase 4**: `./skills/feature-organizer/scripts/validate-commit-structure.js` - Validates commit structure and cleanliness
+
+**IMPORTANT**: Each validation script MUST be executed after its corresponding phase and MUST pass before proceeding to the next phase. The validation scripts provide detailed feedback that should be used to adjust the implementation if needed.
 
 ## Example Usage Scenarios
 

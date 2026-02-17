@@ -173,7 +173,32 @@ export class TreeSitterParser {
    * @returns 结构化节点信息
    */
   private nodeToInfo(node: Parser.SyntaxNode, sourceCode: string): AstNodeInfo {
-    const text = sourceCode.slice(node.startIndex, node.endIndex);
+    let startIndex = node.startIndex;
+    let endIndex = node.endIndex;
+    
+    // 对于方法定义，检查前一个兄弟节点是否是装饰器
+    if (node.type === 'method_definition' && node.parent) {
+      const siblings = node.parent.children;
+      const currentIndex = siblings.indexOf(node);
+      
+      if (currentIndex > 0) {
+        // 从当前节点向前查找连续的装饰器
+        for (let i = currentIndex - 1; i >= 0; i--) {
+          const sibling = siblings[i];
+          if (sibling.type === 'decorator') {
+            startIndex = Math.min(startIndex, sibling.startIndex);
+          } else if (sibling.type === 'comment' || /^\s*$/.test(sibling.text)) {
+            // 跳过注释和空白
+            continue;
+          } else {
+            // 遇到非装饰器、非注释、非空白节点，停止查找
+            break;
+          }
+        }
+      }
+    }
+    
+    const text = sourceCode.slice(startIndex, endIndex);
     return {
       type: node.type,
       text,
@@ -317,6 +342,83 @@ export class TreeSitterParser {
 
     visit(root);
     return types;
+  }
+
+  /**
+   * 查询变量声明
+   * @param sourceCode 源代码
+   * @param filePath 文件路径
+   * @returns 变量声明列表
+   */
+  queryVariables(sourceCode: string, filePath: string): AstNodeInfo[] {
+    const tree = this.parse(sourceCode, filePath);
+    const root = tree.rootNode;
+    const variables: AstNodeInfo[] = [];
+
+    const visit = (node: Parser.SyntaxNode) => {
+      // 查找变量声明
+      if (node.type === 'variable_declarator') {
+        variables.push(this.nodeToInfo(node, sourceCode));
+      }
+      // 查找常量声明
+      else if (node.type === 'lexical_declaration' && 
+               (node.firstChild?.text === 'const' || node.firstChild?.text === 'let')) {
+        // 遍历declarator子节点
+        for (const child of node.children) {
+          if (child.type === 'variable_declarator') {
+            variables.push(this.nodeToInfo(child, sourceCode));
+          }
+        }
+      }
+      
+      for (const child of node.children) {
+        visit(child);
+      }
+    };
+
+    visit(root);
+    return variables;
+  }
+
+  /**
+   * 查询依赖关系（导入和导出语句）
+   * @param sourceCode 源代码
+   * @param filePath 文件路径
+   * @returns 依赖关系信息
+   */
+  queryDependencies(sourceCode: string, filePath: string): {
+    imports: AstNodeInfo[];
+    exports: AstNodeInfo[];
+  } {
+    const tree = this.parse(sourceCode, filePath);
+    const root = tree.rootNode;
+    const imports: AstNodeInfo[] = [];
+    const exports: AstNodeInfo[] = [];
+
+    const visit = (node: Parser.SyntaxNode) => {
+      // 处理导入语句
+      if (node.type === 'import_statement') {
+        imports.push(this.nodeToInfo(node, sourceCode));
+      }
+      // 处理导出语句
+      else if (node.type === 'export_statement' || 
+               node.type === 'export_clause' ||
+               node.type === 'export_default_declaration' ||
+               node.type === 'export_named_declaration') {
+        exports.push(this.nodeToInfo(node, sourceCode));
+      }
+      // 处理默认导出
+      else if (node.type === 'export' && node.parent?.type === 'program') {
+        exports.push(this.nodeToInfo(node, sourceCode));
+      }
+      
+      for (const child of node.children) {
+        visit(child);
+      }
+    };
+
+    visit(root);
+    return { imports, exports };
   }
 
   /**

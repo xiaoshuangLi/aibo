@@ -20,6 +20,8 @@
  * @class LspServiceManager
  */
 import path from 'path';
+import { execSync } from 'child_process';
+import { existsSync } from 'fs';
 import { LspClient, LspClientConfig, Position } from '@/infrastructure/code-analysis/lsp-client';
 
 /**

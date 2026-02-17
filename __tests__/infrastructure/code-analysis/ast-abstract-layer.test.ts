@@ -105,19 +105,36 @@ describe('AstAbstractLayer', () => {
       
       mockTreeSitterTool.isSupportedFile.mockReturnValue(true);
       mockTreeSitterTool.queryFunctions.mockResolvedValue([
-        { type: 'function_declaration', text: 'function test() {}', startPosition: { row: 4, column: 0 }, endPosition: { row: 6, column: 1 } }
+        { 
+          type: 'function_declaration', 
+          text: 'function testFunction() {}', 
+          startPosition: { row: 0, column: 0 }, 
+          endPosition: { row: 10, column: 25 } 
+        }
       ]);
+      mockTreeSitterTool.queryClasses.mockResolvedValue([]);
+      mockTreeSitterTool.queryInterfaces.mockResolvedValue([]);
+      mockTreeSitterTool.queryTypeDefinitions.mockResolvedValue([]);
+      mockTreeSitterTool.queryVariables.mockResolvedValue([]);
       
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      mockReadFile.mockResolvedValue('function testFunction() {}');
       
-      const result = await astAbstractLayer.getDefinition('/test/file.ts', 5, 10);
+      const result = await astAbstractLayer.getDefinition('/test/file.ts', 0, 0);
+      
+      // Check if there were any errors
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
       
       expect(result).toBeDefined();
+      expect(result.name).toBe('testFunction');
+      expect(result.kind).toBe(12); // Function
       expect(mockLspTool.getDefinition).toHaveBeenCalled();
       expect(mockTreeSitterTool.queryFunctions).toHaveBeenCalled();
       expect(consoleWarnSpy).toHaveBeenCalledWith('LSP definition failed, falling back to Tree-sitter:', expect.any(Error));
       
       consoleWarnSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
 
     test('should fallback to symbol table when both LSP and Tree-sitter fail', async () => {
@@ -366,8 +383,11 @@ describe('AstAbstractLayer', () => {
       const shortCount = (astAbstractLayer as any).estimateTokenCount(shortText);
       const longCount = (astAbstractLayer as any).estimateTokenCount(longText);
       
-      expect(shortCount).toBe(Math.ceil(shortText.length / 4));
-      expect(longCount).toBe(Math.ceil(longText.length / 4));
+      // Based on TokenCounter's actual implementation:
+      // shortText: charCount=5, wordCount=1 -> Math.ceil(5*0.25 + 1*0.75) = Math.ceil(2) = 2
+      // longText: charCount=33, wordCount=7 -> Math.ceil(33*0.25 + 7*0.75) = Math.ceil(13.5) = 14
+      expect(shortCount).toBe(2);
+      expect(longCount).toBe(14);
     });
   });
 

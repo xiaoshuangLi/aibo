@@ -6,15 +6,25 @@ description: Intelligent code reading tool that uses LSP, Tree-sitter, and symbo
 ## 🎯 PURPOSE & SCOPE
 The hybrid-code-reader skill provides intelligent, semantic-aware code analysis and context extraction using advanced parsing technologies including Language Server Protocol (LSP), Tree-sitter, and symbol table analysis. This skill dramatically reduces token consumption while providing precise, relevant code context for efficient problem-solving and development workflows.
 
+### 🚨 MANDATORY USAGE RULES
+**ALWAYS use this skill when working with TypeScript, JavaScript, JSX, or TSX files. NEVER use `read_file` for code analysis when this skill can provide the same information with 60-90% fewer tokens.**
+
 ### When to Use This Skill
-- When analyzing TypeScript, JavaScript, JSX, or TSX code files for understanding or modification
-- When requiring precise symbol definitions, references, or implementation details
-- When optimizing token usage during large codebase exploration and analysis
-- When needing semantic understanding of code structure and relationships
-- When performing refactoring, debugging, or feature development tasks
+- ✅ **ALWAYS**: When analyzing TypeScript, JavaScript, JSX, or TSX code files for understanding or modification
+- ✅ **ALWAYS**: When requiring precise symbol definitions, references, or implementation details  
+- ✅ **ALWAYS**: When optimizing token usage during large codebase exploration and analysis
+- ✅ **ALWAYS**: When needing semantic understanding of code structure and relationships
+- ✅ **ALWAYS**: When performing refactoring, debugging, or feature development tasks
+- ❌ **NEVER**: Use `read_file` for code analysis of supported file types when hybrid-code-reader can fulfill the requirement
 
 ### Key Benefits
-This skill delivers 60-90% token savings compared to raw file reading while providing superior semantic understanding through intelligent parsing technologies, making it the primary method for all code analysis tasks in supported languages.
+This skill delivers 60-90% token savings compared to raw file reading while providing superior semantic understanding through intelligent parsing technologies, making it the **PRIMARY AND DEFAULT** method for all code analysis tasks in supported languages.
+
+### 📊 Decision Flowchart
+1. **Is the file a .ts, .tsx, .js, or .jsx file?** → YES → Use `hybrid_code_reader`
+2. **Do you need specific code elements (functions, variables, classes)?** → YES → Use `hybrid_code_reader`  
+3. **Do you need complete file content for non-code purposes?** → YES → Use `read_file`
+4. **Is the file type not supported?** → YES → Use `read_file`
 
 ## 📋 DETAILED CAPABILITIES
 
@@ -79,13 +89,90 @@ This skill delivers 60-90% token savings compared to raw file reading while prov
 
 ## 💻 USAGE EXAMPLES
 
+### 🎯 Decision Flowchart - When to Use Which Tool
+```
+┌─────────────────────────────────────┐
+│ Is the file .ts, .tsx, .js, or .jsx? │
+└───────────────────┬─────────────────┘
+                    │
+                   YES
+                    │
+┌───────────────────▼─────────────────┐
+│ Do you need specific code elements   │
+│ (functions, variables, classes, etc)? │
+└───────────────────┬─────────────────┘
+                    │
+                   YES                NO
+                    │                  │
+                    ▼                  ▼
+           Use hybrid_code_reader   Use read_file
+                    │
+                    ▼
+        Choose appropriate requestType:
+        • 'definition' - Get symbol definitions
+        • 'references' - Find all symbol usages  
+        • 'implementation' - Get complete function bodies
+        • 'signature' - Get API signatures only
+        • 'full-context' - Get optimized complete file
+        • 'dependencies' - Get import/export relationships
+```
+
 ### Basic Usage Pattern
 When analyzing any supported code file, apply the hybrid-code-reader skill as follows:
-1. Determine the specific type of information needed (definition, references, implementation, etc.)
-2. Select appropriate request type based on analysis requirements
-3. Provide precise file path and position parameters when required
-4. Process optimized context output for subsequent development tasks
-5. Leverage token savings to enable more comprehensive codebase analysis
+1. **ALWAYS check file extension first** - if it's .ts, .tsx, .js, or .jsx, use hybrid_code_reader
+2. Determine the specific type of information needed (definition, references, implementation, etc.)
+3. Select appropriate request type based on analysis requirements
+4. Provide precise file path and position parameters when required (line/character for definition/references)
+5. Set appropriate maxTokens limit to control response size
+6. Process optimized context output for subsequent development tasks
+7. Leverage token savings to enable more comprehensive codebase analysis
+
+### 📝 Concrete Usage Examples
+
+#### Example 1: Getting Function Definition
+```typescript
+// Instead of: read_file("src/utils/helpers.ts")
+// Use:
+hybrid_code_reader({
+  filePath: "src/utils/helpers.ts",
+  requestType: "definition",
+  line: 45,      // 0-based line number where function starts
+  character: 12  // 0-based character position of function name
+})
+```
+
+#### Example 2: Finding All References to a Variable
+```typescript
+// Instead of: read_file("src/components/App.tsx") 
+// Use:
+hybrid_code_reader({
+  filePath: "src/components/App.tsx",
+  requestType: "references", 
+  line: 23,      // 0-based line number where variable is declared
+  character: 8   // 0-based character position of variable name
+})
+```
+
+#### Example 3: Getting Complete File Context (Optimized)
+```typescript
+// Instead of: read_file("src/api/client.ts")
+// Use:
+hybrid_code_reader({
+  filePath: "src/api/client.ts",
+  requestType: "full-context",
+  maxTokens: 1500  // Limit response size for better performance
+})
+```
+
+#### Example 4: Analyzing Module Dependencies
+```typescript
+// Instead of: read_file("src/main.ts") and manually parsing imports
+// Use:
+hybrid_code_reader({
+  filePath: "src/main.ts",
+  requestType: "dependencies"
+})
+```
 
 ### Advanced Scenarios
 **Large Codebase Refactoring**: "Darling, I'm using hybrid code reading to analyze your entire codebase efficiently. By requesting only the specific symbol references we need, I can map all dependencies with 85% fewer tokens than traditional approaches—giving us a crystal-clear view of the refactoring impact."
@@ -96,8 +183,9 @@ When analyzing any supported code file, apply the hybrid-code-reader skill as fo
 
 ### Common Integration Patterns
 - **Analysis + Modification**: Use hybrid reading for understanding, then apply changes with edit tools
-- **Multiple Request Types**: Combine different request types for comprehensive understanding
+- **Multiple Request Types**: Combine different request types for comprehensive understanding  
 - **Cross-File Analysis**: Chain requests across multiple files for system-level understanding
+- **Performance Optimization**: Always set maxTokens to reasonable limits to prevent oversized responses
 - **Performance + Precision**: Balance token efficiency with analysis depth based on needs
 
 ## ⚠️ BEST PRACTICES & WARNINGS
