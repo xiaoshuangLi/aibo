@@ -17,14 +17,14 @@ export default async function getTools() {
     githubFetchTools,
     tencentWsaTools,
     hybridCodeReaderTools,
-    composioTools
+    composioTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
     getGithubFetchTools(),
     getTencentWsaTools(),
     getHybridCodeReaderTools(),
-    getComposioTools()
+    getComposioTools(),
   ]);
   
   return [

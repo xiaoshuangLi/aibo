@@ -45,10 +45,11 @@ export interface OutputEvent {
  */
 export interface IOChannel {
   /**
-   * 发送输出事件
+   * 发送输出事件并等待所有异步监听器完成
    * @param event 输出事件
+   * @returns Promise<void> - 当所有监听器完成时解析
    */
-  emit(event: OutputEvent): void;
+  emit(event: OutputEvent): Promise<void>;
   
   /**
    * 请求用户输入
@@ -88,20 +89,31 @@ export interface IOChannel {
 export class DefaultIOChannel implements IOChannel {
   private listeners: Map<OutputEventType, Set<(data: any) => void>> = new Map();
   
-  emit(event: OutputEvent): void {
+  async emit(event: OutputEvent): Promise<void> {
     const { type, data } = event;
     const eventListeners = this.listeners.get(type);
     if (eventListeners) {
-      eventListeners.forEach(listener => listener(data));
+      // 收集所有监听器的 Promise
+      const promises: Promise<any>[] = [];
+      eventListeners.forEach(listener => {
+        const result = listener(data);
+        // 如果监听器返回 Promise，则等待它完成
+        if (result != null && typeof (result as any).then === 'function') {
+          promises.push(result as Promise<any>);
+        }
+      });
+      
+      // 等待所有异步监听器完成
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
     }
   }
   
-  async requestUserInput(prompt?: string): Promise<string> {
+  async requestUserInput(prompt?: string): Promise<void> {
     // 默认实现抛出错误，具体适配器需要重写
     throw new Error('requestUserInput not implemented');
   }
-  
-
   
   setAbortSignal(signal: AbortSignal): void {
     // 默认空实现

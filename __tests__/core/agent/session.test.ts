@@ -3,8 +3,8 @@ import { IOChannel } from '@/core/agent/io-channel';
 
 // Mock IOChannel
 const mockIOChannel = {
-  emit: jest.fn(),
-  requestUserInput: jest.fn(),
+  emit: jest.fn().mockResolvedValue(undefined),
+  requestUserInput: jest.fn().mockResolvedValue('test input'),
   setAbortSignal: jest.fn(),
   destroy: jest.fn()
 } as unknown as IOChannel;
@@ -57,8 +57,8 @@ describe('Session', () => {
   });
 
   describe('start', () => {
-    test('should emit sessionStart event', () => {
-      session.start();
+    test('should emit sessionStart event', async () => {
+      await session.start();
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionStart',
@@ -69,8 +69,8 @@ describe('Session', () => {
   });
 
   describe('end', () => {
-    test('should emit sessionEnd event and destroy ioChannel', () => {
-      session.end('Goodbye!');
+    test('should emit sessionEnd event and destroy ioChannel', async () => {
+      await session.end('Goodbye!');
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionEnd',
@@ -80,8 +80,8 @@ describe('Session', () => {
       expect(ioChannel.destroy).toHaveBeenCalled();
     });
 
-    test('should use default exit message', () => {
-      session.end();
+    test('should use default exit message', async () => {
+      await session.end();
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionEnd',

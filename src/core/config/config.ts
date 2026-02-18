@@ -44,6 +44,8 @@ const envSchema = z.object({
   // Composio Configuration
   COMPOSIO_API_KEY: z.string().min(1).default('test-composio-api-key'),
   COMPOSIO_EXTERNAL_USER_ID: z.string().min(1).default('test-external-user-id'),
+  // Advanced Subtask Configuration
+  MAX_CONCURRENT_SUBTASKS: z.coerce.number().int().min(1).max(50).default(5),
 });
 
 // Parse and validate environment variables
@@ -99,5 +101,8 @@ export const config = {
   composio: {
     apiKey: env.COMPOSIO_API_KEY,
     externalUserId: env.COMPOSIO_EXTERNAL_USER_ID,
+  },
+  advanced: {
+    maxConcurrentSubtasks: env.MAX_CONCURRENT_SUBTASKS,
   },
 };

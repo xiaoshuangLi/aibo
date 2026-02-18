@@ -10,15 +10,14 @@
  */
 
 import readline from 'readline';
-import { IOChannel, OutputEvent, OutputEventType } from '@/core/agent/io-channel';
+import { DefaultIOChannel, OutputEvent, OutputEventType } from '@/core/agent/io-channel';
 import { styled } from '@/presentation/styling/output-styler';
 import { config } from '@/core/config/config';
 
-export class TerminalAdapter implements IOChannel {
+export class TerminalAdapter extends DefaultIOChannel {
   private _rl: readline.Interface | null = null;
   private abortController: AbortController | null = null;
   private isDestroyed = false;
-  private listeners: Map<OutputEventType, Set<(data: any) => void>> = new Map();
 
   // Expose rl for compatibility with existing code that needs direct access
   get rl(): readline.Interface | null {
@@ -26,6 +25,8 @@ export class TerminalAdapter implements IOChannel {
   }
 
   constructor() {
+    super(); // Call parent constructor
+    
     this.setupProcessHandlers();
     
     // Initialize readline interface immediately
@@ -39,6 +40,21 @@ export class TerminalAdapter implements IOChannel {
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    
+    this.on('aiResponse', this.handleAIResponse.bind(this));
+    this.on('toolCall', this.handleToolCall.bind(this));
+    this.on('toolResult', this.handleToolResult.bind(this));
+    this.on('thinkingProcess', this.handleThinkingProcess.bind(this));
+    this.on('systemMessage', this.handleSystemMessage.bind(this));
+    this.on('errorMessage', this.handleErrorMessage.bind(this));
+    this.on('hintMessage', this.handleHintMessage.bind(this));
+    this.on('streamStart', this.handleStreamStart.bind(this));
+    this.on('streamChunk', this.handleStreamChunk.bind(this));
+    this.on('streamEnd', this.handleStreamEnd.bind(this));
+    this.on('sessionStart', this.handleSessionStart.bind(this));
+    this.on('sessionEnd', this.handleSessionEnd.bind(this));
+    this.on('commandExecuted', this.handleCommandExecuted.bind(this));
+    this.on('rawText', this.handleRawText.bind(this));
   }
 
   private setupProcessHandlers(): void {
@@ -71,7 +87,7 @@ export class TerminalAdapter implements IOChannel {
     }
   }
 
-  requestUserInput(prompt: string = "\n👤 你: "): void {
+  async requestUserInput(prompt: string = "\n👤 你: "): Promise<void> {
     if (this.isDestroyed) {
       throw new Error('Terminal adapter is destroyed');
     }
@@ -79,63 +95,18 @@ export class TerminalAdapter implements IOChannel {
     this.showPrompt(prompt);
   }
 
-  emit(event: OutputEvent): void {
-    if (this.isDestroyed) return;
-    
-    const { type, data } = event;
-    
-    switch (type) {
-      case 'aiResponse':
-        this.handleAIResponse(data);
-        break;
-      case 'toolCall':
-        this.handleToolCall(data);
-        break;
-      case 'toolResult':
-        this.handleToolResult(data);
-        break;
-      case 'thinkingProcess':
-        this.handleThinkingProcess(data);
-        break;
-      case 'systemMessage':
-        this.handleSystemMessage(data);
-        break;
-      case 'errorMessage':
-        this.handleErrorMessage(data);
-        break;
-      case 'hintMessage':
-        this.handleHintMessage(data);
-        break;
-      case 'streamStart':
-        this.handleStreamStart(data);
-        break;
-      case 'streamChunk':
-        this.handleStreamChunk(data);
-        break;
-      case 'streamEnd':
-        this.handleStreamEnd(data);
-        break;
-      case 'sessionStart':
-        this.handleSessionStart(data);
-        break;
-      case 'sessionEnd':
-        this.handleSessionEnd(data);
-        break;
-      case 'commandExecuted':
-        this.handleCommandExecuted(data);
-        break;
-      case 'rawText':
-        this.handleRawText(data);
-        break;
-      case 'userInputRequest':
-        // userInputRequest 通常由 requestUserInput 处理，这里可以忽略
-        break;
-    }
-  }
-
   private async handleAIResponse(data: { content: string }): Promise<void> {
     if (!data?.content) return;
-    process.stdout.write(`\n🤖 ${data.content}`);
+    
+    // 实现打字机效果
+    const verbose = config.output.verbose;
+    const delay = verbose ? 5 : 15;
+    
+    for (const char of data.content) {
+      if (this.abortController?.signal.aborted) break;
+      process.stdout.write(char);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 
   private handleToolCall(data: { name: string; args: any }): void {
@@ -143,10 +114,83 @@ export class TerminalAdapter implements IOChannel {
     console.log(styled.toolCall(data.name, data.args));
   }
 
-  private handleToolResult(data: { name: string; success: boolean; preview: string }): void {
+  private handleToolResult(data: any): void {
     if (!data?.name) return;
-    console.log(styled.toolResult(data.name, data.success, data.preview));
-    console.log('\n');
+    
+    // 如果已经有 preview 字段，直接使用（向后兼容）
+    if (data.preview !== undefined) {
+      console.log(styled.toolResult(data.name, data.success, data.preview));
+      return;
+    }
+    
+    // 处理新的数据结构
+    let preview = "";
+    const verbose = config.output.verbose;
+    
+    // 特别处理 task 工具的结果
+    if (data.isTaskResult) {
+      const type = data.name.includes('结果') ? data.name : '子代理任务';
+      if (typeof data.result === 'string' && data.result.includes('▸ 结果:')) {
+        preview = data.result;
+      } else {
+        preview = `▸ 结果: ${styled.truncated(data.result, verbose ? 300 : 150)}`;
+      }
+      
+      console.log(styled.toolResult(type, data.success, preview));
+      return;
+    }
+    
+    // 处理文本结果
+    if (data.isTextResult) {
+      preview = styled.truncated(data.result, verbose ? 300 : 150);
+      console.log(styled.toolResult(data.name, data.success, preview));
+      return;
+    }
+    
+    // 处理 JSON 结果
+    if (data.isJsonResult && data.result) {
+      const parsed = data.result;
+      
+      // 特别处理 task 工具的 JSON 结果
+      if (data.name === '子代理任务' || data.name === 'task') {
+        if (parsed.message) {
+          preview = `▸ 结果: ${styled.truncated(parsed.message, verbose ? 300 : 150)}`;
+        } else if (typeof parsed === 'string') {
+          preview = `▸ 结果: ${styled.truncated(parsed, verbose ? 300 : 150)}`;
+        } else {
+          preview = `▸ 任务已完成`;
+        }
+        
+        console.log(styled.toolResult('子代理任务', data.success, preview));
+        return;
+      }
+      
+      if (parsed.command) {
+        preview = `▸ 命令: ${styled.truncated(parsed.command, 80)}`;
+      } else if (parsed.filepath) {
+        preview = `▸ 文件: ${parsed.filepath}`;
+      }
+      
+      if (parsed.stdout) {
+        const out = String(parsed.stdout).trim();
+        if (out && out !== "(empty)") {
+          preview += `\n▸ 输出: ${styled.truncated(out.split('\n')[0] || out, verbose ? 200 : 80)}`;
+        }
+      }
+      
+      if (parsed.stderr?.trim() !== "(empty)") {
+        preview += `\n▸ 错误: ${styled.truncated(parsed.stderr.split('\n')[0], verbose ? 100 : 60)}`;
+      }
+      
+      console.log(styled.toolResult(data.name || "unknown", data.success, preview || "无输出"));
+      return;
+    }
+    
+    // 处理原始结果字符串
+    if (data.result) {
+      preview = styled.truncated(data.result, verbose ? 300 : 150);
+      console.log(styled.toolResult(data.name || "unknown", data.success, preview));
+    }
   }
 
   private handleThinkingProcess(data: { steps: Array<{ content: string; status?: string }> }): void {
@@ -195,7 +239,7 @@ export class TerminalAdapter implements IOChannel {
 
   private async handleStreamEnd(data: { finalContent?: string }): Promise<void> {
     if (!this.abortController?.signal.aborted && data?.finalContent && !data.finalContent.trim().endsWith(".")) {
-      process.stdout.write(".\n");
+      process.stdout.write("\n\n");
     }
   }
 
@@ -225,20 +269,6 @@ export class TerminalAdapter implements IOChannel {
   private handleRawText(data: { text: string }): void {
     if (data?.text) {
       console.log(data.text);
-    }
-  }
-
-  on(eventType: OutputEventType, listener: (data: any) => void): void {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, new Set());
-    }
-    this.listeners.get(eventType)!.add(listener);
-  }
-
-  off(eventType: OutputEventType, listener: (data: any) => void): void {
-    const eventListeners = this.listeners.get(eventType);
-    if (eventListeners) {
-      eventListeners.delete(listener);
     }
   }
 
@@ -278,7 +308,7 @@ export class TerminalAdapter implements IOChannel {
       this.abortController = null;
     }
     
-    this.listeners.clear();
+    super.destroy();
     
     // 清理进程监听器（简化处理，实际可能需要更精细的管理）
     // 在测试环境中不退出进程

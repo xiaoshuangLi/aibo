@@ -86,7 +86,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       // Virtual machine files
       '.vdi', '.vhd', '.vhdx', '.qcow2', '.raw',
       // Font files
-      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt'
+      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt', '.tsbuildinfo'
     ]);
   }
 
@@ -108,7 +108,9 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    * Check if a file extension is allowed
    */
   isAllowedExtension(filePath: string): boolean {
-    const ext = path.extname(filePath).toLowerCase();
+    const name = path.basename(filePath);
+    const match = name.match(/\.[^\.]+$/);
+    const ext = match ? match[0].toLowerCase() : '';
     
     // If it's in blocked extensions, reject immediately
     if (this.blockedExtensions.has(ext)) {
@@ -262,8 +264,16 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       
       // Filter out files that are in ignored directories
       const filteredMatches = result.filter((match: GrepMatch) => {
-        const fileDir = path.dirname(match.path);
-        return !this.shouldIgnoreDirectory(fileDir);
+        const fullPath = match.path;
+        
+        // Check if file is in an ignored directory
+        const fileDir = path.dirname(fullPath);
+        if (this.shouldIgnoreDirectory(fileDir)) {
+          return false;
+        }
+        
+        // Check if file has allowed extension
+        return this.isAllowedExtension(fullPath);
       });
       
       return filteredMatches;

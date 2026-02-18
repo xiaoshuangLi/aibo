@@ -9,19 +9,9 @@ import {
 } from '@/core/utils/stream-handler';
 import { HumanMessage } from "langchain";
 
-// Mock the styled function and other dependencies
+// Mock dependencies (stream-handler no longer uses styled directly)
 jest.mock('@/presentation/styling/output-styler', () => ({
-  styled: {
-    tool: jest.fn((name, args) => `TOOL: ${name}(${JSON.stringify(args)})`),
-    toolResult: jest.fn((result) => `RESULT: ${result}`),
-    thinking: jest.fn(() => '🤔 Thinking...'),
-    aiResponse: jest.fn((content) => `AI: ${content}`),
-    todoList: jest.fn((todos) => `TODO: ${JSON.stringify(todos)}`),
-    toolCall: jest.fn((name, args) => `TOOL_CALL: ${name}(${JSON.stringify(args)})`),
-    truncated: jest.fn((text, limit) => text.length > limit ? text.substring(0, limit) + '...' : text),
-    error: jest.fn((text) => `ERROR: ${text}`),
-    assistant: jest.fn((text) => `ASSISTANT: ${text}`)
-  }
+  styled: {}
 }));
 
 jest.mock('@/shared/utils/logging', () => ({
@@ -30,6 +20,7 @@ jest.mock('@/shared/utils/logging', () => ({
 
 describe('Stream Handler', () => {
   let mockState: StreamState;
+  let mockSession: any;
   
   beforeEach(() => {
     mockState = {
@@ -37,6 +28,17 @@ describe('Stream Handler', () => {
       lastToolCall: null,
       hasDisplayedThinking: false,
       abortSignal: new AbortController().signal
+    };
+    
+    mockSession = {
+      ioChannel: {
+        emit: jest.fn(),
+        requestUserInput: jest.fn(),
+        setAbortSignal: jest.fn(),
+        on: jest.fn(),
+        off: jest.fn(),
+        destroy: jest.fn()
+      }
     };
   });
 
@@ -49,7 +51,7 @@ describe('Stream Handler', () => {
         }]
       };
       
-      handleToolCall(msg, mockState);
+      handleToolCall(msg, mockState, mockSession);
       
       expect(mockState.lastToolCall).toEqual(msg.tool_calls[0]);
     });
@@ -64,7 +66,7 @@ describe('Stream Handler', () => {
         }]
       };
       
-      handleToolCall(msg, mockState);
+      handleToolCall(msg, mockState, mockSession);
       
       expect(mockState.lastToolCall).toEqual({
         name: 'testTool',
@@ -78,7 +80,7 @@ describe('Stream Handler', () => {
       const msg = { content: 'test' };
       const originalState = { ...mockState };
       
-      handleToolCall(msg, mockState);
+      handleToolCall(msg, mockState, mockSession);
       
       expect(mockState).toEqual(originalState);
     });
@@ -91,10 +93,10 @@ describe('Stream Handler', () => {
       };
       mockState.lastToolCall = { name: 'testTool' };
       
-      handleToolResult(msg, mockState);
+      handleToolResult(msg, mockState, mockSession);
       
       // Should not throw error
-      expect(() => handleToolResult(msg, mockState)).not.toThrow();
+      expect(() => handleToolResult(msg, mockState, mockSession)).not.toThrow();
     });
 
     it('should handle text tool result', () => {
@@ -103,9 +105,9 @@ describe('Stream Handler', () => {
       };
       mockState.lastToolCall = { name: 'testTool' };
       
-      handleToolResult(msg, mockState);
+      handleToolResult(msg, mockState, mockSession);
       
-      expect(() => handleToolResult(msg, mockState)).not.toThrow();
+      expect(() => handleToolResult(msg, mockState, mockSession)).not.toThrow();
     });
 
     it('should handle undefined tool result', () => {
@@ -113,7 +115,7 @@ describe('Stream Handler', () => {
         tool_result: undefined
       };
       
-      expect(() => handleToolResult(msg, mockState)).not.toThrow();
+      expect(() => handleToolResult(msg, mockState, mockSession)).not.toThrow();
     });
   });
 
@@ -122,14 +124,14 @@ describe('Stream Handler', () => {
       const result = '{"data": "test"}';
       const lastToolCall = { name: 'testTool' };
       
-      expect(() => handleJsonToolResult(result, lastToolCall)).not.toThrow();
+      expect(() => handleJsonToolResult(result, lastToolCall, mockSession)).not.toThrow();
     });
 
     it('should handle invalid JSON result', () => {
       const result = 'invalid json';
       const lastToolCall = { name: 'testTool' };
       
-      expect(() => handleJsonToolResult(result, lastToolCall)).not.toThrow();
+      expect(() => handleJsonToolResult(result, lastToolCall, mockSession)).not.toThrow();
     });
   });
 
@@ -138,7 +140,7 @@ describe('Stream Handler', () => {
       const result = 'test result';
       const lastToolCall = { name: 'testTool' };
       
-      expect(() => handleTextToolResult(result, lastToolCall)).not.toThrow();
+      expect(() => handleTextToolResult(result, lastToolCall, mockSession)).not.toThrow();
     });
   });
 
@@ -146,19 +148,19 @@ describe('Stream Handler', () => {
     it('should handle todos array', () => {
       const msg = { todos: [{ content: 'test todo' }] };
       
-      expect(() => handleTodos(msg, mockState)).not.toThrow();
+      expect(() => handleTodos(msg, mockState, mockSession)).not.toThrow();
     });
 
     it('should handle empty todos', () => {
       const msg = { todos: [] };
       
-      expect(() => handleTodos(msg, mockState)).not.toThrow();
+      expect(() => handleTodos(msg, mockState, mockSession)).not.toThrow();
     });
 
     it('should handle undefined todos', () => {
       const msg = {};
       
-      expect(() => handleTodos(msg, mockState)).not.toThrow();
+      expect(() => handleTodos(msg, mockState, mockSession)).not.toThrow();
     });
   });
 
@@ -172,9 +174,19 @@ describe('Stream Handler', () => {
       };
       
       const userInput = 'test input';
-      const session = { threadId: 'test-thread' };
+      const session = { 
+        threadId: 'test-thread',
+        ioChannel: {
+          emit: jest.fn(),
+          requestUserInput: jest.fn(),
+          setAbortSignal: jest.fn(),
+          on: jest.fn(),
+          off: jest.fn(),
+          destroy: jest.fn()
+        }
+      };
       
-      await expect(processStreamChunks(mockStream, mockState, null, userInput))
+      await expect(processStreamChunks(mockStream, mockState, session, userInput))
         .resolves.not.toThrow();
     });
   });

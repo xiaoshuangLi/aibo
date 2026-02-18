@@ -37,10 +37,10 @@ describe('Agent Loader', () => {
       
       expect(agent).toBeDefined();
       expect(agent.name).toBe('general-purpose');
-      expect(agent.description).toBe('Handles general tasks requiring full capabilities and skill inheritance');
-      expect(agent.systemPrompt).toContain('You are a general-purpose AI assistant with full capabilities');
-      expect(agent.systemPrompt).toContain('Full access to all available tools');
-      expect(agent.systemPrompt).toContain('Inheritance of all main agent skills');
+      expect(agent.description).toBe('General-purpose agent for researching complex questions, searching for files and content, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. This agent has access to all tools as the main agent.');
+      expect(agent.systemPrompt).toContain('You are a versatile general-purpose assistant capable of handling a wide range of tasks including research, file operations, system commands, and multi-step problem solving.');
+      expect(agent.systemPrompt).toContain('Full access to all available tools and inherited skills');
+      expect(agent.systemPrompt).toContain('Delegate to specialized subagents when appropriate');
     });
   });
 

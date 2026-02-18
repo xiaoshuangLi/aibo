@@ -170,7 +170,7 @@ export async function startInteractiveMode() {
   });
 
   // Get AI agent instance
-  const agent = await createAIAgent();
+  const agent = await createAIAgent(session);
   
   // Track last interrupt time for double-press confirmation
   let lastInterrupt = 0;

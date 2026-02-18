@@ -16,7 +16,7 @@ import { toolRetryMiddleware } from 'langchain';
  * @param error - The original Error object from tool execution
  * @returns A formatted error message with detailed context
  */
-function enhancedErrorHandler(error: Error): string {
+export function enhancedErrorHandler(error: Error): string {
   // Extract detailed error information
   const errorMessage = error.message || 'Unknown error';
   const errorName = error.name || 'Error';

@@ -7,7 +7,8 @@ import { SYSTEM_PROMPT } from '@/shared/constants/system-prompts';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/agent-loader';
 import { findSkillsDirectories } from '@/core/utils/find-skills-directories';
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-filesystem-backend';
-import { createLangChainToolRetryMiddleware } from '@/core/utils/langchain-tool-retry-middleware';
+import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/utils';
+import { Session } from '@/core/agent/session';
 
 /**
  * AI Agent Factory module that provides DeepAgents integration with LangChain.
@@ -55,6 +56,7 @@ let cachedAgent: ReturnType<typeof createDeepAgent>;
  * 1. 正常情况：返回已配置的agent实例
  * 2. 配置错误：如果环境变量无效或依赖项初始化失败，会在main函数中抛出错误
  * 
+ * @param session - 可选的会话对象，用于子代理输出捕获
  * @returns Promise<ReturnType<typeof createDeepAgent>> - 配置好的DeepAgent实例的Promise
  * @throws {Error} 如果环境变量无效或必需的依赖项初始化失败（实际在main函数中处理）
  * 
@@ -67,7 +69,7 @@ let cachedAgent: ReturnType<typeof createDeepAgent>;
  * @see {@link config} 了解环境变量配置详情
  * @see {@link main} 了解主执行函数
  */
-export async function createAIAgent() {
+export async function createAIAgent(session?: Session) {
   if (cachedAgent) {
     return cachedAgent;
   }
@@ -77,6 +79,9 @@ export async function createAIAgent() {
 
   // 创建 LangChain 工具重试中间件
   const toolRetryMiddleware = createLangChainToolRetryMiddleware();
+  
+  // 创建会话输出捕获中间件（如果提供了session）
+  const sessionMiddleware = session ? [createSessionOutputCaptureMiddleware({ session })] : [];
 
   // 加载自定义subagents - 递归查找工作目录下所有agents目录
   const customSubAgents = loadSubAgents(process.cwd());
@@ -93,12 +98,14 @@ export async function createAIAgent() {
     skills: agent.skills ?? allSkillsDirs,
     // 如果未指定model，则使用系统model
     model: agent.model ?? model,
-    // 只有当子代理没有自己的middleware时才添加重试中间件
-    middleware: agent.middleware ?? [toolRetryMiddleware],
+    // 为子代理的middleware添加会话中间件（如果提供了session）
+    middleware: session 
+      ? [...(agent.middleware ?? []), toolRetryMiddleware, ...sessionMiddleware]
+      : (agent.middleware ?? [toolRetryMiddleware]),
   }));
 
   // 确保至少有一个通用子代理
-  const subAgents = subAgentsWithDefaults.length > 0 
+  let subAgents = subAgentsWithDefaults.length > 0 
     ? subAgentsWithDefaults 
     : [getDefaultGeneralPurposeSubAgent()];
 

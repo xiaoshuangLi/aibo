@@ -42,8 +42,8 @@ export class Session {
   /**
    * 开始会话
    */
-  start(): void {
-    this.ioChannel.emit({
+  async start(): Promise<void> {
+    await this.ioChannel.emit({
       type: 'sessionStart',
       data: { modelInfo: this.modelInfo },
       timestamp: Date.now()
@@ -53,8 +53,8 @@ export class Session {
   /**
    * 结束会话
    */
-  end(exitMessage: string = "再见！"): void {
-    this.ioChannel.emit({
+  async end(exitMessage: string = "再见！"): Promise<void> {
+    await this.ioChannel.emit({
       type: 'sessionEnd',
       data: { exitMessage },
       timestamp: Date.now()

@@ -9,8 +9,6 @@
  */
 
 import { HumanMessage } from "langchain";
-import { styled } from '@/presentation/styling/output-styler';
-import { config } from '@/core/config/config';
 import { structuredLog } from '@/shared/utils/logging';
 import { extractMessagesAndTodos, MessagesAndTodos } from '@/core/utils/message-processor';
 
@@ -38,29 +36,34 @@ export interface StreamState {
  * 中文名称：处理工具调用
  * 
  * 预期行为：
- * - 接收消息对象和流状态
+ * - 接收消息对象、流状态和会话对象
  * - 检查消息是否包含工具调用
  * - 提取工具调用的名称和参数
- * - 使用样式化输出显示工具调用信息
+ * - 使用会话的IOChannel发送工具调用事件
  * - 更新流状态中的最后工具调用信息
  * 
  * 行为分支：
  * 1. 无工具调用：直接返回，不执行任何操作
- * 2. 有工具调用：遍历所有工具调用，提取名称和参数，显示调用信息
+ * 2. 有工具调用：遍历所有工具调用，提取名称和参数，发送调用事件
  * 3. 参数解析：如果参数是JSON字符串，则解析为对象
  * 
  * @param msg - 消息对象，可能包含tool_calls属性
  * @param state - 流状态对象，用于存储最后工具调用信息
- * @returns void - 无返回值
+ * @param session - 会话对象，用于发送I/O事件
+ * @returns Promise<void> - 异步操作完成时解析
  */
-export function handleToolCall(msg: any, state: StreamState) {
+export async function handleToolCall(msg: any, state: StreamState, session: any) {
   if (!msg.tool_calls?.length) return;
   
   for (const call of msg.tool_calls) {
     state.lastToolCall = call;
     const name = call.name || call.function?.name;
     const args = call.args || (call.function?.arguments ? JSON.parse(call.function.arguments) : {});
-    console.log(styled.toolCall(name, args));
+    await session.ioChannel?.emit({
+      type: 'toolCall',
+      data: { name, args },
+      timestamp: Date.now()
+    });
   }
 }
 
@@ -70,7 +73,7 @@ export function handleToolCall(msg: any, state: StreamState) {
  * 中文名称：处理工具结果
  * 
  * 预期行为：
- * - 接收消息对象和流状态
+ * - 接收消息对象、流状态和会话对象
  * - 检查是否为工具结果消息（包含tool_call_id）
  * - 检查是否已被中断
  * - 根据结果内容类型（JSON或文本）调用相应的处理函数
@@ -83,9 +86,10 @@ export function handleToolCall(msg: any, state: StreamState) {
  * 
  * @param msg - 消息对象，可能包含tool_call_id和content属性
  * @param state - 流状态对象，包含中断信号和最后工具调用信息
+ * @param session - 会话对象，用于发送I/O事件
  * @returns void - 无返回值
  */
-export function handleToolResult(msg: any, state: StreamState) {
+export function handleToolResult(msg: any, state: StreamState, session: any) {
   if (!msg.tool_call_id || state.abortSignal.aborted) return;
 
   const result = String(msg.content || "");
@@ -93,9 +97,9 @@ export function handleToolResult(msg: any, state: StreamState) {
   let preview = "";
 
   if (isJson) {
-    handleJsonToolResult(result, state.lastToolCall);
+    handleJsonToolResult(result, state.lastToolCall, session);
   } else {
-    handleTextToolResult(result, state.lastToolCall);
+    handleTextToolResult(result, state.lastToolCall, session);
   }
 }
 
@@ -105,73 +109,55 @@ export function handleToolResult(msg: any, state: StreamState) {
  * 中文名称：处理JSON格式工具结果
  * 
  * 预期行为：
- * - 接收JSON字符串结果和最后工具调用信息
+ * - 接收JSON字符串结果、最后工具调用信息和会话对象
  * - 解析JSON并提取关键信息（命令、文件路径、标准输出、标准错误等）
  * - 根据详细输出模式设置不同的截断长度
- * - 使用样式化输出显示工具结果
+ * - 使用会话的IOChannel发送工具结果事件
  * - 特别优化 task 工具的结果展示
  * 
  * 行为分支：
- * 1. JSON解析成功：提取并格式化相关信息，显示成功/失败状态
- * 2. JSON解析失败：显示原始结果内容（截断处理）
- * 3. 无输出内容：显示"无输出"提示
+ * 1. JSON解析成功：提取并格式化相关信息，发送成功/失败状态
+ * 2. JSON解析失败：发送原始结果内容（截断处理）
+ * 3. 无输出内容：发送"无输出"提示
  * 4. 详细模式：使用更长的截断长度（200-300字符）
  * 5. 简略模式：使用较短的截断长度（60-150字符）
  * 6. task工具结果：提供专门的友好展示格式
  * 
  * @param result - JSON格式的工具结果字符串
  * @param lastToolCall - 最后一次工具调用信息，用于获取工具名称
+ * @param session - 会话对象，用于发送I/O事件
  * @returns void - 无返回值
  */
-export function handleJsonToolResult(result: string, lastToolCall: any) {
+export async function handleJsonToolResult(result: string, lastToolCall: any, session: any) {
   try {
     const parsed = JSON.parse(result);
     const success = parsed.success !== false;
-    let preview = "";
 
-    // 特别处理 task 工具的结果
-    if (lastToolCall?.name === 'task') {
-      if (parsed.message) {
-        preview = `▸ 结果: ${styled.truncated(parsed.message, config.output.verbose ? 300 : 150)}`;
-      } else if (typeof parsed === 'string') {
-        preview = `▸ 结果: ${styled.truncated(parsed, config.output.verbose ? 300 : 150)}`;
-      } else {
-        preview = `▸ 任务已完成`;
-      }
-
-      console.log(styled.toolResult(
-        '子代理任务',
-        success,
-        preview
-      ));
-      return;
-    }
-
-    if (parsed.command) {
-      preview = `▸ 命令: ${styled.truncated(parsed.command, 80)}`;
-    } else if (parsed.filepath) {
-      preview = `▸ 文件: ${parsed.filepath}`;
-    }
-
-    if (parsed.stdout) {
-      const out = String(parsed.stdout).trim();
-      if (out && out !== "(empty)") {
-        preview += `\n▸ 输出: ${styled.truncated(out.split('\n')[0] || out, config.output.verbose ? 200 : 80)}`;
-      }
-    }
-
-    if (parsed.stderr?.trim() !== "(empty)") {
-      preview += `\n▸ 错误: ${styled.truncated(parsed.stderr.split('\n')[0], config.output.verbose ? 100 : 60)}`;
-    }
-
-    console.log(styled.toolResult(
-      lastToolCall?.name || "unknown",
-      success,
-      preview || "无输出"
-    ));
+    // 发送原始的解析结果，让 TerminalAdapter 处理截断和格式化
+    await session.ioChannel?.emit({
+      type: 'toolResult',
+      data: { 
+        name: lastToolCall?.name || "unknown", 
+        success, 
+        result: parsed,
+        originalResult: result,
+        isJsonResult: true
+      },
+      timestamp: Date.now()
+    });
   } catch {
-    const preview = styled.truncated(result, config.output.verbose ? 300 : 150);
-    console.log(styled.toolResult(lastToolCall?.name || "unknown", true, preview));
+    // 发送原始的错误结果
+    await session.ioChannel?.emit({
+      type: 'toolResult',
+      data: { 
+        name: lastToolCall?.name || "unknown", 
+        success: true, 
+        result: result,
+        originalResult: result,
+        isJsonResult: false
+      },
+      timestamp: Date.now()
+    });
   }
 }
 
@@ -181,10 +167,10 @@ export function handleJsonToolResult(result: string, lastToolCall: any) {
  * 中文名称：处理文本格式工具结果
  * 
  * 预期行为：
- * - 接收文本结果和最后工具调用信息
+ * - 接收文本结果、最后工具调用信息和会话对象
  * - 根据内容判断执行是否成功（检查是否包含错误标识符）
  * - 应用截断处理以控制输出长度
- * - 使用样式化输出显示工具结果
+ * - 使用会话的IOChannel发送工具结果事件
  * - 特别优化 task 工具的文本结果展示
  * 
  * 行为分支：
@@ -196,21 +182,40 @@ export function handleJsonToolResult(result: string, lastToolCall: any) {
  * 
  * @param result - 文本格式的工具结果字符串
  * @param lastToolCall - 最后一次工具调用信息，用于获取工具名称
- * @returns void - 无返回值
+ * @param session - 会话对象，用于发送I/O事件
+ * @returns Promise<void> - 异步操作完成时解析
  */
-export function handleTextToolResult(result: string, lastToolCall: any) {
+export async function handleTextToolResult(result: string, lastToolCall: any, session: any) {
   // 特别处理 task 工具的结果
   if (lastToolCall?.name === 'task') {
     const type = lastToolCall?.args?.subagent_type
     const name = type ? `🧠 ${type} 结果` : '子代理任务';
     const success = !result.includes("❌") && !result.includes("失败");
-    console.log(styled.toolResult(name, success, result));
-    console.log('\n');
+    
+    await session.ioChannel?.emit({
+      type: 'toolResult',
+      data: { 
+        name, 
+        success, 
+        result: result,
+        isTaskResult: true
+      },
+      timestamp: Date.now()
+    });
     return;
   }
   
   const success = !result.includes("❌") && !result.includes("失败");
-  console.log(styled.toolResult(lastToolCall?.name || "unknown", success, result));
+  await session.ioChannel?.emit({
+    type: 'toolResult',
+    data: { 
+      name: lastToolCall?.name || "unknown", 
+      success, 
+      result: result,
+      isTextResult: true
+    },
+    timestamp: Date.now()
+  });
 }
 
 /**
@@ -219,10 +224,11 @@ export function handleTextToolResult(result: string, lastToolCall: any) {
  * 中文名称：处理AI内容流
  * 
  * 预期行为：
- * - 接收消息对象、流状态和可选的用户输入
+ * - 接收消息对象、流状态、会话对象和可选的用户输入
  * - 检查是否为有效的内容消息
  * - 计算新增的内容部分（避免重复显示）
  * - 逐字符流式输出，提供打字机效果
+ * - 使用会话的IOChannel发送流数据块事件
  * - 更新流状态中的完整响应内容
  * 
  * 行为分支：
@@ -235,10 +241,11 @@ export function handleTextToolResult(result: string, lastToolCall: any) {
  * 
  * @param msg - 消息对象，包含content属性
  * @param state - 流状态对象，包含完整响应、中断信号等
+ * @param session - 会话对象，用于发送I/O事件
  * @param userInput - 可选的用户输入，用于上下文（当前未使用）
  * @returns Promise<void> - 无返回值的Promise
  */
-export async function handleAIContent(msg: any, state: StreamState, userInput?: string) {
+export async function handleAIContent(msg: any, state: StreamState, session: any, userInput?: string) {
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
   const currentContent = String(msg.content);
@@ -248,11 +255,12 @@ export async function handleAIContent(msg: any, state: StreamState, userInput?: 
   const newContent = currentContent.substring(state.fullResponse.length);
   if (!newContent) return;
 
-  for (const char of newContent) {
-    if (state.abortSignal.aborted) break;
-    process.stdout.write(char);
-    await new Promise(resolve => setTimeout(resolve, config.output.verbose ? 5 : 15));
-  }
+  // 发送完整的AI响应内容
+  await session.ioChannel?.emit({
+    type: 'aiResponse',
+    data: { content: newContent },
+    timestamp: Date.now()
+  });
 
   state.fullResponse = currentContent;
 }
@@ -263,25 +271,26 @@ export async function handleAIContent(msg: any, state: StreamState, userInput?: 
  * 中文名称：处理待办事项
  * 
  * 预期行为：
- * - 接收消息对象和流状态
+ * - 接收消息对象、流状态和会话对象
  * - 检查是否包含待办事项数组
- * - 显示完整的思考过程，包括所有状态的待办事项
+ * - 发送完整的思考过程事件，包括所有状态的待办事项
  * - 避免重复显示已显示的待办事项
  * - 使用不同的图标表示不同状态的思考步骤
  * 
  * 行为分支：
  * 1. 无待办事项或已被中断：直接返回
  * 2. 无新待办事项：直接返回
- * 3. 首次显示待办事项：显示"AI正在思考..."提示
- * 4. 待办事项状态为completed：显示✅图标
- * 5. 待办事项状态为in_progress：显示🔄图标  
- * 6. 待办事项状态为pending：显示💭图标
+ * 3. 首次显示待办事项：发送"AI正在思考..."提示事件
+ * 4. 待办事项状态为completed：使用✅图标
+ * 5. 待办事项状态为in_progress：使用🔄图标  
+ * 6. 待办事项状态为pending：使用💭图标
  * 
  * @param msg - 消息对象，可能包含todos数组
  * @param state - 流状态对象，包含完整响应、思考提示状态和中断信号
+ * @param session - 会话对象，用于发送I/O事件
  * @returns void - 无返回值
  */
-export function handleTodos(msg: any, state: StreamState) {
+export async function handleTodos(msg: any, state: StreamState, session: any) {
   if (!Array.isArray(msg.todos) || state.abortSignal.aborted) return;
 
   // 显示所有状态的待办事项（completed, in_progress, pending），提供完整的思考过程
@@ -291,20 +300,15 @@ export function handleTodos(msg: any, state: StreamState) {
 
   if (newTodos.length === 0) return;
 
+  await session.ioChannel?.emit({
+    type: 'thinkingProcess',
+    data: { steps: newTodos },
+    timestamp: Date.now()
+  });
+  
   if (!state.hasDisplayedThinking) {
-    console.log('\n🧠 AI 深度思考过程:');
     state.hasDisplayedThinking = true;
   }
-
-  newTodos.forEach((todo: any) => {
-    let emoji = '💭'; // 默认为pending状态
-    if (todo.status === 'completed') {
-      emoji = '✅';
-    } else if (todo.status === 'in_progress') {
-      emoji = '🔄';
-    }
-    console.log(`\n${emoji} ${todo.content}`);
-  });
 }
 
 const processedMessageIds = new Set<string>();
@@ -340,7 +344,7 @@ const processedMessageIds = new Set<string>();
 export async function processStreamChunks(
   stream: AsyncIterable<any>,
   state: StreamState,
-  rl: any,
+  session: any,
   userInput?: string
 ): Promise<string> {
   let hasShownInitialIndicator = false;
@@ -374,7 +378,11 @@ export async function processStreamChunks(
           if (todos.length > 0) {
             // Will be handled by handleTodos
           } else {
-            console.log(styled.assistant("..."));
+            await session.ioChannel?.emit({
+              type: 'streamStart',
+              data: { initialContent: "" },
+              timestamp: Date.now()
+            });
           }
           hasShownInitialIndicator = true;
         }
@@ -388,38 +396,46 @@ export async function processStreamChunks(
         // 标记消息是否已被处理，避免重复处理
         let processedAsToolResult = false;
         
-        handleToolCall(msg, state);
+        await handleToolCall(msg, state, session);
         
         // 如果是工具结果消息，处理后标记为已处理
         if (msg.tool_call_id) {
-          handleToolResult(msg, state);
+          handleToolResult(msg, state, session);
           processedAsToolResult = true;
         }
         
         // 只有不是工具结果的消息才进行AI内容流处理
         if (!processedAsToolResult) {
-          await handleAIContent(msg, state, userInput);
+          await handleAIContent(msg, state, session, userInput);
         }
         
-        if (todos.length) handleTodos({ ...msg, todos }, state);
+        if (todos.length) await handleTodos({ ...msg, todos }, state, session);
       }
     }
 
-    // 完成指示器
+    // 完成指示器 - 由 TerminalAdapter 处理
     if (!state.abortSignal.aborted && state.fullResponse && !state.fullResponse.trim().endsWith(".")) {
-      for (let i = 0; i < 2; i++) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        process.stdout.write(".");
-      }
-      process.stdout.write(".\n");
+      await session.ioChannel?.emit({
+        type: 'streamEnd',
+        data: { finalContent: state.fullResponse },
+        timestamp: Date.now()
+      });
     }
 
     return state.fullResponse;
   } catch (error: any) {
     if (error.name === "AbortError" || state.abortSignal.aborted) {
-      console.log(styled.error("⚠️ 操作已被用户中断"));
+      session.ioChannel?.emit({
+        type: 'errorMessage',
+        data: { message: "⚠️ 操作已被用户中断" },
+        timestamp: Date.now()
+      });
     } else {
-      console.log(styled.error(`发生错误: ${error.message}`));
+      session.ioChannel?.emit({
+        type: 'errorMessage',
+        data: { message: `发生错误: ${error.message}` },
+        timestamp: Date.now()
+      });
       structuredLog('error', 'Interactive mode error', { 
         component: 'interactive', 
         error: error.message,

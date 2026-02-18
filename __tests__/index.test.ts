@@ -37,7 +37,7 @@ afterAll(() => {
 
 // Create a mock IOChannel for testing
 const createMockIOChannel = () => ({
-  emit: jest.fn(),
+  emit: jest.fn().mockResolvedValue(undefined),
   destroy: jest.fn(),
   setAbortSignal: jest.fn(),
   requestUserInput: jest.fn(),

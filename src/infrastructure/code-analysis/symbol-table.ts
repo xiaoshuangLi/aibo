@@ -137,11 +137,11 @@ export class SymbolTable {
    */
   private async processFileWithLsp(filePath: string): Promise<void> {
     try {
-      console.log('this.config', this.config);
+      console.log('config', this.config);
       console.log('filePath', filePath);
       // 使用文件名作为查询参数，以减少返回的符号数量
       const relativeFilePath = filePath.replace(this.config.workingDirectory, '').replace(/^[\/\\]/, '');
-      const workspaceSymbols = await this.config.lspTool.getWorkspaceSymbols(filePath);
+      const workspaceSymbols = await this.config.lspTool.getWorkspaceSymbols(relativeFilePath);
       
       // 这里简化处理，实际应用中需要过滤出当前文件的符号
       if (workspaceSymbols && Array.isArray(workspaceSymbols)) {
