@@ -1,5 +1,6 @@
 import { createVoiceRecognition, VoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { Session } from '@/core/agent/session';
+import { config } from '@/core/config/config';
 
 // Keyboard event handler state
 let isRecordingShortcutActive = false;
@@ -131,7 +132,7 @@ export const stopRecord = async (
           session.logSystemMessage(`🎯 识别结果: "${result}"`);
           
           const max = Math.max(currentInput.length - 8, 0);
-          if (result.slice(max, result.length).includes('干活')) {
+          if (result.slice(max, result.length).includes(config.specialKeyword.keyword)) {
             const content = currentInput + result;
             onExecuteCommand(content);
           } else {

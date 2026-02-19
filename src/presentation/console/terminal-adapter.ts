@@ -275,10 +275,10 @@ export class TerminalAdapter extends DefaultIOChannel {
   showPrompt(prompt: string = "\n👤 你: "): void {
     if (!this._rl) return;
 
-    // 特殊的"干活"关键词处理
+    // 特殊的关键词处理
     if (this._rl.line) {
       const max = Math.max(this._rl.line.length - 8, 0);
-      if (this._rl.line.slice(max, this._rl.line.length).includes('干活')) {
+      if (this._rl.line.slice(max, this._rl.line.length).includes(config.specialKeyword.keyword)) {
         const rlRef = this._rl; // Capture reference to avoid null reference in setTimeout
         for (let i = 0; i < this._rl.line.length + 4; i++) {
           setTimeout(() => {

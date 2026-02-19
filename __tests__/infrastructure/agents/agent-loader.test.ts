@@ -60,7 +60,11 @@ describe('Agent Loader', () => {
       expect(result.length).toBe(1);
       expect(result[0].name).toBe('test-agent');
       expect(result[0].description).toBe('Test agent description');
-      expect(result[0].systemPrompt).toBe('This is the system prompt for test agent.');
+      // 现在系统提示会被强化模板包装，检查是否包含原始内容
+      expect(result[0].systemPrompt).toContain('This is the system prompt for test agent.');
+      // 检查是否包含强化约束
+      expect(result[0].systemPrompt).toContain('ABSOLUTE WORKING DIRECTORY ENFORCEMENT');
+      expect(result[0].systemPrompt).toContain('SUBAGENT ROLE DEFINITION');
     });
 
     test('should load agents from nested agents directories', () => {
@@ -90,7 +94,11 @@ describe('Agent Loader', () => {
       expect(result.length).toBe(1);
       expect(result[0].name).toBe('simple-agent'); // 使用文件名
       expect(result[0].description).toContain('simple-agent.md');
-      expect(result[0].systemPrompt).toBe(content);
+      // 现在系统提示会被强化模板包装，检查是否包含原始内容
+      expect(result[0].systemPrompt).toContain(content);
+      // 检查是否包含强化约束
+      expect(result[0].systemPrompt).toContain('ABSOLUTE WORKING DIRECTORY ENFORCEMENT');
+      expect(result[0].systemPrompt).toContain('SUBAGENT ROLE DEFINITION');
     });
 
     test('should handle invalid YAML frontmatter gracefully', () => {
@@ -131,7 +139,11 @@ Advanced system prompt.`;
       expect(agent.skills).toEqual(['skill1', 'skill2']);
       expect(agent.middleware).toEqual(['middleware1']);
       expect(agent.interruptOn).toEqual(['condition1']);
-      expect(agent.systemPrompt).toBe('Advanced system prompt.');
+      // 现在系统提示会被强化模板包装，检查是否包含原始内容
+      expect(agent.systemPrompt).toContain('Advanced system prompt.');
+      // 检查是否包含强化约束
+      expect(agent.systemPrompt).toContain('ABSOLUTE WORKING DIRECTORY ENFORCEMENT');
+      expect(agent.systemPrompt).toContain('SUBAGENT ROLE DEFINITION');
     });
 
     test('should ignore non-markdown files', () => {

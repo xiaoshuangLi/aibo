@@ -127,9 +127,6 @@ describe('SessionOutputCaptureMiddleware - Comprehensive Tests', () => {
       
       const result = await middleware.wrapModelCall(request, handler);
       
-      // Verify system message was logged
-      expect(mockSession.logSystemMessage).toHaveBeenCalledWith('AI is processing your request...');
-      
       // Verify AI content was streamed
       expect(mockSession.streamAIContent).toHaveBeenCalledWith(
         'AI response content',

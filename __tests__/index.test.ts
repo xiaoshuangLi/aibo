@@ -167,6 +167,9 @@ jest.mock('../src/core/config/Config', () => ({
     output: {
       verbose: false,
     },
+    specialKeyword: {
+      keyword: '干活'
+    }
   },
 }));
 
@@ -768,7 +771,7 @@ describe('voice input shortcuts', () => {
     expect(mockSession.getVoiceASR()).toBeNull();
   });
 
-  test('stopRecord stops voice recording and processes audio with "干活" keyword', async () => {
+  test('stopRecord stops voice recording and processes audio with special keyword', async () => {
     // Clear any previous mocks
     (createVoiceRecognition as jest.Mock).mockClear();
     
@@ -777,7 +780,7 @@ describe('voice input shortcuts', () => {
       canRecord: jest.fn().mockReturnValue(true),
       startManualRecording: jest.fn().mockResolvedValue(undefined),
       stopManualRecording: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-      recognizeManualRecording: jest.fn().mockResolvedValue('Hello world 干活'),
+      recognizeManualRecording: jest.fn().mockResolvedValue(`Hello world ${config.specialKeyword.keyword}`),
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     

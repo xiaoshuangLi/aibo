@@ -11,6 +11,8 @@
 import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent/session';
+import { styled } from '@/presentation/styling/output-styler';
+import { config } from '@/core/config/config';
 
 /**
  * Configuration options for the session output capture middleware
@@ -89,7 +91,9 @@ export function createSessionOutputCaptureMiddleware(
             }
           }
           const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
-          session.logToolResult(toolName, success, preview.substring(0, 200));
+          const truncateLimit = config.output.verbose ? 300 : 150;
+          const truncatedPreview = styled.truncated(preview, truncateLimit);
+          session.logToolResult(toolName, success, truncatedPreview);
         }
         
         return result;
@@ -100,7 +104,9 @@ export function createSessionOutputCaptureMiddleware(
           const errorMessage = (error as Error).message || 'Unknown error';
           const preview: string = String(errorMessage);
           const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
-          session.logToolResult(toolName, success, preview.substring(0, 200));
+          const truncateLimit = config.output.verbose ? 300 : 150;
+          const truncatedPreview = styled.truncated(preview, truncateLimit);
+          session.logToolResult(toolName, success, truncatedPreview);
         }
         
         if (session && typeof session.logErrorMessage === 'function') {
@@ -122,11 +128,6 @@ export function createSessionOutputCaptureMiddleware(
       // console.log('wrapModelCall', request, handler);
 
       try {
-        // Log when AI starts processing
-        if (session && typeof session.logSystemMessage === 'function') {
-          session.logSystemMessage('AI is processing your request...');
-        }
-        
         // Execute the actual model call
         const response = await handler(request);
         

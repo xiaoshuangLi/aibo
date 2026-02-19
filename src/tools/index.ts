@@ -4,6 +4,7 @@ import getGithubFetchTools from '@/tools/github-fetch';
 import getTencentWsaTools from '@/tools/tencent-wsa';
 import getHybridCodeReaderTools from '@/tools/hybrid-code-reader';
 import getComposioTools from '@/tools/composio';
+import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
 
 /**
  * 异步获取所有工具的方法
@@ -18,6 +19,7 @@ export default async function getTools() {
     tencentWsaTools,
     hybridCodeReaderTools,
     composioTools,
+    writeSubagentTodosTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -25,6 +27,7 @@ export default async function getTools() {
     getTencentWsaTools(),
     getHybridCodeReaderTools(),
     getComposioTools(),
+    getWriteSubagentTodosTools(),
   ]);
   
   return [
@@ -34,5 +37,6 @@ export default async function getTools() {
     ...tencentWsaTools,
     ...hybridCodeReaderTools,
     ...composioTools,
+    ...writeSubagentTodosTools,
   ];
 }

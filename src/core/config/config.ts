@@ -46,6 +46,8 @@ const envSchema = z.object({
   COMPOSIO_EXTERNAL_USER_ID: z.string().min(1).default('test-external-user-id'),
   // Advanced Subtask Configuration
   MAX_CONCURRENT_SUBTASKS: z.coerce.number().int().min(1).max(50).default(5),
+  // Special keyword configuration
+  SPECIAL_KEYWORD: z.string().min(1).default('干活'),
 });
 
 // Parse and validate environment variables
@@ -104,5 +106,8 @@ export const config = {
   },
   advanced: {
     maxConcurrentSubtasks: env.MAX_CONCURRENT_SUBTASKS,
+  },
+  specialKeyword: {
+    keyword: env.SPECIAL_KEYWORD,
   },
 };

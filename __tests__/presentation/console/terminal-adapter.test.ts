@@ -1,6 +1,7 @@
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
 import { OutputEvent, OutputEventType } from '@/core/agent/io-channel';
 import * as readline from 'readline';
+import { config } from '@/core/config/config';
 
 // Mock the styled functions
 jest.mock('@/presentation/styling/output-styler', () => ({
@@ -19,6 +20,9 @@ jest.mock('@/core/config/config', () => ({
   config: {
     output: {
       verbose: false
+    },
+    specialKeyword: {
+      keyword: '干活'
     }
   }
 }));
@@ -378,12 +382,12 @@ describe('TerminalAdapter', () => {
       }
     });
 
-    test('should handle "干活" keyword', async () => {
+    test('should handle special keyword', async () => {
       const rl = terminalAdapter.rl;
       if (rl) {
         // Mock rl.line property with shorter text to reduce timeout calls
         Object.defineProperty(rl, 'line', {
-          value: '干活',
+          value: config.specialKeyword.keyword,
           writable: true
         });
         const writeSpy = jest.spyOn(rl, 'write');

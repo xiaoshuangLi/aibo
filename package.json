@@ -6,9 +6,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc && tsc-alias",
-    "test": "jest --bail --verbose=false",
-    "test:watch": "jest --bail --verbose=false --watch",
-    "test:coverage": "jest --bail --verbose=false --coverage",
+    "test": "jest --verbose=false",
+    "test:watch": "jest --verbose=false --watch",
+    "test:coverage": "jest --verbose=false --coverage",
     "start": "node dist/index.js",
     "start:interactive": "AIBO_INTERACTIVE=true node dist/index.js",
     "dev": "ts-node -r tsconfig-paths/register src/main.ts",

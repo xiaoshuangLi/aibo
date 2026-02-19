@@ -9,6 +9,7 @@ import { findSkillsDirectories } from '@/core/utils/find-skills-directories';
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-filesystem-backend';
 import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/utils';
 import { Session } from '@/core/agent/session';
+import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-prompt-template';
 
 /**
  * AI Agent Factory module that provides DeepAgents integration with LangChain.
@@ -89,7 +90,7 @@ export async function createAIAgent(session?: Session) {
   // 查找工作目录下的所有skills目录
   const allSkillsDirs = findSkillsDirectories(process.cwd());
 
-  // 为子代理应用默认配置
+  // 为子代理应用默认配置（强化提示词已在代理加载器中处理）
   const subAgentsWithDefaults = customSubAgents.map(agent => ({
     ...agent,
     // 如果未指定tools，则使用系统tools  

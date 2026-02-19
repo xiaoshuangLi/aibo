@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SubAgent } from 'deepagents';
 import * as yaml from 'js-yaml';
+import { SubAgentPromptTemplate } from '../prompt/subagent-prompt-template';
 
 /**
  * Agent Loader module for loading subagent configurations from Markdown files.
@@ -170,10 +171,58 @@ export function loadSubAgents(rootDir: string): SubAgent[] {
             const name = frontmatter.name || file.replace(/\.md$/, '');
             const description = frontmatter.description || `Agent loaded from ${filePath}`;
             
+            // 创建强化的系统提示
+            const promptTemplate = new SubAgentPromptTemplate();
+            let reinforcedSystemPrompt: string;
+            
+            if (name === 'general-purpose') {
+              reinforcedSystemPrompt = promptTemplate.createGeneralPurposeSubAgentPrompt(body.trim());
+            } else {
+              // 对于其他代理类型，尝试从现有提示中提取能力和指南
+              const capabilities: string[] = [];
+              const guidelines: string[] = [];
+              
+              // 简单解析现有提示来提取能力和指南
+              const promptLines = body.trim().split('\n');
+              let inCapabilities = false;
+              let inGuidelines = false;
+              
+              for (const line of promptLines) {
+                if (line.trim().startsWith('## Capabilities')) {
+                  inCapabilities = true;
+                  inGuidelines = false;
+                  continue;
+                }
+                if (line.trim().startsWith('## Guidelines')) {
+                  inCapabilities = false;
+                  inGuidelines = true;
+                  continue;
+                }
+                if (line.trim().startsWith('## ') && !line.trim().startsWith('## Capabilities') && !line.trim().startsWith('## Guidelines')) {
+                  inCapabilities = false;
+                  inGuidelines = false;
+                }
+                
+                if (inCapabilities && line.trim().startsWith('- ')) {
+                  capabilities.push(line.trim().substring(2));
+                }
+                if (inGuidelines && line.trim().startsWith('- ')) {
+                  guidelines.push(line.trim().substring(2));
+                }
+              }
+              
+              reinforcedSystemPrompt = promptTemplate.createReinforcedSubAgentPrompt(
+                body.trim(),
+                name,
+                capabilities,
+                guidelines
+              );
+            }
+            
             const subAgent: SubAgent = {
               name,
               description,
-              systemPrompt: body.trim()
+              systemPrompt: reinforcedSystemPrompt
             };
             
             // 可选字段 - 只有在frontmatter中明确指定时才设置
@@ -231,61 +280,14 @@ export function loadSubAgents(rootDir: string): SubAgent[] {
  * @returns 默认的通用子代理配置
  */
 export function getDefaultGeneralPurposeSubAgent(): SubAgent {
+  const basePrompt = `You are a versatile general-purpose assistant capable of handling a wide range of tasks including research, file operations, system commands, and multi-step problem solving.`;
+  
+  const promptTemplate = new SubAgentPromptTemplate();
+  const reinforcedPrompt = promptTemplate.createGeneralPurposeSubAgentPrompt(basePrompt);
+  
   return {
     name: "general-purpose",
     description: "General-purpose agent for researching complex questions, searching for files and content, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. This agent has access to all tools as the main agent.",
-    systemPrompt: `You are a versatile general-purpose assistant capable of handling a wide range of tasks including research, file operations, system commands, and multi-step problem solving.
-
-## 📌 CRITICAL WORKING DIRECTORY CONSTRAINTS
-**IMPORTANT**: You are operating within a restricted filesystem environment with the following constraints:
-
-- **Dynamic Project Root**: The project root is DYNAMIC and corresponds to the current working directory where the main AIBO process is running
-- **Access Scope**: You can ONLY access files and directories within the current working directory (project root) and its subdirectories
-- **Absolute Paths Required**: All file operations MUST use absolute paths. When in doubt, use \`process.cwd()\` to get the current working directory and construct absolute paths from there
-- **Permission Errors**: If you attempt to access paths outside the current working directory, you will receive "Access denied: / is outside project root" errors
-- **Current Working Directory**: Always assume your current working directory is the dynamic project root. NEVER hardcode static paths.
-- **Operating System**: darwin x64
-- **Node.js Version**: v22.15.0
-
-## Environment Context
-- **Current Working Directory**: ${process.cwd()}
-- **Project Root**: ${process.cwd()}
-
-## Capabilities
-- Comprehensive web research and information gathering
-- File system exploration and content searching
-- System command execution and terminal operations
-- Multi-step task orchestration and delegation
-- Data analysis and processing
-- Code reading and basic understanding (though not specialized for complex coding tasks)
-- Cross-tool coordination and workflow management
-- Full access to all available tools and inherited skills
-
-## Guidelines
-- Always follow best practices and security principles
-- Use precise file access strategies to minimize token consumption
-- Prefer targeted glob patterns over recursive directory listing
-- Read specific files directly when location is known rather than exploring entire directories
-- Use grep for content search instead of reading all files in a directory
-- Implement pagination for large files using offset/limit parameters
-- Focus on source code directories (\`src/\`, \`lib/\`, \`app/\`, \`components\`) and configuration files first
-- **ALWAYS use absolute paths** when performing file operations (use \`process.cwd()\` to get current working directory)
-- **NEVER attempt to access paths outside the current working directory**
-- **VERIFY file paths exist** before attempting operations
-- **HANDLE permission errors gracefully** by checking path constraints first
-- **STRATEGICALLY AVOID reading unnecessary directories** that consume excessive tokens:
-  - Generated/Build directories: \`dist\`, \`build\`, \`out\`, \`target\`, \`public\`, \`static\`
-  - Test directories: \`__tests__\`, \`test\`, \`tests\`, \`spec\`, \`e2e\`
-  - Dependency directories: \`node_modules\`, \`vendor\`, \`.venv\`, \`venv\`, \`packages\`
-  - Coverage/Report directories: \`coverage\`, \`.nyc_output\`, \`reports\`, \`docs\`
-  - Cache/Temporary directories: \`.cache\`, \`.next\`, \`.nuxt\`, \`.svelte-kit\`, \`tmp\`
-  - Version control directories: \`.git\`, \`.svn\`, \`.hg\`
-  - IDE/Editor directories: \`.vscode\`, \`.idea\`, \`.vs\`, \`.editorconfig\`
-- Break down complex tasks into manageable steps
-- Use appropriate tools for each subtask  
-- Leverage inherited skills effectively
-- Maintain context awareness throughout execution
-- Provide clear progress updates and results
-- Delegate to specialized subagents when appropriate`
+    systemPrompt: reinforcedPrompt
   };
 }
