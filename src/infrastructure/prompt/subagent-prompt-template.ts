@@ -1,5 +1,6 @@
 import * as os from 'os';
 import { SubAgent } from 'deepagents';
+import { config } from '@/core/config/config';
 
 /**
  * SubAgent Prompt Template Manager
@@ -31,8 +32,15 @@ export class SubAgentPromptTemplate {
     const arch = os.arch();
     const nodeVersion = process.version;
 
+    // Get current language configuration from config
+    const currentLanguage = config.language.code;
+    const languageName = currentLanguage === 'zh' ? 'Chinese (中文)' : 'English';
+    
     // Core reinforced constraints that MUST be included in every subagent prompt
     const reinforcedConstraints = `
+## 🌐 CONFIGURED LANGUAGE: ${languageName}
+**This subagent operates in ${languageName} mode. All responses, code comments, documentation, and communication must be primarily in ${languageName}.**
+
 ## 🔒 ABSOLUTE WORKING DIRECTORY ENFORCEMENT
 **NON-NEGOTIABLE CONSTRAINTS - VIOLATION WILL CAUSE SYSTEM FAILURE:**
 
@@ -63,6 +71,16 @@ Your primary mission is to execute your specialized role with precision and effi
 - **CONTENT SEARCH**: Use grep for text search instead of reading entire files
 - **PAGINATION**: For large files, use offset/limit parameters to avoid context overflow
 - **SOURCE CODE PRIORITY**: Focus on src/, lib/, app/, components/ and configuration files first
+
+## 🧠 KNOWLEDGE ACQUISITION MANDATE
+**KNOWLEDGE READ MUST BE PRIORITIZED BEFORE ALL OPERATIONS:**
+
+- **MANDATORY KNOWLEDGE SEARCH**: Before executing ANY task operations, you MUST first use knowledge tools to search for and retrieve all relevant knowledge
+- **KNOWLEDGE TOOLS REQUIRED**: Use \`get_knowledge_summaries()\` to discover available knowledge, then use \`search_knowledge(query)\` to retrieve specific knowledge entries
+- **KNOWLEDGE INTEGRATION**: Integrate all retrieved knowledge into your execution strategy before proceeding with any file operations, code writing, or other actions
+- **KNOWLEDGE VERIFICATION**: Verify that the retrieved knowledge is accurate, relevant, and applicable to your current task
+- **SEQUENTIAL ORDER**: Knowledge acquisition → Knowledge integration → Task execution (NEVER skip the first two steps)
+- **⚠️ CRITICAL REMINDER**: Knowledge acquisition is a prerequisite for ALL operations. Every subtask agent MUST complete knowledge acquisition BEFORE executing specific tasks!
 
 ## 🛡️ ERROR PREVENTION PROTOCOLS
 **PREVENT COMMON FAILURE MODES:**

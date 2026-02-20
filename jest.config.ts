@@ -8,8 +8,13 @@ export default {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+    '^.+\\.(j|t)s$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
   },
+  // 添加 transformIgnorePatterns 以处理 ESM 模块
+  // 转换所有 node_modules 中的文件（除了明确排除的）
+  transformIgnorePatterns: [
+    'node_modules/(?!(ansi-styles|langchain|@langchain|deepagents|@composio))',
+  ],
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.ts$',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '\\.d\\.ts$'],
   collectCoverageFrom: [

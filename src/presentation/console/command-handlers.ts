@@ -1,6 +1,7 @@
 import { config } from '@/core/config/config';
 import { styled } from '@/presentation/styling/output-styler';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { SessionManager } from '@/infrastructure/session/session-manager';
 import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { handleUserInput } from '@/presentation/console/user-input-handler';
 
@@ -193,7 +194,8 @@ export async function handleVerboseCommand(): Promise<boolean> {
  * ```
  */
 export async function handleNewCommand(session: any): Promise<boolean> {
-  session.threadId = createConsoleThreadId();
+  const sessionManager = SessionManager.getInstance();
+  session.threadId = sessionManager.clearCurrentSession();
   console.log(styled.system(`✅ 已创建新会话 (ID: ${session.threadId})`));
   return true;
 }

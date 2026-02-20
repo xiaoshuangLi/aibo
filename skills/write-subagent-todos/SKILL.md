@@ -56,39 +56,6 @@ This skill ensures strict adherence to the main process vs subtask agent roles b
 
 ## 📋 DETAILED CAPABILITIES
 
-### Group-Based Concurrency Control with `concurrent_group` Parameter
-
-The write-subagent-todos skill now includes a **`concurrent_group` parameter** that enables sophisticated **group-based concurrent execution** following your exact requirements:
-
-- **`concurrent_group: null`** (default): The task must be executed **sequentially and individually**
-- **`concurrent_group: number`**: Tasks with the **same number** belong to the same concurrency group and can be executed **concurrently as a group**
-
-#### Execution Flow Pattern (Your Exact Requirement)
-
-Given tasks 1-10 with the following `concurrent_group` assignments:
-- Tasks 1-3: `concurrent_group: 1` → **Execute concurrently as Group 1**
-- Task 4: `concurrent_group: null` → **Execute sequentially (individual)**
-- Tasks 5-8: `concurrent_group: 2` → **Execute concurrently as Group 2**  
-- Task 9: `concurrent_group: null` → **Execute sequentially (individual)**
-- Task 10: `concurrent_group: null` → **Execute sequentially (individual)**
-
-**Execution Order:**
-1. **Concurrently execute** all tasks in Group 1 (tasks 1, 2, 3)
-2. **Sequentially execute** task 4 (individual execution)
-3. **Concurrently execute** all tasks in Group 2 (tasks 5, 6, 7, 8)
-4. **Sequentially execute** task 9 (individual execution)  
-5. **Sequentially execute** task 10 (individual execution)
-
-This pattern provides precise control over complex execution workflows where you need both parallel processing within groups and strict sequential ordering between groups.
-
-#### Benefits of Group-Based Concurrency
-
-- **Precise Workflow Control**: Define exactly which tasks can run in parallel and which must run sequentially
-- **Resource Optimization**: Maximize parallel execution while maintaining data consistency and dependency order
-- **Complex Pipeline Support**: Handle sophisticated multi-stage workflows with mixed concurrent/sequential requirements
-- **Dependency Management**: Ensure proper execution order for tasks with interdependencies
-- **Scalability**: Support arbitrarily complex concurrency patterns with simple numeric group identifiers
-
 ### User Dynamic Subagent Configuration
 
 The write-subagent-todos skill fully supports user-defined custom subagent types through dynamic configuration:
@@ -137,68 +104,17 @@ await write-subagent-todos({
     {
       content: "Research best practices for authentication",
       status: "pending",
-      subagent_type: "researcher",
-      concurrent_group: null
+      subagent_type: "researcher"
     },
     {
       content: "Implement authentication service",
       status: "pending", 
-      subagent_type: "coder",
-      concurrent_group: null
+      subagent_type: "coder"
     },
     {
       content: "Write API documentation",
       status: "pending",
-      subagent_type: "documentation", 
-      concurrent_group: null
-    }
-  ]
-});
-```
-
-#### Advanced Usage with Concurrency Groups
-```javascript
-// Execute related tasks in parallel groups
-await write-subagent-todos({
-  todos: [
-    // Group 1: Concurrent research tasks
-    {
-      content: "Research frontend frameworks",
-      status: "pending",
-      subagent_type: "researcher",
-      concurrent_group: 1
-    },
-    {
-      content: "Research backend technologies", 
-      status: "pending",
-      subagent_type: "researcher",
-      concurrent_group: 1
-    },
-    {
-      content: "Research database solutions",
-      status: "pending",
-      subagent_type: "researcher", 
-      concurrent_group: 1
-    },
-    // Individual task: Architecture decision
-    {
-      content: "Design system architecture",
-      status: "pending",
-      subagent_type: "coordinator",
-      concurrent_group: null
-    },
-    // Group 2: Concurrent implementation tasks
-    {
-      content: "Implement frontend components",
-      status: "pending",
-      subagent_type: "coder",
-      concurrent_group: 2
-    },
-    {
-      content: "Implement backend services",
-      status: "pending",
-      subagent_type: "coder", 
-      concurrent_group: 2
+      subagent_type: "documentation"
     }
   ]
 });
@@ -212,14 +128,12 @@ await write-subagent-todos({
     {
       content: "Analyze security vulnerabilities",
       status: "pending",
-      subagent_type: "security-analyst", // Custom user-defined agent
-      concurrent_group: null
+      subagent_type: "security-analyst" // Custom user-defined agent
     },
     {
       content: "Optimize database performance",
       status: "pending", 
-      subagent_type: "db-optimizer", // Custom user-defined agent
-      concurrent_group: null
+      subagent_type: "db-optimizer" // Custom user-defined agent
     }
   ]
 });

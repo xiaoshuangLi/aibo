@@ -163,11 +163,7 @@ export function setupExitHandlers(session: Session, terminalAdapter: TerminalAda
 export async function startInteractiveMode() {
   // Create terminal adapter
   const terminalAdapter = new TerminalAdapter();
-  
-  // Create session with terminal adapter
-  const session = new Session(terminalAdapter, { 
-    modelInfo: config.openai.modelName 
-  });
+  const session = new Session(terminalAdapter);
 
   // Get AI agent instance
   const agent = await createAIAgent(session);

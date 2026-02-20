@@ -2,6 +2,7 @@ import { config } from '@/core/config/config';
 import { ChatOpenAI } from '@langchain/openai';
 import { MemorySaver } from "@langchain/langgraph";
 import { createDeepAgent } from 'deepagents';
+import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/filesystem-checkpointer';
 import getTools from '@/tools/index';
 import { SYSTEM_PROMPT } from '@/shared/constants/system-prompts';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/agent-loader';
@@ -41,6 +42,25 @@ const backend = new SafeFilesystemBackend({
 let cachedAgent: ReturnType<typeof createDeepAgent>;
 
 /**
+ * 创建检查点器实例
+ * 根据配置动态创建不同类型的检查点器
+ */
+function createCheckpointer() {
+  const checkpointerType = config.langgraph.checkpointerType;
+  
+  switch (checkpointerType) {
+    case 'memory':
+      return new MemorySaver();
+    case 'filesystem':
+      return new FilesystemCheckpointer();
+    case 'sqlite':
+      throw new Error('SQLite checkpointer is not yet implemented');
+    default:
+      throw new Error(`Unsupported checkpointer type: ${checkpointerType}`);
+  }
+}
+
+/**
  * 创建AI代理实例
  * 
  * 中文名称：创建AI代理实例
@@ -50,7 +70,7 @@ let cachedAgent: ReturnType<typeof createDeepAgent>;
  * - 代理实例包含以下组件：
  *   - 配置好的ChatOpenAI模型（使用环境变量中的API密钥、基础URL和模型名称）
  *   - 文件系统后端（以当前工作目录为根目录）
- *   - 内存检查点器（用于状态持久化）
+ *   - 检查点器（用于状态持久化，支持 memory/filesystem/sqlite）
  * - 优雅地处理可选配置参数
  * 
  * 行为分支：
@@ -114,7 +134,7 @@ export async function createAIAgent(session?: Session) {
     model,
     backend,
     systemPrompt: SYSTEM_PROMPT,
-    checkpointer: new MemorySaver(),
+    checkpointer: createCheckpointer(),
     tools,
     skills: allSkillsDirs,
     subagents: subAgents,

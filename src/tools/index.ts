@@ -5,6 +5,7 @@ import getTencentWsaTools from '@/tools/tencent-wsa';
 import getHybridCodeReaderTools from '@/tools/hybrid-code-reader';
 import getComposioTools from '@/tools/composio';
 import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
+import getKnowledgeTools from '@/tools/knowledge';
 
 /**
  * 异步获取所有工具的方法
@@ -20,6 +21,7 @@ export default async function getTools() {
     hybridCodeReaderTools,
     composioTools,
     writeSubagentTodosTools,
+    knowledgeTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -28,6 +30,7 @@ export default async function getTools() {
     getHybridCodeReaderTools(),
     getComposioTools(),
     getWriteSubagentTodosTools(),
+    getKnowledgeTools(),
   ]);
   
   return [
@@ -38,5 +41,6 @@ export default async function getTools() {
     ...hybridCodeReaderTools,
     ...composioTools,
     ...writeSubagentTodosTools,
+    ...knowledgeTools,
   ];
 }

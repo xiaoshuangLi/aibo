@@ -24,8 +24,7 @@ describe('writeSubagentTodosTool', () => {
       expect(parsedResult.todos[0]).toEqual({
         content: '测试任务',
         status: 'pending',
-        subagent_type: 'coder',
-        concurrent_group: null
+        subagent_type: 'coder'
       });
     });
 
@@ -35,14 +34,12 @@ describe('writeSubagentTodosTool', () => {
           {
             content: '任务1',
             status: 'in_progress' as const,
-            subagent_type: 'coder',
-            concurrent_group: 1
+            subagent_type: 'coder'
           },
           {
             content: '任务2',
             status: 'pending' as const,
-            subagent_type: 'researcher',
-            concurrent_group: 1
+            subagent_type: 'researcher'
           },
           {
             content: '任务3',
@@ -64,24 +61,21 @@ describe('writeSubagentTodosTool', () => {
       expect(parsedResult.todos[0]).toEqual({
         content: '任务1',
         status: 'in_progress',
-        subagent_type: 'coder',
-        concurrent_group: 1
+        subagent_type: 'coder'
       });
       
       // 验证第二个任务
       expect(parsedResult.todos[1]).toEqual({
         content: '任务2',
         status: 'pending',
-        subagent_type: 'researcher',
-        concurrent_group: 1
+        subagent_type: 'researcher'
       });
       
-      // 验证第三个任务（concurrent_group 应该是 null）
+      // 验证第三个任务
       expect(parsedResult.todos[2]).toEqual({
         content: '任务3',
         status: 'completed',
-        subagent_type: 'validator',
-        concurrent_group: null
+        subagent_type: 'validator'
       });
     });
 
@@ -98,65 +92,9 @@ describe('writeSubagentTodosTool', () => {
       expect(parsedResult.message).toBe('Updated subagent todo list with 0 tasks');
       expect(parsedResult.todos).toHaveLength(0);
     });
-
-    test('应该正确处理 concurrent_group 为 null 的显式输入', async () => {
-      const input = {
-        todos: [
-          {
-            content: '单独任务',
-            status: 'pending' as const,
-            subagent_type: 'documentation',
-            concurrent_group: null
-          }
-        ]
-      };
-
-      const result = await writeSubagentTodosTool.invoke(input);
-      expect(typeof result).toBe('string');
-      const parsedResult = JSON.parse(result);
-
-      expect(parsedResult.todos[0].concurrent_group).toBeNull();
-    });
-
-    test('应该正确处理 concurrent_group 为数字的输入', async () => {
-      const input = {
-        todos: [
-          {
-            content: '并发任务',
-            status: 'in_progress' as const,
-            subagent_type: 'innovator',
-            concurrent_group: 42
-          }
-        ]
-      };
-
-      const result = await writeSubagentTodosTool.invoke(input);
-      expect(typeof result).toBe('string');
-      const parsedResult = JSON.parse(result);
-
-      expect(parsedResult.todos[0].concurrent_group).toBe(42);
-    });
   });
 
   describe('边界条件和特殊场景测试', () => {
-    test('应该处理 undefined concurrent_group', async () => {
-      const input = {
-        todos: [
-          {
-            content: '测试任务',
-            status: 'pending' as const,
-            subagent_type: 'coordinator',
-            concurrent_group: undefined
-          }
-        ]
-      };
-
-      const result = await writeSubagentTodosTool.invoke(input);
-      expect(typeof result).toBe('string');
-      const parsedResult = JSON.parse(result);
-
-      expect(parsedResult.todos[0].concurrent_group).toBeNull();
-    });
 
     test('应该处理各种 subagent_type 值', async () => {
       const validSubagentTypes = [

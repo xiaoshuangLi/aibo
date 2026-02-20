@@ -1,25 +1,24 @@
-feat: implement write-subagent-todos advanced task management
+feat: implement advanced knowledge and session management with enhanced subagent coordination
 
-Introduce the write-subagent-todos tool that provides sophisticated task management with specialized subagent type assignments and group-based concurrency control.
+Introduce comprehensive knowledge management, session persistence, and enhanced subagent task management system that enforces strict role separation between main process (planning/coordination) and subtask agents (execution/implementation).
 
 Key Features:
-- **Specialized Subagent Assignment**: Each task assigned to appropriate agent type (coder, researcher, validator, testing, documentation, coordinator, innovator)
-- **Group-Based Concurrency Control**: Precise parallel execution using concurrent_group parameter (null = sequential, number = concurrent group)
-- **Mandatory Parallel Execution**: Enforces efficient processing of independent subtasks for complex objectives (3+ steps)
-- **Dual-Layer Architecture**: Supports both built-in agents and unlimited user-defined custom agents
-- **Enhanced System Prompts**: Reinforced prompts with strict working directory constraints and role definitions
-- **Comprehensive Testing**: 11/11 tests passing with full coverage of success paths, error conditions, and edge cases
+- **Persistent Knowledge Management**: Store, retrieve, and search knowledge items across sessions with add_knowledge, get_knowledge_summaries, and search_knowledge tools
+- **Session State Persistence**: Maintain session state and knowledge base across application restarts using SessionManager singleton
+- **File System Checkpointing**: Persist LangGraph checkpoint data to local file system with FilesystemCheckpointer implementation
+- **Enhanced Subagent Coordination**: Provide specialized subagent types with reinforced prompts and strict working directory constraints
+- **Strict Role Separation**: Enforce clear boundaries between main process responsibilities (planning, coordination, strategy) and subtask agent execution (actual implementation work)
+- **Knowledge-First Execution**: All subtask agents MUST acquire relevant knowledge before executing specific tasks
 
 Implementation Details:
-- Core tool implementation in src/tools/write-subagent-todos.ts
-- Agent loader enhancements for automatic discovery of user agent configurations
-- Subagent prompt template system with reinforced security constraints
-- Built-in agent configurations for all 7 specialized agent types
-- Complete integration with existing AIBO architecture
-- Comprehensive documentation in skills/write-subagent-todos/SKILL.md
-- Feature specification in features/006-write-subagent-todos-advanced-task-management.md
-- Updated README with new feature description
+- Core knowledge tools in src/tools/knowledge.ts with comprehensive validation and error handling
+- Session management with persistent storage in .data/sessions/{session-id}/ directories
+- File system checkpointing integrated with LangGraph checkpointer interface
+- Enhanced system prompts with dynamic language selection and reinforced security constraints
+- Configuration updates with new environment variables (CHECKPOINTER_TYPE, LANGUAGE, SPECIAL_KEYWORD)
+- Comprehensive testing with 100% coverage of success paths, error conditions, and edge cases
+- Complete documentation in features/007-advanced-knowledge-and-session-management.md
 
-This feature enforces the critical separation between main process responsibilities (planning, coordination, strategy) and subtask agent execution (actual implementation work), ensuring optimal specialization, parallel execution, and system reliability.
+This feature enables truly autonomous and intelligent software development assistance with persistent context sharing, state recovery, and optimal specialization through strict role separation.
 
-Resolves: #006
+Resolves: #007

@@ -1,5 +1,6 @@
 import { Session } from '@/core/agent/session';
 import { IOChannel } from '@/core/agent/io-channel';
+import { SessionManager } from '@/infrastructure/session/session-manager';
 
 // Mock IOChannel
 const mockIOChannel = {
@@ -34,6 +35,11 @@ jest.mock('@/presentation/styling/output-styler', () => ({
   }
 }));
 
+// Helper to reset SessionManager singleton
+const resetSessionManager = () => {
+  (SessionManager as any).instance = null;
+};
+
 describe('Session', () => {
   let session: Session;
   let ioChannel: IOChannel;
@@ -41,6 +47,7 @@ describe('Session', () => {
   beforeEach(() => {
     ioChannel = mockIOChannel;
     jest.clearAllMocks();
+    resetSessionManager(); // Reset singleton before each test
     session = new Session(ioChannel, { threadId: 'test-session', modelInfo: 'test-model' });
   });
 
@@ -52,7 +59,7 @@ describe('Session', () => {
 
     test('should use default values when options not provided', () => {
       const defaultSession = new Session(ioChannel);
-      expect(defaultSession.threadId).toBe('test-thread-id');
+      expect(defaultSession.threadId).toMatch(/^session-\d+$/);
     });
   });
 

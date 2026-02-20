@@ -33,7 +33,7 @@ const envSchema = z.object({
   OPENAI_BASE_URL: z.string().url().optional(),
   MODEL_NAME: z.string().min(1).default('gpt-4o'),
   RECURSION_LIMIT: z.coerce.number().int().positive().default(1000),
-  CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite']).default('memory'),
+  CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite', 'filesystem']).default('memory'),
   MEMORY_WINDOW_SIZE: z.coerce.number().int().positive().default(5),
   VERBOSE_OUTPUT: z.coerce.boolean().default(false),
   // Tencent Cloud ASR and WSA Configuration
@@ -48,6 +48,8 @@ const envSchema = z.object({
   MAX_CONCURRENT_SUBTASKS: z.coerce.number().int().min(1).max(50).default(5),
   // Special keyword configuration
   SPECIAL_KEYWORD: z.string().min(1).default('干活'),
+  // Language configuration
+  LANGUAGE: z.enum(['en', 'zh']).default('en'),
 });
 
 // Parse and validate environment variables
@@ -109,5 +111,8 @@ export const config = {
   },
   specialKeyword: {
     keyword: env.SPECIAL_KEYWORD,
+  },
+  language: {
+    code: env.LANGUAGE,
   },
 };

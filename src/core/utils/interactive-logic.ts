@@ -159,5 +159,5 @@ export function isValidThreadId(threadId: string): boolean {
  * ```
  */
 export function createConsoleThreadId(): string {
-  return "console-session-" + Date.now();
+  return "session-" + Date.now();
 }

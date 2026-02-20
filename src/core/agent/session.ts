@@ -12,6 +12,7 @@ import { IOChannel } from './io-channel';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
 import { styled } from '@/presentation/styling/output-styler';
 import { config } from '@/core/config/config';
+import { SessionManager } from '@/infrastructure/session/session-manager';
 
 export interface SessionOptions {
   threadId?: string;
@@ -31,7 +32,15 @@ export class Session {
 
   constructor(ioChannel: IOChannel, options: SessionOptions = {}) {
     this.ioChannel = ioChannel;
-    this.threadId = options.threadId || createConsoleThreadId();
+    
+    // 如果提供了 threadId，使用它；否则使用会话管理器的当前会话
+    if (options.threadId) {
+      this.threadId = options.threadId;
+    } else {
+      const sessionManager = SessionManager.getInstance();
+      this.threadId = sessionManager.getCurrentSessionId();
+    }
+    
     this.modelInfo = options.modelInfo || config.openai.modelName;
     
     // 设置中止信号

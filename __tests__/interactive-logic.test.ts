@@ -88,10 +88,10 @@ describe('Interactive Logic Utilities', () => {
   describe('createConsoleThreadId', () => {
     test('should create a thread ID with timestamp', () => {
       const threadId = createConsoleThreadId();
-      expect(threadId).toMatch(/^console-session-\d+$/);
+      expect(threadId).toMatch(/^session-\d+$/);
       
       // Verify it contains a reasonable timestamp
-      const timestamp = parseInt(threadId.split('-')[2]);
+      const timestamp = parseInt(threadId.split('-')[1]);
       const now = Date.now();
       expect(timestamp).toBeLessThanOrEqual(now);
       expect(timestamp).toBeGreaterThanOrEqual(now - 1000); // within 1 second
@@ -103,7 +103,7 @@ describe('Interactive Logic Utilities', () => {
       const id2 = createConsoleThreadId();
       // In most cases they should be different, but we can't guarantee it
       // So we'll just verify the format is correct
-      expect(id2).toMatch(/^console-session-\d+$/);
+      expect(id2).toMatch(/^session-\d+$/);
     });
   });
 });
