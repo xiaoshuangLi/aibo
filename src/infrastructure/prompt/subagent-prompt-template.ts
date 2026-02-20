@@ -124,7 +124,6 @@ ${guidelines.map(guideline => `- ${guideline}`).join('\n')}
       "Comprehensive web research and information gathering",
       "File system exploration and content searching", 
       "System command execution and terminal operations",
-      "Multi-step task orchestration and delegation",
       "Data analysis and processing",
       "Cross-tool coordination and workflow management",
       "Full access to all available tools and inherited skills"

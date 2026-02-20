@@ -63,11 +63,21 @@ export class Session {
    * 结束会话
    */
   async end(exitMessage: string = "再见！"): Promise<void> {
+    // 自动生成当前会话的元数据文件
+    try {
+      const sessionManager = SessionManager.getInstance();
+      sessionManager.generateSessionMetadata(this.threadId);
+      console.log(`✅ 会话元数据已生成: .data/sessions/${this.threadId}/metadata.json`);
+    } catch (error) {
+      console.warn(`⚠️ 生成会话元数据时发生警告:`, error);
+    }
+
     await this.ioChannel.emit({
       type: 'sessionEnd',
       data: { exitMessage },
       timestamp: Date.now()
     });
+    
     this.ioChannel.destroy();
   }
 

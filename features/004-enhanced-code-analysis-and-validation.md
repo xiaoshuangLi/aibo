@@ -1,11 +1,11 @@
-# 004 - Enhanced Code Analysis and Validation Framework
+# 004 - 增强的代码分析与验证框架
 
-## Specification
+## 规格说明
 
-### 🎯 User Story
+### 🎯 用户故事
 作为开发者，我想要增强的代码分析能力（包括依赖分析、智能上下文选择和准确的token计数）以及系统化的功能组织验证框架，以便我能更高效地理解复杂代码库、减少60-90%的token使用量，并确保我的代码更改经过适当的测试、文档化和验证后才能提交到生产环境。
 
-### ✅ Acceptance Criteria
+### ✅ 验收标准
 - [ ] 依赖分析器能够正确解析TypeScript/JavaScript文件的导入/导出语句并提取模块依赖关系
 - [ ] 智能上下文选择器支持6种请求类型（definition, references, implementation, signature, full-context, dependencies）并根据token限制动态调整上下文
 - [ ] Token计数器提供准确的token估算并与OpenAI的计数保持一致，支持文本截断以适应token限制
@@ -13,7 +13,7 @@
 - [ ] 所有新组件都有完整的单元测试覆盖，整体测试覆盖率≥85%
 - [ ] 验证脚本能够正确识别未提交的代码更改并验证相应的工作流步骤
 
-### ⚙️ Technical Constraints
+### ⚙️ 技术约束
 - **技术栈要求**: TypeScript 5+, Node.js 18+, Jest for testing, Tree-sitter for parsing
 - **兼容性要求**: 支持所有现代TypeScript/JavaScript项目结构
 - **性能要求**: 依赖分析和上下文选择响应时间<100ms，token计数<10ms
@@ -21,9 +21,9 @@
 
 ---
 
-## Technical Design
+## 技术设计
 
-### 📐 Architecture Overview
+### 📐 架构概述
 增强的代码分析框架建立在现有的混合代码读取器基础上，通过三个核心组件协同工作：
 1. **DependencyAnalyzer**: 负责解析模块依赖关系
 2. **ContextSelector**: 负责智能上下文选择和优化  
@@ -31,24 +31,24 @@
 
 验证框架通过四个独立的Node.js脚本实现，每个脚本验证功能组织工作流的一个阶段，确保代码质量门禁。
 
-### ⚙️ Core Implementation
-#### Main Components/Modules
+### ⚙️ 核心实现
+#### 主要组件/模块
 - **DependencyAnalyzer**: 解析各种导入/导出语法（named, default, namespace, sideEffect, all exports），区分内部/外部依赖
 - **ContextSelector**: 实现6种上下文请求策略，集成缓存管理器提高性能，支持自适应token限制
 - **TokenCounter**: 基于字符和单词的混合估算算法，提供结构感知的文本截断功能
 - **Validation Scripts**: 四个独立的验证脚本，每个脚本验证工作流的一个特定阶段
 
-#### Key Technical Decisions
+#### 关键技术决策
 - **依赖分析策略**: 选择基于正则表达式的简单解析而非完整AST遍历，以平衡准确性和性能
 - **Token估算算法**: 使用字符+单词的混合估算而非集成tiktoken，以减少依赖和启动时间
 - **验证脚本设计**: 每个验证脚本独立运行，不依赖其他脚本的状态，便于调试和维护
 
-#### Data Flow/State Management
+#### 数据流/状态管理
 代码分析数据流：文件内容 → AST抽象层 → 依赖分析器/上下文选择器 → 优化后的上下文输出
 验证数据流：git diff → 需求提取 → 文档生成 → 提交验证
 
-### 🧩 API Changes
-#### New APIs
+### 🧩 API变更
+#### 新增API
 ```typescript
 // 依赖分析器
 interface DependencyResult {
@@ -83,15 +83,15 @@ class TokenCounter {
 }
 ```
 
-#### Modified APIs
+#### 修改的API
 - **hybrid_code_reader tool**: 现在支持新的requestType选项和maxTokens参数
 - **feature-organizer skill**: 新增四阶段验证工作流
 
 ---
 
-## Implementation Plan
+## 实施计划
 
-### 📋 Task Breakdown
+### 📋 任务分解
 1. **实现依赖分析器** - 解析导入/导出语句，提取依赖关系 (预计: 4小时)
 2. **实现智能上下文选择器** - 支持6种请求类型和token限制 (预计: 6小时)  
 3. **实现Token计数器** - 提供准确估算和截断功能 (预计: 2小时)

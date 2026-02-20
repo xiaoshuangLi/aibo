@@ -1,175 +1,175 @@
-# Feature 007: Advanced Knowledge and Session Management with Enhanced Subagent Coordination
+# 功能 007：高级知识与会话管理，配合增强的子代理协调
 
-## 📋 Executive Summary
+## 📋 执行摘要
 
-This feature implements a comprehensive knowledge management and session persistence system that integrates with the advanced subagent task management framework. It provides persistent knowledge storage, enhanced session management with file system checkpointing, and strict role separation between main process (planning/coordination) and subtask agents (execution/implementation).
+此功能实现了一个全面的知识管理和会话持久化系统，与高级子代理任务管理框架集成。它提供持久的知识存储、带有文件系统检查点的增强会话管理，以及主流程（规划/协调）与子任务代理（执行/实现）之间的严格角色分离。
 
-**Key Innovation**: Enforces the critical separation between main process responsibilities (planning, coordination, strategy) and subtask agent execution (actual implementation work), ensuring optimal specialization, parallel execution, and system reliability.
+**关键创新**：强制执行主流程职责（规划、协调、策略）与子任务代理执行（实际实施工作）之间的关键分离，确保最佳专业化、并行执行和系统可靠性。
 
-## 🎯 Feature Scope & Objectives
+## 🎯 功能范围与目标
 
-### Primary Goals
-- **Persistent Knowledge Management**: Store, retrieve, and search knowledge items across sessions
-- **Session State Persistence**: Maintain session state and knowledge base across application restarts
-- **File System Checkpointing**: Persist LangGraph checkpoint data to local file system for state recovery
-- **Enhanced Subagent Coordination**: Provide specialized subagent types with reinforced prompts and constraints
-- **Strict Role Separation**: Enforce clear boundaries between main process and subtask agents
-- **Working Directory Security**: Implement strict path validation and access control
+### 主要目标
+- **持久知识管理**：跨会话存储、检索和搜索知识项
+- **会话状态持久化**：在应用程序重启期间维护会话状态和知识库
+- **文件系统检查点**：将LangGraph检查点数据持久化到本地文件系统以进行状态恢复
+- **增强的子代理协调**：提供具有强化提示和约束的专业子代理类型
+- **严格的角色分离**：在主流程和子任务代理之间强制执行清晰的边界
+- **工作目录安全性**：实施严格的路径验证和访问控制
 
-### Core Principles
-1. **Main Process Plans, Subtask Agents Work**: The main process is ONLY responsible for planning, coordination, and strategy. ALL actual implementation work ("doing", "executing", "working") MUST be delegated to specialized subtask agents.
-2. **Mandatory Usage for Complex Tasks**: ALWAYS use write-subagent-todos instead of standard todo lists when dealing with complex objectives requiring 3+ steps.
-3. **Work Delegation Enforcement**: Main process NEVER does implementation work directly - ALL "hands-on" work is delegated to specialized subtask agents.
-4. **Knowledge-First Execution**: All subtask agents MUST acquire relevant knowledge before executing specific tasks.
+### 核心原则
+1. **主流程规划，子任务代理工作**：主流程仅负责规划、协调和策略。所有实际实施工作（"执行"、"操作"、"工作"）必须委托给专业子任务代理。
+2. **复杂任务的强制使用**：处理需要3+步骤的复杂目标时，始终使用write-subagent-todos而不是标准待办事项列表。
+3. **工作委派强制执行**：主流程从不直接执行实施工作 - 所有"动手"工作都委派给专业子任务代理。
+4. **知识优先执行**：所有子任务代理在执行特定任务之前必须获取相关知识。
 
-## 🏗️ Technical Architecture
+## 🏗️ 技术架构
 
-### Core Components
+### 核心组件
 
-#### 1. Knowledge Management System
-- **`src/tools/knowledge.ts`**: LangChain tools for knowledge operations
-  - `add_knowledge`: Add knowledge items with content, title, and keywords
-  - `get_knowledge_summaries`: Retrieve all knowledge summaries (title + keywords only)
-  - `search_knowledge`: Search knowledge by title or keywords
-- **`src/shared/utils/library.ts`**: Utility functions for knowledge operations
-- **`src/infrastructure/session/session-manager.ts`**: Persistent knowledge storage per session
+#### 1. 知识管理系统
+- **`src/tools/knowledge.ts`**: 用于知识操作的LangChain工具
+  - `add_knowledge`: 添加带有内容、标题和关键字的知识项
+  - `get_knowledge_summaries`: 检索所有知识摘要（仅标题+关键字）
+  - `search_knowledge`: 按标题或关键字搜索知识
+- **`src/shared/utils/library.ts`**: 知识操作的实用函数
+- **`src/infrastructure/session/session-manager.ts`**: 每个会话的持久知识存储
 
-#### 2. Session Management
-- **`SessionManager` Class**: Singleton pattern for session ID and knowledge management
-  - Automatic session ID generation and persistence
-  - Per-session knowledge base storage in `.data/sessions/{session-id}/knowledge.json`
-  - Metadata persistence in `.data/metadata.json`
-  - Thread-safe operations with atomic file writes
+#### 2. 会话管理
+- **`SessionManager` 类**: 用于会话ID和知识管理的单例模式
+  - 自动会话ID生成和持久化
+  - 在 `.data/sessions/{session-id}/knowledge.json` 中存储每个会话的知识库
+  - 在 `.data/metadata.json` 中存储元数据
+  - 带有原子文件写入的线程安全操作
 
-#### 3. File System Checkpointing
-- **`FilesystemCheckpointer` Class**: Implements LangGraph Checkpointer interface
-  - Stores checkpoint data in `.data/sessions/{thread_id}/session.json`
-  - Supports all LangGraph checkpoint operations (get, put, list, putWrites, deleteThread)
-  - Atomic file operations with temporary file handling
+#### 3. 文件系统检查点
+- **`FilesystemCheckpointer` 类**: 实现LangGraph Checkpointer接口
+  - 在 `.data/sessions/{thread_id}/session.json` 中存储检查点数据
+  - 支持所有LangGraph检查点操作（get, put, list, putWrites, deleteThread）
+  - 带有临时文件处理的原子文件操作
 
-#### 4. Enhanced Subagent Framework
-- **Subagent Prompt Templates**: Reinforced prompts with strict working directory constraints
-- **Built-in Specialized Agents**: 7 foundation agent types with specific capabilities
-- **User Dynamic Agents**: Automatic discovery of custom agent configurations from `agents/*.md`
-- **Knowledge Acquisition Mandate**: Subtask agents must read knowledge before executing tasks
+#### 4. 增强的子代理框架
+- **子代理提示模板**：带有严格工作目录约束的强化提示
+- **内置专业代理**：7种具有特定能力的基础代理类型
+- **用户动态代理**：从 `agents/*.md` 自动发现自定义代理配置
+- **知识获取强制要求**：子任务代理在执行任务前必须读取知识
 
-### Data Structures
+### 数据结构
 
-#### Knowledge Item
+#### 知识项
 ```typescript
 interface KnowledgeItem {
-  content: string;      // Detailed knowledge content
-  title: string;        // Knowledge title
-  keywords: string[];   // Keywords for search and categorization
+  content: string;      // 详细的知识内容
+  title: string;        // 知识标题
+  keywords: string[];   // 用于搜索和分类的关键字
 }
 ```
 
-#### Knowledge Summary
+#### 知识摘要
 ```typescript
 interface KnowledgeSummary {
-  title: string;        // Knowledge title
-  keywords: string[];   // Keywords for search and categorization
+  title: string;        // 知识标题
+  keywords: string[];   // 用于搜索和分类的关键字
 }
 ```
 
-#### Subagent Todo
+#### 子代理待办事项
 ```typescript
 interface SubagentTodo {
-  content: string;                    // Task description
-  status: 'pending' | 'in_progress' | 'completed';  // Task status
-  subagent_type: string;             // Specialized agent type (built-in or custom)
+  content: string;                    // 任务描述
+  status: 'pending' | 'in_progress' | 'completed';  // 任务状态
+  subagent_type: string;             // 专业代理类型（内置或自定义）
 }
 ```
 
-## 🔧 Implementation Details
+## 🔧 实施细节
 
-### Configuration Updates
-- **New Environment Variables**:
-  - `CHECKPOINTER_TYPE=filesystem` - Enable file system checkpointing
-  - `LANGUAGE=zh` - Set Chinese as default language
-  - `SPECIAL_KEYWORD=干活` - Special keyword for voice/terminal input
-- **Updated .env.example**: Includes all new configuration options
-- **Jest Configuration**: Updated transformIgnorePatterns for ESM modules
+### 配置更新
+- **新环境变量**:
+  - `CHECKPOINTER_TYPE=filesystem` - 启用文件系统检查点
+  - `LANGUAGE=zh` - 设置中文为默认语言
+  - `SPECIAL_KEYWORD=干活` - 语音/终端输入的特殊关键字
+- **更新的 .env.example**: 包含所有新配置选项
+- **Jest 配置**: 为ESM模块更新transformIgnorePatterns
 
-### File System Structure
+### 文件系统结构
 ```
 .data/
-├── metadata.json                 # Current session ID and metadata
+├── metadata.json                 # 当前会话ID和元数据
 └── sessions/
-    ├── session-1234567890/       # Session-specific directory
-    │   ├── session.json          # LangGraph checkpoint data
-    │   └── knowledge.json        # Session knowledge base
-    └── session-9876543210/       # Another session
+    ├── session-1234567890/       # 会话特定目录
+    │   ├── session.json          # LangGraph检查点数据
+    │   └── knowledge.json        # 会话知识库
+    └── session-9876543210/       # 另一个会话
         ├── session.json
         └── knowledge.json
 ```
 
-### API Contracts
+### API契约
 
-#### Knowledge Tools
-- **Input**: Validated parameters with Zod schema
-- **Output**: JSON response with success/failure status
-- **Error Handling**: Structured error responses with descriptive messages
-- **Validation**: Comprehensive parameter validation and error handling
+#### 知识工具
+- **输入**: 使用Zod schema验证的参数
+- **输出**: 带有成功/失败状态的JSON响应
+- **错误处理**: 带有描述性消息的结构化错误响应
+- **验证**: 全面的参数验证和错误处理
 
-#### Write-Subagent-Todos Tool
-- **Input**: Array of `SubagentTodo` objects with `subagent_type` field
-- **Output**: JSON string with success/failure status and processed todos
-- **Validation**: Zod schema ensures proper structure and required fields
-- **Agent Types**: Supports both built-in and user-defined custom agent types
+#### Write-Subagent-Todos 工具
+- **输入**: 带有 `subagent_type` 字段的 `SubagentTodo` 对象数组
+- **输出**: 带有成功/失败状态和处理后的待办事项的JSON字符串
+- **验证**: Zod schema确保正确的结构和必需字段
+- **代理类型**: 支持内置和用户定义的自定义代理类型
 
-### Enhanced System Prompts
-The system prompts have been significantly enhanced with:
+### 增强的系统提示
+系统提示已通过以下方式显著增强：
 
-1. **Language Configuration**: Dynamic language selection based on `LANGUAGE` env var
-2. **Working Directory Constraints**: Strict path validation and access control
-3. **Role Separation Rules**: Clear main process vs subtask agent responsibilities
-4. **Knowledge Acquisition Mandate**: Required knowledge reading before task execution
-5. **Performance Optimization**: Token conservation and precise file access strategies
-6. **Error Prevention Protocols**: Path validation and graceful error handling
+1. **语言配置**: 基于 `LANGUAGE` 环境变量的动态语言选择
+2. **工作目录约束**: 严格的路径验证和访问控制
+3. **角色分离规则**: 清晰的主流程vs子任务代理职责
+4. **知识获取强制要求**: 任务执行前必须读取知识
+5. **性能优化**: 令牌节约和精确的文件访问策略
+6. **错误预防协议**: 路径验证和优雅的错误处理
 
-## 🚀 Usage Patterns & Examples
+## 🚀 使用模式与示例
 
-### Basic Knowledge Management
+### 基础知识管理
 ```javascript
-// Add knowledge item
+// 添加知识项
 await add_knowledge({
-  content: "This is detailed knowledge content about AI programming",
-  title: "AI Programming Best Practices",
-  keywords: ["AI", "programming", "best practices"]
+  content: "这是关于AI编程的详细知识内容",
+  title: "AI编程最佳实践",
+  keywords: ["AI", "编程", "最佳实践"]
 });
 
-// Get all knowledge summaries
+// 获取所有知识摘要
 const summaries = await get_knowledge_summaries({});
 
-// Search knowledge
+// 搜索知识
 const results = await search_knowledge({
-  query: "AI programming"
+  query: "AI编程"
 });
 ```
 
-### Advanced Subagent Task Management
+### 高级子代理任务管理
 ```javascript
-// Complex task decomposition with specialized subagents
+// 使用专业子代理进行复杂任务分解
 await write-subagent-todos({
   todos: [
     {
-      content: "Research best practices for authentication systems",
+      content: "研究认证系统的最佳实践",
       status: "in_progress",
       subagent_type: "researcher"
     },
     {
-      content: "Implement secure authentication service with JWT tokens",
+      content: "使用JWT令牌实现安全的认证服务",
       status: "in_progress", 
       subagent_type: "coder"
     },
     {
-      content: "Write comprehensive API documentation for auth endpoints",
+      content: "为认证端点编写全面的API文档",
       status: "pending",
       subagent_type: "documentation"
     },
     {
-      content: "Create and execute security tests for authentication flow",
+      content: "创建并执行认证流程的安全测试",
       status: "pending",
       subagent_type: "testing"
     }
@@ -177,163 +177,163 @@ await write-subagent-todos({
 });
 ```
 
-### Using Custom User-Defined Agents
+### 使用自定义用户定义代理
 ```javascript
-// Custom agents defined in agents/security-analyst.md
+// 在 agents/security-analyst.md 中定义的自定义代理
 await write-subagent-todos({
   todos: [
     {
-      content: "Analyze security vulnerabilities in the authentication system",
+      content: "分析认证系统中的安全漏洞",
       status: "pending",
-      subagent_type: "security-analyst" // Custom user-defined agent
+      subagent_type: "security-analyst" // 自定义用户定义代理
     },
     {
-      content: "Optimize database performance for user authentication queries",
+      content: "优化用户认证查询的数据库性能",
       status: "pending", 
-      subagent_type: "db-optimizer" // Custom user-defined agent
+      subagent_type: "db-optimizer" // 自定义用户定义代理
     }
   ]
 });
 ```
 
-### Session Management
+### 会话管理
 ```javascript
-// Get current session manager instance
+// 获取当前会话管理器实例
 const sessionManager = getSessionManager();
 
-// Add knowledge to current session
+// 向当前会话添加知识
 sessionManager.addKnowledgeToCurrentSession(
-  "Session-specific knowledge content",
-  "Session Knowledge",
-  ["session", "context"]
+  "会话特定的知识内容",
+  "会话知识",
+  ["会话", "上下文"]
 );
 
-// Search knowledge in current session
-const results = sessionManager.searchKnowledgeInCurrentSession("session");
+// 在当前会话中搜索知识
+const results = sessionManager.searchKnowledgeInCurrentSession("会话");
 ```
 
-## 📊 Decision Framework
+## 📊 决策框架
 
-### When to Use This Feature vs Standard Approaches
+### 何时使用此功能vs标准方法
 
-| Scenario | Recommendation |
+| 场景 | 推荐 |
 |----------|----------------|
-| Complex objectives requiring 3+ steps | ✅ **ALWAYS** use `write-subagent-todos` |
-| Tasks spanning different expertise domains | ✅ **ALWAYS** use `write-subagent-todos` |
-| Need for persistent knowledge storage | ✅ **ALWAYS** use knowledge tools |
-| Session state persistence required | ✅ **ALWAYS** use filesystem checkpointer |
-| Simple, single-domain tasks (< 3 steps) | ⚠️ Consider basic approaches (rare case) |
+| 需要3+步骤的复杂目标 | ✅ **始终**使用 `write-subagent-todos` |
+| 跨不同专业领域的任务 | ✅ **始终**使用 `write-subagent-todos` |
+| 需要持久知识存储 | ✅ **始终**使用知识工具 |
+| 需要会话状态持久化 | ✅ **始终**使用文件系统检查点 |
+| 简单的单领域任务（< 3步骤） | ⚠️ 考虑基本方法（罕见情况） |
 
-### Decision Flowchart
-1. **Does the objective require 3+ steps?** → YES → Use `write-subagent-todos`
-2. **Do tasks span different expertise areas?** → YES → Use `write-subagent-todos`
-3. **Is persistent knowledge storage needed?** → YES → Use knowledge tools
-4. **Is session state persistence required?** → YES → Use filesystem checkpointer
-5. **Are tasks simple and single-domain?** → YES → Consider basic approaches (rare case)
+### 决策流程图
+1. **目标是否需要3+步骤？** → 是 → 使用 `write-subagent-todos`
+2. **任务是否跨越不同专业领域？** → 是 → 使用 `write-subagent-todos`
+3. **是否需要持久知识存储？** → 是 → 使用知识工具
+4. **是否需要会话状态持久化？** → 是 → 使用文件系统检查点
+5. **任务是否简单且单领域？** → 是 → 考虑基本方法（罕见情况）
 
-## 🧪 Testing Strategy
+## 🧪 测试策略
 
-### Test Coverage Requirements
-- **Success Paths**: All valid input combinations and configurations
-- **Boundary Conditions**: Edge cases, null values, empty arrays
-- **Error Handling**: Invalid inputs, missing required fields, type mismatches
-- **Agent Type Validation**: All built-in and custom agent types
-- **Status Transitions**: All valid status values and transitions
-- **File System Operations**: Read/write/delete operations with proper error handling
-- **Knowledge Operations**: Add/retrieve/search/clear knowledge operations
+### 测试覆盖要求
+- **成功路径**: 所有有效的输入组合和配置
+- **边界条件**: 边缘情况、空值、空数组
+- **错误处理**: 无效输入、缺少必需字段、类型不匹配
+- **代理类型验证**: 所有内置和自定义代理类型
+- **状态转换**: 所有有效的状态值和转换
+- **文件系统操作**: 带有适当错误处理的读/写/删除操作
+- **知识操作**: 添加/检索/搜索/清除知识操作
 
-### Validation Checklist
-- [x] Input validation with Zod schema
-- [x] Proper error handling and response formatting
-- [x] Agent type recognition and validation
-- [x] Status field validation and processing
-- [x] JSON serialization and deserialization
-- [x] Integration with existing agent configurations
-- [x] File system operations with atomic writes
-- [x] Session persistence across application restarts
-- [x] Knowledge base operations with proper filtering
+### 验证清单
+- [x] 使用Zod schema的输入验证
+- [x] 适当的错误处理和响应格式化
+- [x] 代理类型识别和验证
+- [x] 状态字段验证和处理
+- [x] JSON序列化和反序列化
+- [x] 与现有代理配置的集成
+- [x] 带有原子写入的文件系统操作
+- [x] 应用程序重启期间的会话持久化
+- [x] 带有适当过滤的知识库操作
 
-## 🔄 Migration Guide
+## 🔄 迁移指南
 
-### From Standard Approaches to Advanced Features
+### 从标准方法到高级功能
 
-#### Step 1: Identify Complex Tasks
-- Review existing workflows with 3+ steps
-- Identify tasks that span different expertise domains
-- Flag tasks that could benefit from specialized execution
-- Determine if persistent knowledge storage is needed
+#### 步骤1：识别复杂任务
+- 审查具有3+步骤的现有工作流程
+- 识别跨越不同专业领域的任务
+- 标记可以从专业执行中受益的任务
+- 确定是否需要持久知识存储
 
-#### Step 2: Assign Appropriate Subagent Types
-- Map each task to the most appropriate built-in agent type
-- Consider creating custom agent types for project-specific needs
-- Ensure proper agent type assignment based on task requirements
+#### 步骤2：分配适当的子代理类型
+- 将每个任务映射到最合适的内置代理类型
+- 考虑为项目特定需求创建自定义代理类型
+- 确保基于任务要求的适当代理类型分配
 
-#### Step 3: Update Usage Patterns
-- Replace standard approaches with advanced features for complex tasks
-- Update todo item structure to include `subagent_type`
-- Implement proper error handling for the new JSON response format
-- Integrate knowledge management for context sharing
+#### 步骤3：更新使用模式
+- 为复杂任务用高级功能替换标准方法
+- 更新待办事项结构以包含 `subagent_type`
+- 为新的JSON响应格式实施适当的错误处理
+- 集成知识管理以进行上下文共享
 
-### Backward Compatibility
-- Standard approaches remain available for simple tasks
-- No breaking changes to existing functionality
-- Gradual migration path without disruption
-- Existing session data can be migrated to new format
+### 向后兼容性
+- 简单任务的标准方法仍然可用
+- 现有功能没有破坏性更改
+- 无中断的渐进迁移路径
+- 现有会话数据可以迁移到新格式
 
-## 📈 Benefits & Impact
+## 📈 收益与影响
 
-### Performance Improvements
-- **Parallel Execution**: Independent tasks execute simultaneously, reducing total execution time
-- **Resource Optimization**: Specialized agents use appropriate tools and capabilities efficiently
-- **Scalability**: Support for arbitrarily complex workflows with minimal overhead
-- **Token Conservation**: Strategic file access and context minimization
+### 性能改进
+- **并行执行**: 独立任务同时执行，减少总执行时间
+- **资源优化**: 专业代理高效使用适当的工具和能力
+- **可扩展性**: 支持任意复杂的工流程，开销最小
+- **令牌节约**: 战略性文件访问和上下文最小化
 
-### Quality Improvements
-- **Specialized Expertise**: Each task handled by the most appropriate agent type
-- **Reduced Errors**: Clear responsibility assignment eliminates ambiguity
-- **Consistent Output**: Standardized agent configurations ensure consistent results
-- **Persistent Context**: Knowledge base enables context sharing across sessions
+### 质量改进
+- **专业专长**: 每个任务由最合适的代理类型处理
+- **减少错误**: 清晰的职责分配消除歧义
+- **一致输出**: 标准化的代理配置确保一致结果
+- **持久上下文**: 知识库支持跨会话的上下文共享
 
-### Security Improvements
-- **Working Directory Constraints**: Strict path validation prevents unauthorized access
-- **Error Prevention**: Graceful handling of access errors and invalid paths
-- **Atomic Operations**: File system operations with proper error handling
-- **Context Awareness**: Always maintain awareness of current working directory context
+### 安全改进
+- **工作目录约束**: 严格的路径验证防止未授权访问
+- **错误预防**: 优雅处理访问错误和无效路径
+- **原子操作**: 带有适当错误处理的文件系统操作
+- **上下文感知**：始终保持对当前工作目录上下文的感知
 
-## 🛡️ Error Handling & Recovery
+## 🛡️ 错误处理与恢复
 
-### Error Classification
-1. **Tool Execution Failures**: Immediate analysis of root cause, command syntax validation
-2. **File System Errors**: Path validation, permission checking, race condition handling
-3. **Network/API Failures**: Exponential backoff, alternative data sources
-4. **Logic/Implementation Errors**: Execution flow tracing, assumption validation
-5. **Resource Limitations**: Memory optimization, pagination, alternative approaches
+### 错误分类
+1. **工具执行失败**：立即分析根本原因，验证命令语法
+2. **文件系统错误**：路径验证、权限检查、竞态条件处理
+3. **网络/API失败**：指数退避、替代数据源
+4. **逻辑/实现错误**：执行流程追踪、假设验证
+5. **资源限制**：内存优化、分页、替代方法
 
-### Recovery Protocol
-1. **Immediate Analysis**: Diagnose exact failure point and underlying cause
-2. **Strategy Adjustment**: Modify approach with alternative methods, tools, or parameters
-3. **Systematic Retries**: Attempt fixes with clear reasoning (max 3 attempts)
-4. **Fallback Implementation**: Propose and implement alternative solutions
-5. **Transparent Communication**: Explain errors, analysis, and next steps to user
+### 恢复协议
+1. **即时分析**：诊断确切的失败点和根本原因
+2. **策略调整**：使用替代方法、工具或参数修改方法
+3. **系统性重试**：以清晰的推理尝试修复（最多3次尝试）
+4. **备用方案实施**：提出并实施替代解决方案
+5. **透明沟通**：向用户解释错误、分析和下一步行动
 
-## 🎯 Future Enhancements
+## 🎯 未来增强功能
 
-### Planned Features
-1. **Multi-Session Knowledge Sharing**: Share knowledge across multiple sessions
-2. **Knowledge Versioning**: Track changes to knowledge items over time
-3. **Advanced Search Capabilities**: Full-text search, semantic search, faceted search
-4. **Knowledge Graph Integration**: Build relationships between knowledge items
-5. **Automated Knowledge Discovery**: Automatically extract knowledge from subtask agent outputs
+### 计划功能
+1. **多会话知识共享**：在多个会话之间共享知识
+2. **知识版本控制**：跟踪知识项随时间的变化
+3. **高级搜索功能**：全文搜索、语义搜索、分面搜索
+4. **知识图谱集成**：在知识项之间建立关系
+5. **自动化知识发现**：自动从子任务代理输出中提取知识
 
-### Potential Integrations
-1. **Database Storage**: Alternative storage backends (SQLite, PostgreSQL, MongoDB)
-2. **Cloud Storage**: Integration with cloud storage providers (AWS S3, Google Cloud Storage)
-3. **Vector Databases**: Semantic similarity search with vector embeddings
-4. **Collaborative Features**: Multi-user knowledge sharing and collaboration
-5. **Knowledge Analytics**: Usage statistics, popularity metrics, quality scoring
+### 潜在集成
+1. **数据库存储**：替代存储后端（SQLite、PostgreSQL、MongoDB）
+2. **云存储**：与云存储提供商集成（AWS S3、Google Cloud Storage）
+3. **向量数据库**：使用向量嵌入进行语义相似性搜索
+4. **协作功能**：多用户知识共享和协作
+5. **知识分析**：使用统计、流行度指标、质量评分
 
-## 📝 Conclusion
+## 📝 结论
 
-This feature represents a significant advancement in autonomous programming AI capabilities by implementing a comprehensive knowledge management and session persistence system integrated with advanced subagent coordination. The strict separation of concerns between main process and subtask agents ensures optimal specialization, parallel execution, and system reliability while maintaining security through strict working directory constraints and path validation.
+此功能通过实现一个全面的知识管理和会话持久化系统，并与高级子代理协调集成，在自主编程AI能力方面代表了重大进步。主流程和子任务代理之间的严格关注点分离确保了最佳专业化、并行执行和系统可靠性，同时通过严格的工作目录约束和路径验证来维护安全性。
 
-The implementation provides a solid foundation for complex, multi-step workflows with persistent context sharing and state recovery, enabling truly autonomous and intelligent software development assistance.
+该实现在复杂的多步骤工作流程中提供了坚实的基础，支持持久的上下文共享和状态恢复，从而实现真正自主和智能的软件开发辅助。

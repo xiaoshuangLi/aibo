@@ -31,3 +31,4 @@ coverage/
 .data
 .DS_Store
 .tsbuildinfo
+COMMIT_MESSAGE.md

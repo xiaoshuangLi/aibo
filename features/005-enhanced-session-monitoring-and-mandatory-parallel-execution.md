@@ -1,44 +1,44 @@
-# 005 - Enhanced Session Monitoring and Mandatory Parallel Execution Framework
+# 005 - 增强的会话监控与强制并行执行框架
 
-## Specification
+## 规格说明
 
-### 🎯 User Story
+### 🎯 用户故事
 作为开发者，我想要一个全面的会话监控系统和强制并行执行框架，以便能够实时跟踪智能体的所有活动，并确保复杂任务被自动分解为并行子任务以最大化性能。
 
-### ✅ Acceptance Criteria
+### ✅ 验收标准
 - [ ] 会话输出捕获中间件能够记录所有工具调用、工具结果、AI处理状态和错误信息
 - [ ] 系统提示词和代理配置明确强调强制并行执行的要求
 - [ ] 所有核心会话方法（start/end）支持异步操作
 - [ ] 测试覆盖率达到85%以上，所有测试用例通过
 - [ ] 不会破坏现有的功能和API兼容性
 
-### ⚙️ Technical Constraints
+### ⚙️ 技术约束
 - **技术栈要求**: TypeScript, Node.js v18+, LangChain
 - **兼容性要求**: 保持向后兼容，不破坏现有API
 - **性能要求**: 中间件不应显著影响执行性能，日志记录应高效
 - **安全要求**: 遵循现有的安全最佳实践，不引入新的安全漏洞
 
-## Technical Design
+## 技术设计
 
-### Architecture Overview
+### 架构概述
 该功能在现有AIBO架构的基础上增加了两个主要组件：
 1. SessionOutputCaptureMiddleware: 一个LangChain中间件，用于捕获和记录智能体的所有活动
 2. Mandatory Parallel Execution Framework: 通过更新系统提示词和代理配置，强制要求复杂任务必须被分解为并行子任务
 
-### Core Implementation
-#### Main Components/Modules
+### 核心实现
+#### 主要组件/模块
 - SessionOutputCaptureMiddleware: 实现了wrapToolCall和wrapModelCall钩子，能够捕获工具调用开始/结束、AI处理状态、错误信息等事件
 - System Prompts Update: 更新了中英文系统提示词，强调强制并行执行的重要性
 - Agent Configuration Update: 更新所有代理的配置文件，包含新的工作目录约束和并行执行要求
 - Session Class Enhancement: 将start()和end()方法改为异步，以支持异步IO操作
 
-#### Key Technical Decisions
+#### 关键技术决策
 - 非侵入式监控: 中间件设计为非侵入式，即使在工具调用失败时也会返回有效的ToolMessage而不是抛出异常，确保流程继续
 - 防御性编程: 在调用会话方法前检查方法是否存在，避免因会话对象不完整而导致的运行时错误
 - 内容截断: 工具结果预览被限制在200个字符以内，避免日志过长影响性能
 - 强制并行: 通过系统提示词的强化，确保复杂任务自动分解为并行子任务
 
-#### Data Flow/State Management
+#### 数据流/状态管理
 1. 智能体执行开始 → beforeAgent钩子（注释中保留）
 2. 工具调用开始 → wrapToolCall记录工具名称和参数
 3. 工具调用完成 → wrapToolCall记录结果或错误
@@ -46,8 +46,8 @@
 5. AI响应生成 → wrapModelCall流式输出AI内容
 6. 智能体执行结束 → afterAgent钩子（注释中保留）
 
-### API Changes
-#### New APIs
+### API 变更
+#### 新增 API
 ```typescript
 // 新增的会话输出捕获中间件
 interface SessionOutputCaptureMiddlewareOptions {
@@ -59,7 +59,7 @@ function createSessionOutputCaptureMiddleware(
 ): Middleware;
 ```
 
-#### Modified APIs
+#### 修改的 API
 ```typescript
 // 原有:
 class Session {
@@ -74,12 +74,12 @@ class Session {
 }
 ```
 
-#### Deprecated APIs
+#### 废弃的 API
 - 无废弃的API
 
-## Implementation Plan
+## 实施计划
 
-### Task Breakdown
+### 任务分解
 1. 实现SessionOutputCaptureMiddleware - 创建中间件类和工厂函数 (预计: 4小时)
 2. 更新系统提示词 - 强化并行执行要求和工作目录约束 (预计: 2小时)
 3. 更新代理配置 - 更新所有代理的markdown配置文件 (预计: 2小时)
@@ -87,12 +87,12 @@ class Session {
 5. 编写全面测试 - 覆盖所有新功能和边界情况 (预计: 6小时)
 6. 集成和验证 - 确保所有组件正常工作且不破坏现有功能 (预计: 3小时)
 
-### Dependencies
-- Internal Dependencies: core/agent/session.ts, core/utils/index.ts, shared/constants/system-prompts.ts
-- External Dependencies: @langchain/core, typescript
-- Prerequisites: 现有的LangChain中间件框架
+### 依赖项
+- 内部依赖: core/agent/session.ts, core/utils/index.ts, shared/constants/system-prompts.ts
+- 外部依赖: @langchain/core, typescript
+- 先决条件: 现有的LangChain中间件框架
 
-### Risk Assessment
+### 风险评估
 | 风险 | 概率 | 影响 | 缓解措施 |
 |------|------|------|----------|
 | 中间件性能影响 | 低 | 中 | 优化日志记录逻辑，使用内容截断，避免不必要的操作 |

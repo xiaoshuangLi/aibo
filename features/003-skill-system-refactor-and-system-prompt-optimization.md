@@ -1,4 +1,4 @@
-# 003 - Skill System Refactor and System Prompt Optimization
+# 003 - 技能系统重构与系统提示词优化
 
 ## 功能概述 (Feature Summary)
 

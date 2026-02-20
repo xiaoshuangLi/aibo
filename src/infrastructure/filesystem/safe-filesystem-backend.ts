@@ -55,7 +55,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       'venv',
       '.venv',
       'env',
-      '.env'
+      '.env',
+      '.data',
     ]);
 
     // Allowed extensions for text-based files we want to read

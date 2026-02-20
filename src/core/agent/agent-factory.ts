@@ -110,11 +110,27 @@ export async function createAIAgent(session?: Session) {
   // 查找工作目录下的所有skills目录
   const allSkillsDirs = findSkillsDirectories(process.cwd());
 
-  // 为子代理应用默认配置（强化提示词已在代理加载器中处理）
+  /**
+ * 过滤掉子代理不应该使用的工具
+ * @param tools - 原始工具列表
+ * @returns 过滤后的工具列表
+ */
+function filterSubAgentTools(tools: any[]): any[] {
+  return tools.filter(tool => {
+    // 禁止子代理使用 write-subagent-todos 工具
+    if (tool.name === 'write-subagent-todos') {
+      return false;
+    }
+    return true;
+  });
+}
+
+// 为子代理应用默认配置（强化提示词已在代理加载器中处理）
   const subAgentsWithDefaults = customSubAgents.map(agent => ({
     ...agent,
-    // 如果未指定tools，则使用系统tools  
-    tools: agent.tools ?? tools,
+    // 确保子代理的tools中不包含 write-subagent-todos 工具
+    // 即使用户在配置中指定了该工具，也会被过滤掉
+    tools: filterSubAgentTools(agent.tools ?? tools),
     // 如果未指定skills，则使用系统skills  
     skills: agent.skills ?? allSkillsDirs,
     // 如果未指定model，则使用系统model

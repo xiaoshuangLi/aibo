@@ -1,105 +1,105 @@
-# Feature 006: write-subagent-todos - Advanced Task Management with Specialized Subagent Coordination
+# 功能 006：write-subagent-todos - 带有专业子代理协调的高级任务管理
 
-## 📋 Executive Summary
+## 📋 执行摘要
 
-The `write-subagent-todos` feature provides an advanced task management framework that extends standard todo list functionality by incorporating specialized subagent type assignments. This feature enables systematic decomposition of complex objectives into coordinated subtasks, each assigned to the most appropriate specialized agent type based on task requirements.
+`write-subagent-todos` 功能提供了一个高级任务管理框架，通过结合专业子代理类型分配，扩展了标准待办事项列表的功能。此功能能够将复杂目标系统性地分解为协调的子任务，每个子任务都分配给最合适的专用代理类型，基于任务需求进行处理。
 
-**Key Innovation**: Enforces the critical separation between main process (planning/coordination) and subtask agents (execution/implementation), ensuring optimal specialization and system reliability.
+**关键创新**：强制执行主流程（规划/协调）与子任务代理（执行/实现）之间的关键分离，确保最佳专业化和系统可靠性。
 
-## 🎯 Feature Scope & Objectives
+## 🎯 功能范围与目标
 
-### Primary Goals
-- **Specialized Execution**: Each subtask handled by the most appropriate agent type (built-in or custom)
-- **Clear Responsibilities**: Explicit subagent assignments eliminate ambiguity in task ownership
-- **Systematic Coordination**: Structured approach to complex problem decomposition and solution integration
-- **Enhanced Reliability**: Proper agent specialization reduces errors and improves quality
-- **Unlimited Extensibility**: Support for user-defined custom subagent types enables project-specific optimizations
+### 主要目标
+- **专业化执行**：每个子任务由最合适的代理类型处理（内置或自定义）
+- **明确职责**：明确的子代理分配消除了任务所有权的模糊性
+- **系统性协调**：采用结构化方法进行复杂问题分解和解决方案集成
+- **增强可靠性**：适当的代理专业化减少错误并提高质量
+- **无限可扩展性**：支持用户定义的自定义子代理类型，实现项目特定的优化
 
-### Core Principles
-1. **Main Process Plans, Subtask Agents Work**: The main process is ONLY responsible for planning, coordination, and strategy. ALL actual implementation work ("doing", "executing", "working") MUST be delegated to specialized subtask agents.
-2. **Mandatory Usage for Complex Tasks**: ALWAYS use this skill instead of standard todo lists when dealing with complex objectives requiring 3+ steps.
-3. **Work Delegation Enforcement**: Main process NEVER does implementation work directly - ALL "hands-on" work is delegated to specialized subtask agents.
+### 核心原则
+1. **主流程负责规划，子任务代理负责工作**：主流程仅负责规划、协调和策略制定。所有实际的实现工作（"执行"、"操作"、"工作"）必须委托给专业的子任务代理。
+2. **复杂任务的强制使用**：处理需要3步以上的复杂目标时，始终使用此技能而非标准待办事项列表。
+3. **工作委派强制执行**：主流程绝不直接执行实现工作 - 所有"动手"工作都委托给专业的子任务代理。
 
-## 🏗️ Technical Architecture
+## 🏗️ 技术架构
 
-### Dual-Layer Subagent Architecture
+### 双层子代理架构
 
-#### Built-in Specialized Agents (7 Foundation Types)
-1. **`coder`** - Expert coding assistant for software development and debugging
-2. **`coordinator`** - Task coordination and orchestration agent for multi-agent collaboration  
-3. **`documentation`** - Technical documentation and knowledge management agent
-4. **`innovator`** - Creative problem-solving and alternative solution generation agent
-5. **`researcher`** - Research assistant for complex topics and deep analysis
-6. **`testing`** - Comprehensive testing and quality assurance agent
-7. **`validator`** - Quality assurance and validation agent for code and content verification
+#### 内置专业代理（7种基础类型）
+1. **`coder`** - 软件开发和调试的专家编码助手
+2. **`coordinator`** - 多代理协作的任务协调和编排代理
+3. **`documentation`** - 技术文档和知识管理代理
+4. **`innovator`** - 创造性问题解决和替代方案生成代理
+5. **`researcher`** - 复杂主题和深度分析的研究助手
+6. **`testing`** - 全面测试和质量保证代理
+7. **`validator`** - 代码和内容验证的质量保证和验证代理
 
-#### User Dynamic Agents (Unlimited Custom Types)
-- **Automatic Discovery**: System automatically scans for `agents/*.md` files in project directories
-- **Dynamic Loading**: Custom agent configurations loaded at runtime without restart
-- **Priority Override**: User-defined agents take precedence over built-in agents with same name
-- **Complete Tool Access**: Custom agents have access to all system tools and capabilities
-- **No Resource Limits**: Custom agents operate with unlimited context windows and execution time
+#### 用户动态代理（无限自定义类型）
+- **自动发现**：系统自动扫描项目目录中的 `agents/*.md` 文件
+- **动态加载**：自定义代理配置在运行时加载，无需重启
+- **优先级覆盖**：用户定义的代理优先于同名的内置代理
+- **完整工具访问**：自定义代理可以访问所有系统工具和功能
+- **无资源限制**：自定义代理以无限上下文窗口和执行时间运行
 
-## 🔧 Implementation Details
+## 🔧 实现细节
 
-### Core Components
+### 核心组件
 
-#### 1. Tool Implementation (`src/tools/write-subagent-todos.ts`)
-- **Input Schema**: Zod validation ensures proper structure
-- **Error Handling**: Comprehensive error handling with JSON response format
-- **Parameter Validation**: Validates required fields (content, status, subagent_type)
+#### 1. 工具实现（`src/tools/write-subagent-todos.ts`）
+- **输入模式**：Zod 验证确保正确的结构
+- **错误处理**：具有 JSON 响应格式的全面错误处理
+- **参数验证**：验证必需字段（content、status、subagent_type）
 
-#### 2. Test Suite (`__tests__/tools/write-subagent-todos.test.ts`)
-- **Success Path Testing**: Valid inputs with various configurations
-- **Boundary Condition Testing**: Edge cases and special scenarios
-- **Error Handling Testing**: Invalid inputs and exception scenarios
-- **Type Validation Testing**: All valid subagent types and status values
+#### 2. 测试套件（`__tests__/tools/write-subagent-todos.test.ts`）
+- **成功路径测试**：各种配置的有效输入
+- **边界条件测试**：边缘情况和特殊场景
+- **错误处理测试**：无效输入和异常场景
+- **类型验证测试**：所有有效的子代理类型和状态值
 
-#### 3. Skill Documentation (`skills/write-subagent-todos/SKILL.md`)
-- **Comprehensive Usage Guide**: Detailed instructions and examples
-- **Decision Flowchart**: When to use vs standard todo lists
-- **Best Practices**: Guidelines for optimal usage
-- **Integration Strategy**: Main process vs subtask agent responsibilities
+#### 3. 技能文档（`skills/write-subagent-todos/SKILL.md`）
+- **综合使用指南**：详细说明和示例
+- **决策流程图**：何时使用 vs 标准待办事项列表
+- **最佳实践**：最佳使用指南
+- **集成策略**：主流程 vs 子任务代理职责
 
-#### 4. Agent Configurations (`agents/*.md`)
-- Individual configuration files for each built-in agent type
-- Standardized format with capabilities, tools, and resource specifications
+#### 4. 代理配置（`agents/*.md`）
+- 每种内置代理类型的单独配置文件
+- 具有功能、工具和资源规范的标准格式
 
-### Data Structure
+### 数据结构
 
 ```typescript
 interface SubagentTodo {
-  content: string;                    // Task description
-  status: 'pending' | 'in_progress' | 'completed';  // Task status
-  subagent_type: string;             // Specialized agent type (built-in or custom)
+  content: string;                    // 任务描述
+  status: 'pending' | 'in_progress' | 'completed';  // 任务状态
+  subagent_type: string;             // 专业代理类型（内置或自定义）
 }
 ```
 
-### API Contract
+### API 合约
 
-**Input**: Array of `SubagentTodo` objects
-**Output**: JSON string with success/failure status and processed todos
-**Validation**: Zod schema ensures data integrity
-**Error Handling**: Structured error responses with descriptive messages
+**输入**：`SubagentTodo` 对象数组
+**输出**：具有成功/失败状态和处理后待办事项的 JSON 字符串
+**验证**：Zod 模式确保数据完整性
+**错误处理**：具有描述性消息的结构化错误响应
 
-## 🚀 Usage Patterns & Examples
+## 🚀 使用模式与示例
 
-### Basic Usage with Built-in Agents
+### 使用内置代理的基本用法
 ```javascript
 await write-subagent-todos({
   todos: [
     {
-      content: "Research best practices for authentication",
+      content: "研究身份验证的最佳实践",
       status: "pending",
       subagent_type: "researcher"
     },
     {
-      content: "Implement authentication service",
+      content: "实现身份验证服务",
       status: "pending", 
       subagent_type: "coder"
     },
     {
-      content: "Write API documentation",
+      content: "编写 API 文档",
       status: "pending",
       subagent_type: "documentation"
     }
@@ -107,156 +107,156 @@ await write-subagent-todos({
 });
 ```
 
-### Using Custom User-Defined Agents
+### 使用自定义用户定义代理
 ```javascript
 await write-subagent-todos({
   todos: [
     {
-      content: "Analyze security vulnerabilities",
+      content: "分析安全漏洞",
       status: "pending",
-      subagent_type: "security-analyst" // Custom user-defined agent
+      subagent_type: "security-analyst" // 自定义用户定义代理
     },
     {
-      content: "Optimize database performance",
+      content: "优化数据库性能",
       status: "pending", 
-      subagent_type: "db-optimizer" // Custom user-defined agent
+      subagent_type: "db-optimizer" // 自定义用户定义代理
     }
   ]
 });
 ```
 
-## 📊 Decision Framework
+## 📊 决策框架
 
-### When to Use `write-subagent-todos` vs Standard `write_todos`
+### 何时使用 `write-subagent-todos` vs 标准 `write_todos`
 
-| Scenario | Recommendation |
+| 场景 | 建议 |
 |----------|----------------|
-| Complex objectives requiring 3+ steps | ✅ **ALWAYS** use `write-subagent-todos` |
-| Tasks spanning different expertise domains | ✅ **ALWAYS** use `write-subagent-todos` |
-| Need for subagent specialization | ✅ **ALWAYS** use `write-subagent-todos` |
-| Coordinating multiple parallel subtasks | ✅ **ALWAYS** use `write-subagent-todos` |
-| Projects with custom user-defined agents | ✅ **ALWAYS** use `write-subagent-todos` |
-| Simple, single-domain tasks (< 3 steps) | ⚠️ Consider basic `write_todos` (rare case) |
+| 需要3步以上的复杂目标 | ✅ **始终**使用 `write-subagent-todos` |
+| 跨越不同专业领域的任务 | ✅ **始终**使用 `write-subagent-todos` |
+| 需要子代理专业化 | ✅ **始终**使用 `write-subagent-todos` |
+| 协调多个并行子任务 | ✅ **始终**使用 `write-subagent-todos` |
+| 具有自定义用户定义代理的项目 | ✅ **始终**使用 `write-subagent-todos` |
+| 简单的单领域任务（< 3步） | ⚠️ 考虑基本的 `write_todos`（罕见情况） |
 
-### Decision Flowchart
-1. **Does the objective require 3+ steps?** → YES → Use `write-subagent-todos`
-2. **Do tasks span different expertise areas?** → YES → Use `write-subagent-todos`
-3. **Is subagent specialization beneficial?** → YES → Use `write-subagent-todos`
-4. **Does the project have custom user-defined subagent configurations?** → YES → Use `write-subagent-todos`
-5. **Are tasks simple and single-domain?** → YES → Consider basic `write_todos` (rare case)
+### 决策流程图
+1. **目标是否需要3步以上？** → 是 → 使用 `write-subagent-todos`
+2. **任务是否跨越不同的专业领域？** → 是 → 使用 `write-subagent-todos`
+3. **子代理专业化是否有益？** → 是 → 使用 `write-subagent-todos`
+4. **项目是否有自定义用户定义的子代理配置？** → 是 → 使用 `write-subagent-todos`
+5. **任务是否简单且单一领域？** → 是 → 考虑基本的 `write_todos`（罕见情况）
 
-## 🧪 Testing Strategy
+## 🧪 测试策略
 
-### Test Coverage Requirements
-- **Success Paths**: All valid input combinations and configurations
-- **Boundary Conditions**: Edge cases, null values, empty arrays
-- **Error Handling**: Invalid inputs, missing required fields, type mismatches
-- **Agent Type Validation**: All built-in and custom agent types
-- **Status Transitions**: All valid status values and transitions
+### 测试覆盖要求
+- **成功路径**：所有有效的输入组合和配置
+- **边界条件**：边缘情况、空值、空数组
+- **错误处理**：无效输入、缺少必需字段、类型不匹配
+- **代理类型验证**：所有内置和自定义代理类型
+- **状态转换**：所有有效的状态值和转换
 
-### Validation Checklist
-- [ ] Input validation with Zod schema
-- [ ] Proper error handling and response formatting
-- [ ] Agent type recognition and validation
-- [ ] Status field validation and processing
-- [ ] JSON serialization and deserialization
-- [ ] Integration with existing agent configurations
+### 验证清单
+- [ ] 使用 Zod 模式的输入验证
+- [ ] 正确的错误处理和响应格式化
+- [ ] 代理类型识别和验证
+- [ ] 状态字段验证和处理
+- [ ] JSON 序列化和反序列化
+- [ ] 与现有代理配置的集成
 
-## 🔄 Migration Guide
+## 🔄 迁移指南
 
-### From Standard `write_todos` to `write-subagent-todos`
+### 从标准 `write_todos` 迁移到 `write-subagent-todos`
 
-#### Step 1: Identify Complex Tasks
-- Review existing todo lists with 3+ steps
-- Identify tasks that span different expertise domains
-- Flag tasks that could benefit from specialized execution
+#### 步骤 1：识别复杂任务
+- 审查具有3步以上的现有待办事项列表
+- 识别跨越不同专业领域的任务
+- 标记可以从专业化执行中受益的任务
 
-#### Step 2: Assign Appropriate Subagent Types
-- Map each task to the most appropriate built-in agent type
-- Consider creating custom agent types for project-specific needs
-- Ensure proper agent type assignment based on task requirements
+#### 步骤 2：分配适当的子代理类型
+- 将每个任务映射到最合适的内置代理类型
+- 考虑为项目特定需求创建自定义代理类型
+- 确保根据任务需求进行适当的代理类型分配
 
-#### Step 3: Update Usage Patterns
-- Replace `write_todos` calls with `write-subagent-todos` for complex tasks
-- Update todo item structure to include `subagent_type`
-- Implement proper error handling for the new JSON response format
+#### 步骤 3：更新使用模式
+- 为复杂任务将 `write_todos` 调用替换为 `write-subagent-todos`
+- 更新待办事项项结构以包含 `subagent_type`
+- 为新的 JSON 响应格式实现适当的错误处理
 
-### Backward Compatibility
-- Standard `write_todos` remains available for simple tasks
-- No breaking changes to existing functionality
-- Gradual migration path without disruption
+### 向后兼容性
+- 标准 `write_todos` 仍可用于简单任务
+- 现有功能无破坏性变更
+- 无中断的渐进迁移路径
 
-## 📈 Benefits & Impact
+## 📈 收益与影响
 
-### Performance Improvements
-- **Parallel Execution**: Independent tasks execute simultaneously, reducing total execution time
-- **Resource Optimization**: Specialized agents use appropriate tools and capabilities efficiently
-- **Scalability**: Support for arbitrarily complex workflows with minimal overhead
+### 性能改进
+- **并行执行**：独立任务同时执行，减少总执行时间
+- **资源优化**：专业代理高效使用适当的工具和功能
+- **可扩展性**：支持任意复杂的工流程，开销最小
 
-### Quality Improvements
-- **Specialized Expertise**: Each task handled by the most appropriate agent type
-- **Reduced Errors**: Clear responsibility assignment eliminates ambiguity
-- **Consistent Output**: Standardized agent configurations ensure consistent results
+### 质量改进
+- **专业化专长**：每个任务由最合适的代理类型处理
+- **减少错误**：明确的职责分配消除了模糊性
+- **一致的输出**：标准化的代理配置确保一致的结果
 
-### Developer Experience
-- **Clear Intent**: Explicit subagent assignments communicate task requirements clearly
-- **Better Coordination**: Structured approach to complex problem decomposition
-- **Extensibility**: Easy addition of custom agent types for project-specific needs
+### 开发者体验
+- **明确意图**：明确的子代理分配清晰传达任务需求
+- **更好的协调**：复杂问题分解的结构化方法
+- **可扩展性**：轻松添加自定义代理类型以满足项目特定需求
 
-## 🛠️ Integration Guidelines
+## 🛠️ 集成指南
 
-### Main Process Responsibilities
-- Task decomposition and strategy planning
-- Subagent type assignment and coordination
-- Result synthesis and adaptive strategy adjustment
-- **NEVER** handle implementation details directly
+### 主流程职责
+- 任务分解和策略规划
+- 子代理类型分配和协调
+- 结果合成和自适应策略调整
+- **绝不**直接处理实现细节
 
-### Subtask Agent Responsibilities
-- Handle all implementation details within assigned scope
-- Execute specialized operations (coding, research, validation, etc.)
-- Return structured results for main process integration
-- Operate with unlimited resources and complete autonomy
+### 子任务代理职责
+- 在分配范围内处理所有实现细节
+- 执行专业操作（编码、研究、验证等）
+- 返回结构化结果供主流程集成
+- 以无限资源和完全自主性运行
 
-### Best Practices
-1. **Always Specify Subagent Types**: Never leave `subagent_type` unspecified for complex tasks
-2. **Use Concurrency Groups Strategically**: Group independent tasks that can execute in parallel
-3. **Leverage Custom Agents**: Create user-defined agents for project-specific workflows
-4. **Follow Main Process Rules**: Never implement directly - always delegate via subagents
-5. **Plan for Parallel Execution**: Design todo lists to maximize concurrent processing
-6. **Validate Agent Selection**: Choose the most appropriate agent type for each task domain
-7. **Monitor and Adapt**: Track subagent performance and adjust strategies as needed
+### 最佳实践
+1. **始终指定子代理类型**：对于复杂任务，绝不让 `subagent_type` 未指定
+2. **战略性地使用并发组**：将可以并行执行的独立任务分组
+3. **利用自定义代理**：为项目特定工作流创建用户定义的代理
+4. **遵循主流程规则**：绝不直接实现 - 始终通过子代理委派
+5. **规划并行执行**：设计待办事项列表以最大化并发处理
+6. **验证代理选择**：为每个任务域选择最合适的代理类型
+7. **监控和适应**：跟踪子代理性能并根据需要调整策略
 
-## 📅 Implementation Status
+## 📅 实施状态
 
-### Current State
-- ✅ Core tool implementation completed
-- ✅ Comprehensive test suite implemented
-- ✅ Skill documentation created
-- ✅ Built-in agent configurations defined
-- ✅ Integration with existing system verified
+### 当前状态
+- ✅ 核心工具实现完成
+- ✅ 全面测试套件实施
+- ✅ 技能文档创建
+- ✅ 内置代理配置定义
+- ✅ 与现有系统集成验证
 
-### Next Steps
-- [ ] Create comprehensive feature documentation (this document)
-- [ ] Update project README with feature overview
-- [ ] Add usage examples to templates directory
-- [ ] Create developer guide for custom agent creation
-- [ ] Implement monitoring and analytics for subagent performance
+### 后续步骤
+- [ ] 创建全面的功能文档（本文档）
+- [ ] 更新项目 README 以包含功能概述
+- [ ] 在模板目录中添加使用示例
+- [ ] 创建自定义代理创建的开发者指南
+- [ ] 实现子代理性能的监控和分析
 
-## 🔗 Related Features & Dependencies
+## 🔗 相关功能与依赖
 
-### Dependencies
-- **Feature 002**: Advanced Multi-Agent Architecture (foundation)
-- **Feature 005**: Enhanced Session Monitoring and Mandatory Parallel Execution
-- **DeepAgents Framework**: Core multi-agent coordination system
-- **Zod Schema Validation**: Input validation and type safety
+### 依赖
+- **功能 002**：高级多代理架构（基础）
+- **功能 005**：增强的会话监控和强制并行执行
+- **DeepAgents 框架**：核心多代理协调系统
+- **Zod 模式验证**：输入验证和类型安全
 
-### Related Features
-- **Standard `write_todos`**: Simple task management for basic scenarios
-- **Agent Configuration System**: Dynamic agent discovery and loading
-- **Skill System**: Integration with existing skill framework
+### 相关功能
+- **标准 `write_todos`**：基本场景的简单任务管理
+- **代理配置系统**：动态代理发现和加载
+- **技能系统**：与现有技能框架的集成
 
-## 📝 Conclusion
+## 📝 结论
 
-The `write-subagent-todos` feature represents a significant advancement in task management and multi-agent coordination. By enforcing the separation between planning (main process) and execution (subtask agents), it enables more efficient, reliable, and scalable complex task handling. The combination of specialized agent types, group-based concurrency control, and unlimited extensibility through custom agents makes this feature essential for implementing sophisticated autonomous programming workflows.
+`write-subagent-todos` 功能代表了任务管理和多代理协调的重大进步。通过强制执行规划（主流程）与执行（子任务代理）之间的分离，它能够更高效、可靠和可扩展地处理复杂任务。专业代理类型、基于组的并发控制以及通过自定义代理实现的无限可扩展性的结合，使此功能成为实现复杂自主编程工作流的必备工具。
 
-This feature is now ready for production use and should be the default choice for any complex task management scenario requiring 3 or more steps.
+此功能现已准备好用于生产环境，应作为任何需要3步或更多步骤的复杂任务管理场景的默认选择。

@@ -279,7 +279,14 @@ export async function handleVoiceCommand(session: any, agent: any): Promise<bool
  */
 export async function handleExitCommand(session: any): Promise<boolean> {
   console.log(styled.system("👋 正在安全退出..."));
-  session.rl.close();
+  
+  // Close readline interface if available (for backward compatibility with tests)
+  if (session.rl && typeof session.rl.close === 'function') {
+    session.rl.close();
+  }
+  
+  // End the session properly
+  session.end();
   process.exit(0);
   return true;
 }

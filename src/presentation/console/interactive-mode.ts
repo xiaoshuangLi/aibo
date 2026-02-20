@@ -6,6 +6,7 @@ import { createKeypressHandler } from '@/features/voice-input/voice-input-manage
 import { handleUserInput } from '@/presentation/console/user-input-handler';
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
 import { Session } from '@/core/agent/session';
+import { createConsoleThreadId } from '@/core/utils/interactive-logic';
 
 /**
  * Interactive Mode module that orchestrates the main interactive conversation interface.
@@ -126,6 +127,7 @@ export function setupExitHandlers(session: Session, terminalAdapter: TerminalAda
       if (now - lastInterrupt < 500) {
         console.log('\x1b[36m\n👋 双击确认，立即退出...\x1b[0m');
         terminalAdapter.rl?.close?.();
+        gracefulShutdown(session);
         process.exit(0);
       } else {
         console.log('\x1b[36m\n👋 检测到退出请求 (再次 Ctrl+C 确认退出)\x1b[0m');
@@ -163,7 +165,8 @@ export function setupExitHandlers(session: Session, terminalAdapter: TerminalAda
 export async function startInteractiveMode() {
   // Create terminal adapter
   const terminalAdapter = new TerminalAdapter();
-  const session = new Session(terminalAdapter);
+  const threadId = createConsoleThreadId();
+  const session = new Session(terminalAdapter, { threadId });
 
   // Get AI agent instance
   const agent = await createAIAgent(session);
