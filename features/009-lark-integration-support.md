@@ -1,6 +1,6 @@
-# 009 - Lark Integration Support
+# 009 - 飞书集成支持
 
-## Specification
+## 📋 规格说明
 
 **一句话描述**: 实现飞书(Lark)平台集成支持，允许用户在飞书环境中与AIBO AI助手进行交互，并支持多种交互模式的灵活切换
 
@@ -18,83 +18,83 @@
 
 ---
 
-## Technical Design
+## 🏗️ 技术设计
 
-### Architecture Overview
-Implemented using the Adapter pattern to support multiple platforms:
-- **IOChannel Interface**: Defines a unified input/output interface
-- **DefaultIOChannel**: Base class implementation for console
-- **LarkAdapter**: Specific implementation for Lark platform, inheriting from DefaultIOChannel
-- **Session**: Session manager that performs all I/O operations through IOChannel
+### 📐 架构概览
+采用适配器模式实现多平台支持：
+- **IOChannel 接口**: 定义统一的输入/输出接口
+- **DefaultIOChannel**: 控制台的基础类实现
+- **LarkAdapter**: 飞书平台的特定实现，继承自 DefaultIOChannel
+- **Session**: 会话管理器，通过 IOChannel 执行所有 I/O 操作
 
-### Interaction Mode Decision Flow
-1. **Command line arguments take priority**: `--interaction=lark|console` or `--interactive`
-2. **Environment variables next**: `AIBO_LARK_MODE=true` (backward compatibility) or `AIBO_INTERACTION=lark|console`
-3. **Default value**: `console`
+### ⚙️ 交互模式决策流程
+1. **命令行参数优先级最高**: `--interaction=lark|console` 或 `--interactive`
+2. **环境变量次之**: `AIBO_LARK_MODE=true`（向后兼容）或 `AIBO_INTERACTION=lark|console`
+3. **默认值**: `console`
 
-### Lark Integration Architecture
-- **Authentication**: OAuth2 authentication using App ID and App Secret
-- **Message Reception**: WebSocket long connection to receive user messages
-- **Message Sending**: REST API to send AI responses
-- **Event Handling**: Register various output event handlers (AI response, tool calls, system messages, etc.)
+### 🧩 飞书集成架构
+- **认证机制**: 使用 App ID 和 App Secret 进行 OAuth2 认证
+- **消息接收**: 通过 WebSocket 长连接接收用户消息
+- **消息发送**: 通过 REST API 发送 AI 响应
+- **事件处理**: 注册各种输出事件处理器（AI 响应、工具调用、系统消息等）
 
-### Error Handling and Security
-- **Environment Variable Validation**: Validate required Lark environment variables at startup
-- **Exception Handling**: Global error handling to ensure process stability
-- **Signal Handling**: Properly handle SIGINT and SIGTERM signals for graceful shutdown
-
----
-
-## Implementation Plan
-
-### Completed Tasks
-✅ **Core Architecture Implementation**
-- [x] Implemented LarkAdapter adapter class
-- [x] Implemented Lark interactive mode main entry point
-- [x] Implemented Lark internal command handler
-- [x] Updated main function to support multi-mode startup
-
-✅ **Configuration System Enhancement**  
-- [x] Supported command line argument parsing
-- [x] Supported multi-level environment variable configuration
-- [x] Updated .env.example file
-
-✅ **Test Coverage**
-- [x] Wrote unit tests for LarkAdapter
-- [x] Wrote unit tests for interactive mode  
-- [x] Wrote unit tests for command handler
-- [x] Updated configuration tests
-
-✅ **Dependency Management**
-- [x] Added @larksuiteoapi/node-sdk dependency
-- [x] Updated package.json scripts
-
-✅ **Documentation Updates**
-- [x] Created this feature documentation
-- [x] Updated related feature documentation references
+### 🔒 错误处理与安全
+- **环境变量验证**: 启动时验证必需的飞书环境变量
+- **异常处理**: 全局错误处理确保进程稳定性
+- **信号处理**: 正确处理 SIGINT 和 SIGTERM 信号以实现优雅关闭
 
 ---
 
-## Usage Guide
+## 📝 实施计划
 
-### Quick Start
-1. **Get Lark App Credentials**:
-   - Create an enterprise self-built app on Lark Open Platform
-   - Get App ID and App Secret
-   - Configure bot permissions and event subscriptions
+### ✅ 已完成任务
+✅ **核心架构实现**
+- [x] 实现了 LarkAdapter 适配器类
+- [x] 实现了飞书交互模式主入口点
+- [x] 实现了飞书内部命令处理器
+- [x] 更新了主函数以支持多模式启动
 
-2. **Configure Environment Variables**:
+✅ **配置系统增强**  
+- [x] 支持命令行参数解析
+- [x] 支持多级环境变量配置
+- [x] 更新了 .env.example 文件
+
+✅ **测试覆盖**
+- [x] 编写了 LarkAdapter 的单元测试
+- [x] 编写了交互模式的单元测试
+- [x] 编写了命令处理器的单元测试
+- [x] 更新了配置相关的测试
+
+✅ **依赖管理**
+- [x] 添加了 @larksuiteoapi/node-sdk 依赖
+- [x] 更新了 package.json 脚本
+
+✅ **文档更新**
+- [x] 创建了此功能文档
+- [x] 更新了相关功能文档的引用
+
+---
+
+## 🚀 使用指南
+
+### 📦 快速开始
+1. **获取飞书应用凭证**:
+   - 在飞书开放平台创建企业自建应用
+   - 获取 App ID 和 App Secret
+   - 配置机器人权限和事件订阅
+
+2. **配置环境变量**:
    ```bash
-   # .env file
+   # .env 文件
    AIBO_INTERACTION=lark
    AIBO_LARK_APP_ID=your-app-id
    AIBO_LARK_APP_SECRET=your-app-secret
    ```
 
-3. **Start the Application**:
+3. **启动应用程序**:
    ```bash
    npm run dev:lark
-   # or
+   # 或
    AIBO_INTERACTION=lark npm run dev
    ```
 
