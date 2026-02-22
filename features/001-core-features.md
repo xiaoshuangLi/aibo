@@ -50,9 +50,9 @@
 ### 功能后  
 ```typescript
 // 1. 环境变量配置 (.env 文件)
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.proxy.com/v1
-MODEL_NAME=gpt-4o
+AIBO_OPENAI_API_KEY=your-api-key
+AIBO_OPENAI_BASE_URL=https://api.proxy.com/v1
+AIBO_MODEL_NAME=gpt-4o
 
 // 2. 代码中使用
 import { createAIAgent } from './src/index';

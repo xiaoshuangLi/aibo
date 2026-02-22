@@ -1,6 +1,6 @@
 ---
 name: feature-organizer
-description: "Guide for organizing current code changes into a well-structured feature. This skill should be used when users want to convert uncommitted code changes into a complete feature with proper testing, documentation, and git workflow. Use this skill when you need to: organize uncommitted changes, create feature documentation, generate feature spec, document current work, convert changes to feature, package current work, create feature from changes, document pending changes, or prepare feature for commit. 中文触发词：整理代码、生成文档、创建功能、打包提交、整理成文档、代码转功能、未提交整理、自动生成文档、整理当前工作、一键生成feature"
+description: "Guide for organizing current code changes into a well-structured feature with **MANDATORY CHINESE DOCUMENTATION**. This skill should be used when users want to convert uncommitted code changes into a complete feature with proper testing, documentation (必须使用中文书写), and git workflow. Use this skill when you need to: organize uncommitted changes, create feature documentation, generate feature spec, document current work, convert changes to feature, package current work, create feature from changes, document pending changes, or prepare feature for commit. 中文触发词：整理代码、生成文档、创建功能、打包提交、整理成文档、代码转功能、未提交整理、自动生成文档、整理当前工作、一键生成feature"
 license: "Complete terms in LICENSE.txt"
 ---
 
@@ -55,17 +55,19 @@ Use this skill when you have uncommitted code changes that need to be:
 
 ### Step 3: Create Feature Documentation
 
-**Objective**: Generate comprehensive feature documentation using the standard template
+**Objective**: Generate comprehensive feature documentation using the standard template **(MUST BE WRITTEN IN CHINESE)**
 
 **Process**:
 1. **Use feature template**: Apply `templates/feature-template.md` structure
-2. **Populate sections based on extracted requirements**:
-   - **Specification**: User stories and acceptance criteria from Step 2
-   - **Technical Design**: Architecture overview based on actual code changes
-   - **Implementation Plan**: Task breakdown reflecting the work already done
-   - **Usage Guide**: Examples based on the new/modified APIs
-   - **Impact Analysis**: File changes from `git diff --name-status`
+2. **Populate sections based on extracted requirements** **(ALL DOCUMENTATION MUST BE IN CHINESE)**:
+   - **Specification**: User stories and acceptance criteria from Step 2 **(用中文书写)**
+   - **Technical Design**: Architecture overview based on actual code changes **(用中文书写)**
+   - **Implementation Plan**: Task breakdown reflecting the work already done **(用中文书写)**
+   - **Usage Guide**: Examples based on the new/modified APIs **(用中文书写)**
+   - **Impact Analysis**: File changes from `git diff --name-status` **(用中文书写)**
 3. **Assign sequential numbering**: Check existing features in `features/` directory and use next available number (e.g., if max is 042, use 043)
+
+**CRITICAL REQUIREMENT**: All feature documentation content MUST be written in Chinese (中文). This includes all sections, descriptions, examples, and technical explanations. English should only be used for code snippets, technical terms, or API names that are inherently in English.
 
 **MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-feature-documentation.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your feature documentation based on the feedback and re-run the validation until it passes.
 
@@ -88,6 +90,7 @@ Before completing the feature organization process, ensure:
 - **✅ All tests pass**: Zero test failures
 - **✅ Coverage ≥85%**: Verified through coverage report  
 - **✅ Feature documentation complete**: All template sections populated
+- **✅ Documentation in Chinese**: **ALL feature documentation content MUST be written in Chinese (中文)**
 - **✅ Sequential numbering**: No gaps or duplicates in feature numbering
 - **✅ Clean commit**: All changes properly staged and committed
 

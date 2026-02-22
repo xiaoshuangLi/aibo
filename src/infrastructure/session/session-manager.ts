@@ -607,34 +607,45 @@ export class SessionManager {
    * 打印token使用量信息到控制台
    */
   private printTokenUsageInfo(metadata: AITelemetryRecord): void {
+    const formattedInfo = this.formatTokenUsageInfo(metadata);
+    console.log(formattedInfo);
+  }
+
+  /**
+   * 生成格式化的token使用量信息
+   * @param metadata AI监控元数据记录
+   * @returns 格式化的token使用量信息字符串
+   */
+  public formatTokenUsageInfo(metadata: AITelemetryRecord): string {
     const formatted = metadata.metadata.token_usage_formatted;
     const modelUsage = metadata.metadata.model_token_usage;
     
-    console.log('\n📊 **AI监控元数据 - Token使用量统计**');
-    console.log('=========================================');
+    let result = '\n📊 **AI监控元数据 - Token使用量统计**\n';
+    result += '=========================================\n';
     
     // 总体token使用量
-    console.log(`📈 总体Token使用量:`);
-    console.log(`   📥 输入Tokens: ${formatted.input_tokens_formatted} (${metadata.token_usage.input_tokens.toLocaleString()} tokens)`);
-    console.log(`   📤 输出Tokens: ${formatted.output_tokens_formatted} (${metadata.token_usage.output_tokens.toLocaleString()} tokens)`);
-    console.log(`   📊 总计Tokens: ${formatted.total_tokens_formatted} (${metadata.token_usage.total_tokens.toLocaleString()} tokens)`);
+    result += `📈 总体Token使用量:\n`;
+    result += `   📥 输入Tokens: ${formatted.input_tokens_formatted} (${metadata.token_usage.input_tokens.toLocaleString()} tokens)\n`;
+    result += `   📤 输出Tokens: ${formatted.output_tokens_formatted} (${metadata.token_usage.output_tokens.toLocaleString()} tokens)\n`;
+    result += `   📊 总计Tokens: ${formatted.total_tokens_formatted} (${metadata.token_usage.total_tokens.toLocaleString()} tokens)\n`;
     
     // 按模型分组的token使用量
     if (modelUsage && Object.keys(modelUsage).length > 0) {
-      console.log(`\n🤖 按模型分组的Token使用量:`);
+      result += `\n🤖 按模型分组的Token使用量:\n`;
       for (const [modelKey, usage] of Object.entries(modelUsage)) {
         const inputFormatted = this.formatTokenCount(usage.input_tokens);
         const outputFormatted = this.formatTokenCount(usage.output_tokens);
         const totalFormatted = this.formatTokenCount(usage.total_tokens);
         
-        console.log(`   🧠 ${modelKey}:`);
-        console.log(`      📥 输入: ${inputFormatted} (${usage.input_tokens.toLocaleString()} tokens)`);
-        console.log(`      📤 输出: ${outputFormatted} (${usage.output_tokens.toLocaleString()} tokens)`);
-        console.log(`      📊 总计: ${totalFormatted} (${usage.total_tokens.toLocaleString()} tokens)`);
+        result += `   🧠 ${modelKey}:\n`;
+        result += `      📥 输入: ${inputFormatted} (${usage.input_tokens.toLocaleString()} tokens)\n`;
+        result += `      📤 输出: ${outputFormatted} (${usage.output_tokens.toLocaleString()} tokens)\n`;
+        result += `      📊 总计: ${totalFormatted} (${usage.total_tokens.toLocaleString()} tokens)\n`;
       }
     }
     
-    console.log('=========================================\n');
+    result += '=========================================\n';
+    return result;
   }
 
   /**
@@ -1007,5 +1018,37 @@ export class SessionManager {
     }
     
     return null;
+  }
+
+  /**
+   * 获取当前会话的token使用量统计信息
+   * @returns 格式化的token使用量信息字符串，如果当前会话不存在则返回null
+   */
+  public getCurrentSessionTokenUsageInfo(): string | null {
+    try {
+      const currentSessionId = this.getCurrentSessionId();
+      
+      // 获取session.json文件路径
+      const sessionFilePath = this.getSessionFilePath(currentSessionId);
+      
+      // 检查session.json是否存在
+      if (!fs.existsSync(sessionFilePath)) {
+        console.warn(`Session file not found for current session ${currentSessionId}: ${sessionFilePath}`);
+        return null;
+      }
+      
+      // 读取session.json内容
+      const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
+      const sessionData = JSON.parse(sessionContent);
+      
+      // 提取AI监控元数据
+      const metadata = this.extractAIMonitoringMetadata(sessionData, currentSessionId);
+      
+      // 使用现有的formatTokenUsageInfo方法生成格式化的统计信息
+      return this.formatTokenUsageInfo(metadata);
+    } catch (error) {
+      console.error('❌ Failed to get current session token usage info:', error);
+      return null;
+    }
   }
 }

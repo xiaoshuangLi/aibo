@@ -62,6 +62,7 @@ export function extractMessagesAndTodos(chunk: any): MessagesAndTodos {
 
   // 按优先级尝试提取消息
   const sources = [
+    () => ({ messages: chunk.tools?.messages, todos: [] }),
     () => ({ messages: chunk.model_request?.messages, todos: [] }),
     () => ({ messages: chunk['todoListMiddleware.after_model']?.messages, todos: chunk['todoListMiddleware.after_model']?.todos || [] }),
     () => ({ messages: chunk['patchToolCallsMiddleware.before_agent']?.messages, todos: [] }),
