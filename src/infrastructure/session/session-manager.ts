@@ -553,6 +553,35 @@ export class SessionManager {
     this.clearKnowledge(currentSessionId);
   }
 
+  /**
+   * 获取当前会话的AI监控元数据
+   * @returns AITelemetryRecord对象，如果无法获取则返回null
+   */
+  public getCurrentSessionMetadata(): AITelemetryRecord | null {
+    try {
+      const currentSessionId = this.getCurrentSessionId();
+      
+      // 获取session.json文件路径
+      const sessionFilePath = this.getSessionFilePath(currentSessionId);
+      
+      // 检查session.json是否存在
+      if (!fs.existsSync(sessionFilePath)) {
+        console.warn(`Session file not found for current session ${currentSessionId}: ${sessionFilePath}`);
+        return null;
+      }
+      
+      // 读取session.json内容
+      const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
+      const sessionData = JSON.parse(sessionContent);
+      
+      // 提取AI监控元数据
+      return this.extractAIMonitoringMetadata(sessionData, currentSessionId);
+    } catch (error) {
+      console.error('❌ Failed to get current session metadata:', error);
+      return null;
+    }
+  }
+
   // ==================== AI监控元数据生成功能 ====================
 
   /**
