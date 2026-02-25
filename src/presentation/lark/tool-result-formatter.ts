@@ -76,12 +76,55 @@ const formatFilesystemResult = (name: string, result: any): string => {
         return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
       
       case 'grep':
-        // grep 工具返回的文本按换行符分割成匹配项
+        // 智能解析 grep 工具的输出格式
         const grepLines = trimmed.split('\n').filter(line => line.trim());
         if (grepLines.length === 0) return '未找到匹配内容';
-        return `找到 ${grepLines.length} 个匹配项:\n\n` + 
-               grepLines.slice(0, 10).map(match => `- ${match}`).join('\n') + 
-               (grepLines.length > 10 ? `\n... 还有 ${grepLines.length - 10} 个匹配项` : '');
+        
+        // 解析内置 grep 工具的特殊格式：文件路径后跟缩进的内容行
+        const parsedResults: string[] = [];
+        let currentFile = '';
+        
+        for (const line of grepLines) {
+          // 检查是否是文件路径行（以冒号结尾，且不以空格开头）
+          if (line.endsWith(':') && !line.startsWith(' ')) {
+            currentFile = line.slice(0, -1); // 移除末尾的冒号
+          } 
+          // 检查是否是内容行（以空格开头，包含行号:内容格式）
+          else if (line.startsWith(' ') && line.includes(':')) {
+            const content = line.trim();
+            if (currentFile) {
+              parsedResults.push(`📄 \`${currentFile}\`\n   🔹 ${content}`);
+            } else {
+              parsedResults.push(`🔹 ${content}`);
+            }
+          }
+          // 处理其他可能的格式（兼容标准 grep 格式）
+          else if (line.includes(':') && /^\d+:/.test(line.split(':')[1] || '')) {
+            // 标准格式：文件:行号:内容
+            const parts = line.split(':');
+            if (parts.length >= 3) {
+              const file = parts[0];
+              const lineNumber = parts[1];
+              const content = parts.slice(2).join(':');
+              parsedResults.push(`📄 \`${file}\`\n   🔹 第${lineNumber}行: ${content}`);
+            }
+          }
+          // 兜底处理
+          else {
+            parsedResults.push(`🔹 ${line}`);
+          }
+        }
+        
+        if (parsedResults.length === 0) return '未找到匹配内容';
+        
+        const displayResults = parsedResults.slice(0, 10);
+        let resultText = `找到 ${parsedResults.length} 个匹配项:\n\n${displayResults.join('\n\n')}`;
+        
+        if (parsedResults.length > 10) {
+          resultText += `\n\n... 还有 ${parsedResults.length - 10} 个匹配项`;
+        }
+        
+        return resultText;
       
       case 'read_file':
         // read_file 工具的字符串结果直接显示
