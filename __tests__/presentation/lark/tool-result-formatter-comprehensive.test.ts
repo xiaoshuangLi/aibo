@@ -215,8 +215,8 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       it('should format string grep result', () => {
         const result = formatToolResultByType('grep', 'filesystem', true, 'match1\nmatch2');
         expect(result).toContain('找到 2 个匹配项:');
-        expect(result).toContain('- match1');
-        expect(result).toContain('- match2');
+        expect(result).toContain('🔹 match1');
+        expect(result).toContain('🔹 match2');
       });
 
       it('should handle empty grep string result', () => {

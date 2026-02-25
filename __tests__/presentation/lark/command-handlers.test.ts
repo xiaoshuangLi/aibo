@@ -39,7 +39,14 @@ jest.mock('@/infrastructure/session/session-manager', () => {
   return {
     SessionManager: {
       getInstance: jest.fn(() => ({
-        clearCurrentSession: jest.fn(() => 'new-session-id')
+        clearCurrentSession: jest.fn(() => 'new-session-id'),
+        getCurrentSessionMetadata: jest.fn(() => ({
+          sessionId: 'test-session-id',
+          startTime: new Date(),
+          commandCount: 0,
+          toolCalls: [],
+          messages: []
+        }))
       }))
     }
   };
