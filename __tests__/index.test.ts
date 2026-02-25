@@ -35,8 +35,8 @@ afterAll(() => {
   (process.exit as any) = originalProcessExit;
 });
 
-// Create a mock IOChannel for testing
-const createMockIOChannel = () => ({
+// Create a mock Adapter for testing
+const createMockAdapter = () => ({
   emit: jest.fn().mockResolvedValue(undefined),
   destroy: jest.fn(),
   setAbortSignal: jest.fn(),

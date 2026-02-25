@@ -108,7 +108,7 @@ describe('Lark Command Handlers', () => {
     it('should display help message and return true', async () => {
       // Create a mock session object
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -124,7 +124,7 @@ describe('Lark Command Handlers', () => {
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/abort'));
       
       // Verify that the message was emitted through ioChannel
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -167,7 +167,7 @@ describe('Lark Command Handlers', () => {
     it('should create new session and return true', async () => {
       const mockSession = {
         threadId: 'old-session-id',
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -177,7 +177,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockSession.threadId).toBe('new-session-id');
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('新会话已创建'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -200,7 +200,7 @@ describe('Lark Command Handlers', () => {
       };
       const mockSession = {
         abortController: mockAbortController,
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -210,7 +210,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockAbortController.abort).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('操作已中断'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -227,7 +227,7 @@ describe('Lark Command Handlers', () => {
     it('should show no operation message when no abortController exists', async () => {
       const mockSession = {
         abortController: null,
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -236,7 +236,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('无操作可中断'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -257,7 +257,7 @@ describe('Lark Command Handlers', () => {
       };
       const mockSession = {
         abortController: mockAbortController,
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -267,7 +267,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockAbortController.abort).not.toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('无操作可中断'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -358,7 +358,7 @@ describe('Lark Command Handlers', () => {
       });
       
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
@@ -369,7 +369,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建成功！'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -399,7 +399,7 @@ describe('Lark Command Handlers', () => {
       );
       
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
@@ -410,7 +410,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建失败'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -430,7 +430,7 @@ describe('Lark Command Handlers', () => {
       (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockRejectedValue(new Error('Execution failed'));
       
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
@@ -441,7 +441,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('执行构建时发生错误'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -460,7 +460,7 @@ describe('Lark Command Handlers', () => {
   describe('handleShowFilesCommand', () => {
     it('should show modified files successfully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -480,7 +480,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('当前工作区状态'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -495,7 +495,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle empty working directory', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -513,7 +513,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('工作区很干净'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -528,7 +528,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle git status error gracefully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -541,7 +541,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('获取文件列表失败'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -558,7 +558,7 @@ describe('Lark Command Handlers', () => {
   describe('handleShowDiffCommand', () => {
     it('should show diff of all files successfully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -584,12 +584,12 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Diff 概览'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledTimes(2); // Summary + file detail
+      expect(mockSession.adapter.emit).toHaveBeenCalledTimes(2); // Summary + file detail
     });
 
     it('should handle no file changes', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -605,7 +605,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('没有检测到文件改动'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -620,7 +620,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle git diff error gracefully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -636,7 +636,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Git diff failed'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -653,7 +653,7 @@ describe('Lark Command Handlers', () => {
   describe('handleDiffCommand', () => {
     it('should show diff for specific file successfully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -675,7 +675,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.getFileDiff).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`**路径**: \`${filename}\``));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -690,7 +690,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle git diff for specific file error gracefully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -708,7 +708,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockFileDiffVisualizerInstance.getFileDiff).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('File not found'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -725,7 +725,7 @@ describe('Lark Command Handlers', () => {
   describe('handleRevertCommand', () => {
     it('should revert specific file successfully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -742,7 +742,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.revertFile).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`文件 ${filename} 已成功撤销改动`));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -757,7 +757,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle git checkout error gracefully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -775,7 +775,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockFileDiffVisualizerInstance.revertFile).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('撤销文件失败'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -792,7 +792,7 @@ describe('Lark Command Handlers', () => {
   describe('handleStageCommand', () => {
     it('should stage specific file successfully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -809,7 +809,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(true);
       expect(mockFileDiffVisualizerInstance.stageFile).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`文件 ${filename} 已成功暂存`));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -824,7 +824,7 @@ describe('Lark Command Handlers', () => {
 
     it('should handle git add error gracefully', async () => {
       const mockSession = {
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         }
       };
@@ -842,7 +842,7 @@ describe('Lark Command Handlers', () => {
       expect(result).toBe(false);
       expect(mockFileDiffVisualizerInstance.stageFile).toHaveBeenCalledWith(filename);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('暂存文件失败'));
-      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
           data: expect.objectContaining({
@@ -863,7 +863,7 @@ describe('Lark Command Handlers', () => {
     beforeEach(() => {
       mockSession = {
         threadId: 'test-session-id',
-        ioChannel: {
+        adapter: {
           emit: jest.fn()
         },
         end: jest.fn(),

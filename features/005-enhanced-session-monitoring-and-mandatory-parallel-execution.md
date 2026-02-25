@@ -116,7 +116,7 @@ class Session {
 // 开发者可以通过session对象的方法查看智能体活动
 
 // 示例：创建会话并启动
-const session = new Session(ioChannel, modelInfo);
+const session = new Session(adapter, modelInfo);
 await session.start();
 
 // 智能体执行过程中，所有活动都会被自动记录和显示

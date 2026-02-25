@@ -1,7 +1,10 @@
 import { 
   processLarkText, 
   isJsonContent, 
-  isErrorContent, 
+  isErrorContent
+} from '@/presentation/lark/shared';
+
+import { 
   getToolType, 
   formatToolResultByType,
   formatStructuredResult

@@ -31,7 +31,7 @@ import { getRestartCommand } from '@/shared/utils/restart-helper';
  * 1. 正常情况：总是成功显示帮助信息并返回true
  * 2. 无异常情况：该函数不抛出异常，始终返回true
  * 
- * @param session - 会话对象，用于通过ioChannel发送消息
+ * @param session - 会话对象，用于通过adapter发送消息
  * @returns Promise<boolean> - 始终返回true，表示命令处理成功
  */
 export async function handleHelpCommand(session: any): Promise<boolean> {
@@ -59,7 +59,7 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 `;
 
   // 通过 Lark 消息系统发送帮助信息
-  await session.ioChannel.emit({
+  await session.adapter.emit({
     type: 'commandExecuted',
     data: { 
       command: '/help', 
@@ -121,7 +121,7 @@ export async function handleNewCommand(session: any): Promise<boolean> {
   session.threadId = sessionManager.clearCurrentSession();
   
   // 触发commandExecuted事件
-  await session.ioChannel.emit({
+  await session.adapter.emit({
     type: 'commandExecuted',
     data: { 
       command: '/new', 
@@ -170,7 +170,7 @@ export async function handleAbortCommand(session: any): Promise<boolean> {
   }
   
   // 触发commandExecuted事件
-  await session.ioChannel.emit({
+  await session.adapter.emit({
     type: 'commandExecuted',
     data: { 
       command: '/abort', 
@@ -249,7 +249,7 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
       console.log(styled.system("✅ **构建成功！**\n\n正在重启 Lark 交互模式..."));
       
       // 触发commandExecuted事件
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: '/rebot', 
@@ -295,7 +295,7 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
       console.log(styled.error(errorMessage));
       
       // 触发commandExecuted事件
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: '/rebot', 
@@ -314,7 +314,7 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
     console.log(styled.error(errorMessage));
     
     // 触发commandExecuted事件
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: '/rebot', 
@@ -361,7 +361,7 @@ export async function handleUnknownCommand(command: string): Promise<boolean> {
  * 
  * 预期行为：
  * - 调用 FileDiffVisualizer 获取改动文件列表
- * - 将结果通过 ioChannel 发送给用户
+ * - 将结果通过 adapter 发送给用户
  * - 在控制台显示相同信息
  * - 返回true表示命令处理成功
  * 
@@ -394,7 +394,7 @@ ${result.files.map((file: { path: string; emoji: string; status: string }) =>
     }
     
     // 通过 Lark 消息系统发送
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: '/show-files', 
@@ -412,7 +412,7 @@ ${result.files.map((file: { path: string; emoji: string; status: string }) =>
     return true;
   } catch (error) {
     const errorMessage = `❌ 获取文件列表失败: ${(error as Error).message}`;
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: '/show-files', 
@@ -445,7 +445,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
     
     if (!result.success) {
       const errorMessage = result.error || '未知错误';
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: '/show-diff', 
@@ -464,7 +464,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
     if (result.diffs.length === 0) {
       const summaryMessage = '📋 **Diff 概览**\n\n✅ **没有检测到文件改动！**';
       
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: '/show-diff', 
@@ -524,7 +524,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
     summaryMessage += '\n🔍 **详细内容将在后续消息中逐个显示...**';
     
     // 发送摘要消息
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: '/show-diff', 
@@ -563,7 +563,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
       }
       
       // 为每个文件发送独立消息
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: '/show-diff-file', // 使用不同的命令标识
@@ -585,7 +585,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
     return true;
   } catch (error) {
     const errorMessage = `❌ 获取详细diff失败: ${(error as Error).message}`;
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: '/show-diff', 
@@ -619,7 +619,7 @@ export async function handleDiffCommand(session: any, filePath: string): Promise
     
     if (!result.success) {
       const errorMessage = result.error || '未知错误';
-      await session.ioChannel.emit({
+      await session.adapter.emit({
         type: 'commandExecuted',
         data: { 
           command: `/diff ${filePath}`, 
@@ -637,7 +637,7 @@ export async function handleDiffCommand(session: any, filePath: string): Promise
     
     const displayMessage = `📄 **文件差异详情**\n\n**路径**: \`${result.filePath}\`\n${result.summary ? `\n📊 **统计**: ${result.summary}\n` : ''}\n${result.diff}\n\n### 🚀 **可执行操作**\n- ↩️ \`/revert ${result.filePath}\` - 撤销此文件的所有改动\n- ✅ \`/stage ${result.filePath}\` - 将此文件暂存到Git`;
     
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/diff ${filePath}`, 
@@ -654,7 +654,7 @@ export async function handleDiffCommand(session: any, filePath: string): Promise
     return true;
   } catch (error) {
     const errorMessage = `❌ 获取文件diff失败: ${(error as Error).message}`;
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/diff ${filePath}`, 
@@ -687,7 +687,7 @@ export async function handleRevertCommand(session: any, filePath: string): Promi
     
     const result = await visualizer.revertFile(filePath);
     
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/revert ${filePath}`, 
@@ -704,7 +704,7 @@ export async function handleRevertCommand(session: any, filePath: string): Promi
     return result.success;
   } catch (error) {
     const errorMessage = `❌ 撤销文件失败: ${(error as Error).message}`;
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/revert ${filePath}`, 
@@ -737,7 +737,7 @@ export async function handleStageCommand(session: any, filePath: string): Promis
     
     const result = await visualizer.stageFile(filePath);
     
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/stage ${filePath}`, 
@@ -754,7 +754,7 @@ export async function handleStageCommand(session: any, filePath: string): Promis
     return result.success;
   } catch (error) {
     const errorMessage = `❌ 暂存文件失败: ${(error as Error).message}`;
-    await session.ioChannel.emit({
+    await session.adapter.emit({
       type: 'commandExecuted',
       data: { 
         command: `/stage ${filePath}`, 

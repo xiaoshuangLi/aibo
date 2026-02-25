@@ -1,16 +1,16 @@
 /**
- * 飞书(Lark)适配器 - 实现 I/O 通道接口的飞书具体实现
+ * 飞书(Lark)适配器 - 实现适配器接口的飞书具体实现
  * 
  * 中文名称：飞书适配器
  * 
- * 这是 DefaultIOChannel 的具体实现，专门用于飞书环境。
+ * 这是 DefaultAdapter 的具体实现，专门用于飞书环境。
  * 所有原来的终端输出逻辑都移到这里，核心模块不再直接依赖飞书 API。
  * 
  * @module lark-adapter
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';
-import { DefaultIOChannel, OutputEvent, OutputEventType } from '@/core/agent/io-channel';
+import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import { config } from '@/core/config/config';
 import { SessionManager } from '@/infrastructure/session/session-manager';
 
@@ -26,7 +26,7 @@ interface LarkConfig {
 // 用户消息回调类型
 type UserMessageCallback = (message: string) => void;
 
-export class LarkAdapter extends DefaultIOChannel {
+export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
   private wsClient: lark.WSClient;
   private abortController: AbortController | null = null;

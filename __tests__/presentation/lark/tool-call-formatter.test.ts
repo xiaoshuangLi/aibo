@@ -2,7 +2,10 @@ import {
   escapeLarkIndentation, 
   escapeLarkSpecialChars, 
   processLarkText,
-  isErrorContent,
+  isErrorContent
+} from '@/presentation/lark/shared';
+
+import { 
   formatToolCallArgs
 } from '@/presentation/lark/tool-call-formatter';
 

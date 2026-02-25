@@ -22,10 +22,10 @@
 
 ### 📐 架构概览
 采用适配器模式实现多平台支持：
-- **IOChannel 接口**: 定义统一的输入/输出接口
-- **DefaultIOChannel**: 控制台的基础类实现
-- **LarkAdapter**: 飞书平台的特定实现，继承自 DefaultIOChannel
-- **Session**: 会话管理器，通过 IOChannel 执行所有 I/O 操作
+- **Adapter 接口**: 定义统一的输入/输出接口
+- **DefaultAdapter**: 控制台的基础类实现
+- **LarkAdapter**: 飞书平台的特定实现，继承自 DefaultAdapter
+- **Session**: 会话管理器，通过 Adapter 执行所有 I/O 操作
 
 ### ⚙️ 交互模式决策流程
 1. **命令行参数优先级最高**: `--interaction=lark|console` 或 `--interactive`

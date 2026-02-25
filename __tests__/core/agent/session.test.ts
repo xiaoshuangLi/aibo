@@ -1,14 +1,14 @@
 import { Session } from '@/core/agent/session';
-import { IOChannel } from '@/core/agent/io-channel';
+import { Adapter } from '@/core/agent/adapter';
 import { SessionManager } from '@/infrastructure/session/session-manager';
 
-// Mock IOChannel
-const mockIOChannel = {
+// Mock Adapter
+const mockAdapter = {
   emit: jest.fn().mockResolvedValue(undefined),
   requestUserInput: jest.fn().mockResolvedValue('test input'),
   setAbortSignal: jest.fn(),
   destroy: jest.fn()
-} as unknown as IOChannel;
+} as unknown as Adapter;
 
 // Mock createConsoleThreadId
 jest.mock('@/core/utils/interactive-logic', () => ({
@@ -43,23 +43,23 @@ const resetSessionManager = () => {
 
 describe('Session', () => {
   let session: Session;
-  let ioChannel: IOChannel;
+  let adapter: Adapter;
 
   beforeEach(() => {
-    ioChannel = mockIOChannel;
+    adapter = mockAdapter;
     jest.clearAllMocks();
     resetSessionManager(); // Reset singleton before each test
-    session = new Session(ioChannel, { threadId: 'test-session', modelInfo: 'test-model' });
+    session = new Session(adapter, { threadId: 'test-session', modelInfo: 'test-model' });
   });
 
   describe('constructor', () => {
     test('should initialize with provided options', () => {
       expect(session.threadId).toBe('test-session');
-      expect(ioChannel.setAbortSignal).toHaveBeenCalled();
+      expect(adapter.setAbortSignal).toHaveBeenCalled();
     });
 
     test('should use default values when options not provided', () => {
-      const defaultSession = new Session(ioChannel);
+      const defaultSession = new Session(adapter);
       expect(defaultSession.threadId).toBe('test-thread-id');
     });
   });
@@ -67,7 +67,7 @@ describe('Session', () => {
   describe('start', () => {
     test('should emit sessionStart event', async () => {
       await session.start();
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionStart',
           data: { modelInfo: 'test-model' }
@@ -77,20 +77,20 @@ describe('Session', () => {
   });
 
   describe('end', () => {
-    test('should emit sessionEnd event and destroy ioChannel', async () => {
+    test('should emit sessionEnd event and destroy adapter', async () => {
       await session.end('Goodbye!');
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionEnd',
           data: { exitMessage: 'Goodbye!' }
         })
       );
-      expect(ioChannel.destroy).toHaveBeenCalled();
+      expect(adapter.destroy).toHaveBeenCalled();
     });
 
     test('should use default exit message', async () => {
       await session.end();
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sessionEnd',
           data: { exitMessage: '再见！' }
@@ -100,15 +100,15 @@ describe('Session', () => {
   });
 
   describe('requestUserInput', () => {
-    test('should call ioChannel.requestUserInput', () => {
+    test('should call adapter.requestUserInput', () => {
       session.requestUserInput('Enter command: ');
-      expect(ioChannel.requestUserInput).toHaveBeenCalledWith('Enter command: ');
+      expect(adapter.requestUserInput).toHaveBeenCalledWith('Enter command: ');
     });
 
-    test('should not call ioChannel.requestUserInput when session is running', () => {
+    test('should not call adapter.requestUserInput when session is running', () => {
       session.isRunning = true;
       session.requestUserInput('Enter command: ');
-      expect(ioChannel.requestUserInput).not.toHaveBeenCalled();
+      expect(adapter.requestUserInput).not.toHaveBeenCalled();
     });
   });
 
@@ -169,7 +169,7 @@ describe('Session', () => {
   describe('logToolCall', () => {
     test('should emit toolCall event with structured data', () => {
       session.logToolCall('testTool', { param: 'value' });
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'toolCall',
           data: { name: 'testTool', args: { param: 'value' } }
@@ -181,7 +181,7 @@ describe('Session', () => {
   describe('logToolResult', () => {
     test('should emit toolResult event with structured data', () => {
       session.logToolResult('testTool', true, 'preview');
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'toolResult',
           data: { name: 'testTool', success: true, preview: 'preview' }
@@ -197,7 +197,7 @@ describe('Session', () => {
         { content: 'step 2', status: 'completed' }
       ];
       session.logThinkingProcess(steps);
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'thinkingProcess',
           data: { steps }
@@ -209,7 +209,7 @@ describe('Session', () => {
   describe('streamAIContent', () => {
     test('should handle initial empty content', async () => {
       await session.streamAIContent('', true, false);
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'streamStart',
           data: { placeholder: "..." }
@@ -219,7 +219,7 @@ describe('Session', () => {
 
     test('should handle content streaming', async () => {
       await session.streamAIContent('Hello', false, false);
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'streamChunk',
           data: { chunk: 'Hello' }
@@ -229,7 +229,7 @@ describe('Session', () => {
 
     test('should handle final content without period', async () => {
       await session.streamAIContent('Hello world', false, true);
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'streamEnd',
           data: { finalContent: 'Hello world' }
@@ -240,7 +240,7 @@ describe('Session', () => {
     test('should not add streamEnd for content ending with period', async () => {
       await session.streamAIContent('Hello world.', false, true);
       // Should not call streamEnd
-      const streamEndCalls = (ioChannel.emit as jest.Mock).mock.calls
+      const streamEndCalls = (adapter.emit as jest.Mock).mock.calls
         .filter(call => call[0].type === 'streamEnd');
       expect(streamEndCalls).toHaveLength(0);
     });
@@ -249,7 +249,7 @@ describe('Session', () => {
   describe('logSystemMessage', () => {
     test('should emit systemMessage event with structured data', () => {
       session.logSystemMessage('System message');
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'systemMessage',
           data: { message: 'System message' }
@@ -261,7 +261,7 @@ describe('Session', () => {
   describe('logErrorMessage', () => {
     test('should emit errorMessage event with structured data', () => {
       session.logErrorMessage('Error message');
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'errorMessage',
           data: { message: 'Error message' }
@@ -273,7 +273,7 @@ describe('Session', () => {
   describe('logRawText', () => {
     test('should emit rawText event', () => {
       session.logRawText('Raw text');
-      expect(ioChannel.emit).toHaveBeenCalledWith(
+      expect(adapter.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'rawText',
           data: { text: 'Raw text' }
@@ -283,18 +283,18 @@ describe('Session', () => {
   });
 
   describe('destroy', () => {
-    test('should abort controller and destroy ioChannel', () => {
+    test('should abort controller and destroy adapter', () => {
       const abortSpy = jest.spyOn(session.abortController!, 'abort');
       session.destroy();
       expect(abortSpy).toHaveBeenCalled();
-      expect(ioChannel.destroy).toHaveBeenCalled();
+      expect(adapter.destroy).toHaveBeenCalled();
       expect(session.abortController).toBeNull();
     });
 
     test('should handle null abortController', () => {
       session.abortController = null;
       session.destroy();
-      expect(ioChannel.destroy).toHaveBeenCalled();
+      expect(adapter.destroy).toHaveBeenCalled();
     });
   });
 });

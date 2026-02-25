@@ -1,5 +1,5 @@
 /**
- * 会话类 - 包含 IOChannel 的完整会话管理
+ * 会话类 - 包含 Adapter 的完整会话管理
  * 
  * 中文名称：会话类
  * 
@@ -8,7 +8,7 @@
  * @module session
  */
 
-import { IOChannel } from './io-channel';
+import { Adapter } from './adapter';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
 import { config } from '@/core/config/config';
 import { SessionManager } from '@/infrastructure/session/session-manager';
@@ -22,15 +22,15 @@ export class Session {
   public readonly threadId: string;
   public isRunning: boolean = false;
   public abortController: AbortController | null = null;
-  private ioChannel: IOChannel;
+  private adapter: Adapter;
   private commandHistory: string[] = [];
   private historyIndex: number = 0;
   private isVoiceRecording: boolean = false;
   private voiceASR: any | null = null;
   private modelInfo: string;
 
-  constructor(ioChannel: IOChannel, options: SessionOptions = {}) {
-    this.ioChannel = ioChannel;
+  constructor(adapter: Adapter, options: SessionOptions = {}) {
+    this.adapter = adapter;
     
     // 如果提供了 threadId，使用它；否则使用会话管理器的当前会话
     if (options.threadId) {
@@ -44,14 +44,14 @@ export class Session {
     
     // 设置中止信号
     this.abortController = new AbortController();
-    this.ioChannel.setAbortSignal(this.abortController.signal);
+    this.adapter.setAbortSignal(this.abortController.signal);
   }
 
   /**
    * 开始会话
    */
   async start(): Promise<void> {
-    await this.ioChannel.emit({
+    await this.adapter.emit({
       type: 'sessionStart',
       data: { modelInfo: this.modelInfo },
       timestamp: Date.now()
@@ -71,13 +71,13 @@ export class Session {
       console.warn(`⚠️ 生成会话元数据时发生警告:`, error);
     }
 
-    await this.ioChannel.emit({
+    await this.adapter.emit({
       type: 'sessionEnd',
       data: { exitMessage },
       timestamp: Date.now()
     });
     
-    this.ioChannel.destroy();
+    this.adapter.destroy();
   }
 
   /**
@@ -88,7 +88,7 @@ export class Session {
       return;
     }
 
-    return this.ioChannel.requestUserInput(prompt);
+    return this.adapter.requestUserInput(prompt);
   }
 
   /**
@@ -132,7 +132,7 @@ export class Session {
    * 记录工具调用
    */
   logToolCall(name: string, args: any): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'toolCall',
       data: { name, args },
       timestamp: Date.now()
@@ -143,7 +143,7 @@ export class Session {
    * 记录工具结果
    */
   logToolResult(name: string, success: boolean, preview: string): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'toolResult',
       data: { name, success, preview },
       timestamp: Date.now()
@@ -154,7 +154,7 @@ export class Session {
    * 记录思考过程
    */
   logThinkingProcess(steps: Array<{ content: string; status?: string }>): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'thinkingProcess',
       data: { steps },
       timestamp: Date.now()
@@ -167,7 +167,7 @@ export class Session {
   async streamAIContent(content: string, isInitial: boolean, isFinal: boolean): Promise<void> {
     if (isInitial && !content) {
       // 发送初始状态，让 TerminalAdapter 处理显示
-      await this.ioChannel.emit({
+      await this.adapter.emit({
         type: 'streamStart',
         data: { placeholder: "..." },
         timestamp: Date.now()
@@ -178,7 +178,7 @@ export class Session {
     if (content) {
       // For streaming, we need to handle it differently
       // Since we're using events, we'll send the content as a stream chunk
-      this.ioChannel.emit({
+      this.adapter.emit({
         type: 'streamChunk',
         data: { chunk: content },
         timestamp: Date.now()
@@ -187,7 +187,7 @@ export class Session {
     
     if (isFinal && content && !content.trim().endsWith(".")) {
       // Add ellipsis for final content
-      this.ioChannel.emit({
+      this.adapter.emit({
         type: 'streamEnd',
         data: { finalContent: content },
         timestamp: Date.now()
@@ -199,7 +199,7 @@ export class Session {
    * 记录系统消息
    */
   logSystemMessage(message: string): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'systemMessage',
       data: { message },
       timestamp: Date.now()
@@ -210,7 +210,7 @@ export class Session {
    * 记录错误消息
    */
   logErrorMessage(message: string): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'errorMessage',
       data: { message },
       timestamp: Date.now()
@@ -221,7 +221,7 @@ export class Session {
    * 记录原始文本
    */
   logRawText(text: string): void {
-    this.ioChannel.emit({
+    this.adapter.emit({
       type: 'rawText',
       data: { text },
       timestamp: Date.now()
@@ -236,6 +236,6 @@ export class Session {
       this.abortController.abort();
       this.abortController = null;
     }
-    this.ioChannel.destroy();
+    this.adapter.destroy();
   }
 }

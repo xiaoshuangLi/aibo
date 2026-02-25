@@ -1,5 +1,5 @@
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
-import { OutputEvent } from '@/core/agent/io-channel';
+import { OutputEvent } from '@/core/agent/adapter';
 import * as readline from 'readline';
 
 describe('TerminalAdapter Branch Coverage Tests', () => {

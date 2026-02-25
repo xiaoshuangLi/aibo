@@ -20,7 +20,9 @@ import {
   processLarkText,
   isJsonContent,
   isErrorContent,
-  getToolType,
+  getToolType
+} from './shared';
+import { 
   formatToolResultByType,
   formatStructuredResult
 } from './tool-result-formatter';

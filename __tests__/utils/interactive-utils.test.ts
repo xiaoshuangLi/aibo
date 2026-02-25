@@ -39,7 +39,7 @@ const createState = (): StreamState => ({
 });
 
 const createMockSession = (overrides = {}) => ({
-  ioChannel: {
+  adapter: {
     emit: jest.fn(),
   },
   setVoiceRecording: jest.fn(),
@@ -48,7 +48,7 @@ const createMockSession = (overrides = {}) => ({
 
 // ===== 工具函数 =====
 beforeEach(() => {
-  // Clear any mocks on session.ioChannel.emit in tests
+  // Clear any mocks on session.adapter.emit in tests
   (structuredLog as jest.Mock).mockClear();
 });
 
@@ -64,7 +64,7 @@ describe('message handlers', () => {
         ],
       };
       await handleToolCall(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.lastToolCall.name).toBe('toolWithArgs');
     });
 
@@ -82,7 +82,7 @@ describe('message handlers', () => {
         ],
       };
       await handleToolCall(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.lastToolCall.function?.name).toBe('toolWithArgs');
     });
 
@@ -100,7 +100,7 @@ describe('message handlers', () => {
         ],
       };
       await handleToolCall(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.lastToolCall.function?.name).toBe('toolWithArgs');
     });
 
@@ -117,7 +117,7 @@ describe('message handlers', () => {
         ],
       };
       await handleToolCall(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.lastToolCall.name).toBe('toolWithoutArgs');
     });
   });
@@ -129,7 +129,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'cmd' };
       const msg = { tool_call_id: '1', content: '{"command":"ls","stdout":"file.txt"}' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle JSON result with filepath preview', () => {
@@ -138,7 +138,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'readFile' };
       const msg = { tool_call_id: '1', content: '{"filepath":"/path/to/file.txt","content":"file content"}' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle JSON result with no preview fields', () => {
@@ -147,7 +147,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'tool' };
       const msg = { tool_call_id: '1', content: '{"success":true}' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle text result with success detection', () => {
@@ -156,7 +156,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'textTool' };
       const msg = { tool_call_id: '1', content: 'Operation completed successfully' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should detect failure in text result', () => {
@@ -165,7 +165,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'failTool' };
       const msg = { tool_call_id: '1', content: '❌ Operation failed' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should skip when aborted', () => {
@@ -175,7 +175,7 @@ describe('message handlers', () => {
       const session = createMockSession();
       const msg = { tool_call_id: '1', content: 'test' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).not.toHaveBeenCalled();
+      expect(session.adapter.emit).not.toHaveBeenCalled();
     });
 
     it('should handle invalid JSON gracefully', () => {
@@ -184,7 +184,7 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'badJson' };
       const msg = { tool_call_id: '1', content: 'not json' };
       handleToolResult(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle null/undefined content', () => {
@@ -193,11 +193,11 @@ describe('message handlers', () => {
       state.lastToolCall = { name: 'nullContent' };
       const msg1 = { tool_call_id: '1', content: null };
       handleToolResult(msg1, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       
       const msg2 = { tool_call_id: '2' };
       handleToolResult(msg2, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
   });
 
@@ -207,7 +207,7 @@ describe('message handlers', () => {
       const session = createMockSession();
       await handleAIContent({ tool_call_id: '1' }, state, session);
       await handleAIContent({ content: '' }, state, session);
-      expect(session.ioChannel.emit).not.toHaveBeenCalled();
+      expect(session.adapter.emit).not.toHaveBeenCalled();
     });
 
     it('should write new content character by character', async () => {
@@ -215,7 +215,7 @@ describe('message handlers', () => {
       state.fullResponse = 'existing ';
       const session = createMockSession();
       await handleAIContent({ content: 'existing new content' }, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.fullResponse).toBe('existing new content');
     });
 
@@ -224,7 +224,7 @@ describe('message handlers', () => {
       state.fullResponse = 'existing content';
       const session = createMockSession();
       await handleAIContent({ content: 'existing content ' }, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
   });
 
@@ -240,7 +240,7 @@ describe('message handlers', () => {
       };
       
       await handleTodos(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
       expect(state.hasDisplayedThinking).toBe(true);
     });
 
@@ -256,7 +256,7 @@ describe('message handlers', () => {
       };
       
       await handleTodos(msg, state, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should skip when aborted', async () => {
@@ -267,7 +267,7 @@ describe('message handlers', () => {
       const msg = { todos: [{ content: 'Task', status: 'completed' }] };
       
       await handleTodos(msg, state, session);
-      expect(session.ioChannel.emit).not.toHaveBeenCalled();
+      expect(session.adapter.emit).not.toHaveBeenCalled();
     });
   });
 });
@@ -295,7 +295,7 @@ describe('processStreamChunks', () => {
 
     const result = await processStreamChunks(mockStream as any, state, session);
     expect(result).toBe('Hello world');
-    expect(session.ioChannel.emit).toHaveBeenCalled();
+    expect(session.adapter.emit).toHaveBeenCalled();
   });
 
   it('should log structured error on exception', async () => {
@@ -307,7 +307,7 @@ describe('processStreamChunks', () => {
     const state = createState();
 
     await processStreamChunks(badStream as any, state, session);
-    expect(session.ioChannel.emit).toHaveBeenCalled();
+    expect(session.adapter.emit).toHaveBeenCalled();
     expect(structuredLog).toHaveBeenCalled();
   });
 
@@ -322,7 +322,7 @@ describe('processStreamChunks', () => {
     const state = { ...createState(), abortSignal: controller.signal };
 
     await processStreamChunks(mockStream as any, state, session);
-    expect(session.ioChannel.emit).toHaveBeenCalled();
+    expect(session.adapter.emit).toHaveBeenCalled();
   });
 
   it('should handle general errors with structured logging', async () => {
@@ -334,7 +334,7 @@ describe('processStreamChunks', () => {
     const state = createState();
 
     await processStreamChunks(mockStream as any, state, session);
-    expect(session.ioChannel.emit).toHaveBeenCalled();
+    expect(session.adapter.emit).toHaveBeenCalled();
     expect(structuredLog).toHaveBeenCalled();
   });
 });
@@ -348,7 +348,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = '{"success":true,"stdout":"(empty)","stderr":"(empty)"}';
       
       await handleJsonToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle JSON task tool result with message', async () => {
@@ -357,7 +357,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = JSON.stringify({ message: 'Research completed successfully', success: true });
       
       await handleJsonToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle JSON task tool result as string', async () => {
@@ -366,7 +366,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = JSON.stringify('Simple result string');
       
       await handleJsonToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle stdout with "(empty)" value', async () => {
@@ -375,7 +375,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = '{"stdout":"(empty)","success":true}';
       
       await handleJsonToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should use longer truncation limits in verbose mode', async () => {
@@ -389,7 +389,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const result = `{"command":"test","stdout":"${longOutput}","success":true}`;
         
         await handleJsonToolResult(result, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -406,7 +406,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const result = `{"command":"test","stdout":"${longOutput}","success":true}`;
         
         await handleJsonToolResult(result, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -423,7 +423,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const result = `{"command":"test","stderr":"${longError}","success":true}`;
         
         await handleJsonToolResult(result, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -439,7 +439,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const invalidJson = 'this is not valid json at all';
         
         await handleJsonToolResult(invalidJson, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -457,7 +457,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const longResult = 'a'.repeat(400);
         
         await handleTextToolResult(longResult, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -473,7 +473,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const result = '❌ Operation failed due to error';
         
         await handleTextToolResult(result, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -489,7 +489,7 @@ describe('Edge Cases for 100% Coverage', () => {
         const longResult = 'b'.repeat(200);
         
         await handleTextToolResult(longResult, lastToolCall, session);
-        expect(session.ioChannel.emit).toHaveBeenCalled();
+        expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
         require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
       }
@@ -501,7 +501,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = 'Task completed with detailed analysis';
       
       await handleTextToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
 
     it('should handle failed text task tool result', async () => {
@@ -510,7 +510,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const result = '❌ Task failed due to error';
       
       await handleTextToolResult(result, lastToolCall, session);
-      expect(session.ioChannel.emit).toHaveBeenCalled();
+      expect(session.adapter.emit).toHaveBeenCalled();
     });
   });
 
@@ -529,7 +529,7 @@ describe('Edge Cases for 100% Coverage', () => {
       };
       
       await processStreamChunks(stream, state, testSession);
-      expect(testSession.ioChannel.emit).toHaveBeenCalled();
+      expect(testSession.adapter.emit).toHaveBeenCalled();
     });
   });
 
@@ -558,7 +558,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const testSession = createMockSession();
 
       await processStreamChunks(mockStream as any, state, testSession);
-      expect(testSession.ioChannel.emit).toHaveBeenCalled();
+      expect(testSession.adapter.emit).toHaveBeenCalled();
     });
 
     it('should show initial indicator for todos without showing assistant indicator', async () => {
@@ -574,7 +574,7 @@ describe('Edge Cases for 100% Coverage', () => {
       const testSession = createMockSession();
 
       await processStreamChunks(mockStream as any, state, testSession);
-      expect(testSession.ioChannel.emit).toHaveBeenCalled();
+      expect(testSession.adapter.emit).toHaveBeenCalled();
     });
   });
 });
@@ -590,7 +590,7 @@ describe('processStreamChunks completion indicator', () => {
     const testSession = createMockSession();
 
     await processStreamChunks(mockStream as any, state, testSession);
-    expect(testSession.ioChannel.emit).toHaveBeenCalled();
+    expect(testSession.adapter.emit).toHaveBeenCalled();
   });
 
   it('should not show completion indicator when response ends with period', async () => {
@@ -603,6 +603,6 @@ describe('processStreamChunks completion indicator', () => {
     const testSession = createMockSession();
 
     await processStreamChunks(mockStream as any, state, testSession);
-    expect(testSession.ioChannel.emit).toHaveBeenCalled();
+    expect(testSession.adapter.emit).toHaveBeenCalled();
   });
 });

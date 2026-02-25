@@ -39,7 +39,7 @@ export interface StreamState {
  * - 接收消息对象、流状态和会话对象
  * - 检查消息是否包含工具调用
  * - 提取工具调用的名称和参数
- * - 使用会话的IOChannel发送工具调用事件
+ * - 使用会话的Adapter发送工具调用事件
  * - 更新流状态中的最后工具调用信息
  * 
  * 行为分支：
@@ -59,7 +59,7 @@ export async function handleToolCall(msg: any, state: StreamState, session: any)
     state.lastToolCall = call;
     const name = call.name || call.function?.name;
     const args = call.args || (call.function?.arguments ? JSON.parse(call.function.arguments) : {});
-    await session.ioChannel?.emit({
+    await session.adapter?.emit({
       type: 'toolCall',
       data: { name, args },
       timestamp: Date.now()
@@ -112,7 +112,7 @@ export function handleToolResult(msg: any, state: StreamState, session: any) {
  * - 接收JSON字符串结果、最后工具调用信息和会话对象
  * - 解析JSON并提取关键信息（命令、文件路径、标准输出、标准错误等）
  * - 根据详细输出模式设置不同的截断长度
- * - 使用会话的IOChannel发送工具结果事件
+ * - 使用会话的Adapter发送工具结果事件
  * - 特别优化 task 工具的结果展示
  * 
  * 行为分支：
@@ -134,7 +134,7 @@ export async function handleJsonToolResult(result: string, lastToolCall: any, se
     const success = parsed.success !== false;
 
     // 发送原始的解析结果，让 TerminalAdapter 处理截断和格式化
-    await session.ioChannel?.emit({
+    await session.adapter?.emit({
       type: 'toolResult',
       data: { 
         name: lastToolCall?.name || "unknown", 
@@ -147,7 +147,7 @@ export async function handleJsonToolResult(result: string, lastToolCall: any, se
     });
   } catch {
     // 发送原始的错误结果
-    await session.ioChannel?.emit({
+    await session.adapter?.emit({
       type: 'toolResult',
       data: { 
         name: lastToolCall?.name || "unknown", 
@@ -170,7 +170,7 @@ export async function handleJsonToolResult(result: string, lastToolCall: any, se
  * - 接收文本结果、最后工具调用信息和会话对象
  * - 根据内容判断执行是否成功（检查是否包含错误标识符）
  * - 应用截断处理以控制输出长度
- * - 使用会话的IOChannel发送工具结果事件
+ * - 使用会话的Adapter发送工具结果事件
  * - 特别优化 task 工具的文本结果展示
  * 
  * 行为分支：
@@ -192,7 +192,7 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
     const name = type ? `🧠 ${type} 结果` : '子代理任务';
     const success = !result.includes("❌") && !result.includes("失败");
     
-    await session.ioChannel?.emit({
+    await session.adapter?.emit({
       type: 'toolResult',
       data: { 
         name, 
@@ -206,7 +206,7 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
   }
   
   const success = !result.includes("❌") && !result.includes("失败");
-  await session.ioChannel?.emit({
+  await session.adapter?.emit({
     type: 'toolResult',
     data: { 
       name: lastToolCall?.name || "unknown", 
@@ -228,7 +228,7 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
  * - 检查是否为有效的内容消息
  * - 计算新增的内容部分（避免重复显示）
  * - 逐字符流式输出，提供打字机效果
- * - 使用会话的IOChannel发送流数据块事件
+ * - 使用会话的Adapter发送流数据块事件
  * - 更新流状态中的完整响应内容
  * 
  * 行为分支：
@@ -260,7 +260,7 @@ export async function handleAIContent(msg: any, state: StreamState, session: any
   if (!newContent) return;
 
   // 发送完整的AI响应内容
-  await session.ioChannel?.emit({
+  await session.adapter?.emit({
     type: 'aiResponse',
     data: { content: newContent },
     timestamp: Date.now()
@@ -304,7 +304,7 @@ export async function handleTodos(msg: any, state: StreamState, session: any) {
 
   if (newTodos.length === 0) return;
 
-  await session.ioChannel?.emit({
+  await session.adapter?.emit({
     type: 'thinkingProcess',
     data: { steps: newTodos },
     timestamp: Date.now()
@@ -382,7 +382,7 @@ export async function processStreamChunks(
           if (todos.length > 0) {
             // Will be handled by handleTodos
           } else {
-            await session.ioChannel?.emit({
+            await session.adapter?.emit({
               type: 'streamStart',
               data: { initialContent: "" },
               timestamp: Date.now()
@@ -419,7 +419,7 @@ export async function processStreamChunks(
 
     // 完成指示器 - 由 TerminalAdapter 处理
     if (!state.abortSignal.aborted && state.fullResponse && !state.fullResponse.trim().endsWith(".")) {
-      await session.ioChannel?.emit({
+      await session.adapter?.emit({
         type: 'streamEnd',
         data: { finalContent: state.fullResponse },
         timestamp: Date.now()
@@ -429,13 +429,13 @@ export async function processStreamChunks(
     return state.fullResponse;
   } catch (error: any) {
     if (error.name === "AbortError" || state.abortSignal.aborted) {
-      session.ioChannel?.emit({
+      session.adapter?.emit({
         type: 'errorMessage',
         data: { message: "⚠️ 操作已被用户中断" },
         timestamp: Date.now()
       });
     } else {
-      session.ioChannel?.emit({
+      session.adapter?.emit({
         type: 'errorMessage',
         data: { message: `发生错误: ${error.message}` },
         timestamp: Date.now()

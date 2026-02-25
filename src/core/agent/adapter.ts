@@ -1,12 +1,12 @@
 /**
- * I/O 通道接口 - 解耦终端依赖的核心抽象
+ * 适配器接口 - 解耦终端依赖的核心抽象
  * 
- * 中文名称：I/O 通道接口
+ * 中文名称：适配器接口
  * 
  * 定义了与用户交互的抽象接口，支持多种输出方式和输入方式。
  * 所有核心逻辑都应该通过此接口进行 I/O 操作，而不是直接使用终端 API。
  * 
- * @module io-channel
+ * @module adapter
  */
 
 /**
@@ -39,11 +39,11 @@ export interface OutputEvent {
 }
 
 /**
- * I/O 通道接口
+ * 适配器接口
  * 
  * 所有 I/O 操作都应该通过此接口进行，实现真正的解耦。
  */
-export interface IOChannel {
+export interface Adapter {
   /**
    * 发送输出事件并等待所有异步监听器完成
    * @param event 输出事件
@@ -78,15 +78,15 @@ export interface IOChannel {
   off(eventType: OutputEventType, listener: (data: any) => void): void;
   
   /**
-   * 销毁 I/O 通道
+   * 销毁适配器
    */
   destroy(): void;
 }
 
 /**
- * 默认的 I/O 通道实现（空实现，需要具体适配器实现）
+ * 默认的适配器实现（空实现，需要具体适配器实现）
  */
-export class DefaultIOChannel implements IOChannel {
+export class DefaultAdapter implements Adapter {
   private listeners: Map<OutputEventType, Set<(data: any) => void>> = new Map();
   
   async emit(event: OutputEvent): Promise<void> {

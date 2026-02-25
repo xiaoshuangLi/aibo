@@ -9,140 +9,7 @@
  * @module tool-result-formatter
  */
 
-/**
- * 零宽空格字符 - 用于避免 Lark 将缩进行识别为代码块
- */
-const ZERO_WIDTH_SPACE = '\u200B';
-
-/**
- * 在文本行首添加零宽空格以避免 Lark 代码块识别
- * @param text - 要处理的文本
- * @returns 处理后的文本
- */
-export const escapeLarkIndentation = (text: string): string => {
-  if (!text) return text;
-  
-  // 按行分割文本
-  const lines = text.split('\n');
-  
-  // 为每一行添加零宽空格（如果该行以空白字符开头）
-  const processedLines = lines.map(line => {
-    // 如果行以空白字符（空格、制表符等）开头，则在开头添加零宽空格
-    if (line.length > 0 && /^\s/.test(line)) {
-      return ZERO_WIDTH_SPACE + line;
-    }
-    return line;
-  });
-  
-  return processedLines.join('\n');
-};
-
-/**
- * 转义 Lark 特殊字符
- * @param text - 要转义的文本
- * @returns 转义后的文本
- */
-export const escapeLarkSpecialChars = (text: string): string => {
-  if (!text) return text;
-  
-  // Lark 支持完整的 Markdown，但某些特殊字符可能需要处理
-  // 目前主要处理可能导致解析问题的字符
-  let escapedText = text;
-  
-  // 转义反斜杠（如果后面跟着特殊字符）
-  escapedText = escapedText.replace(/\\/g, '\\\\');
-  
-  // 转义可能导致问题的其他字符（根据实际需要添加）
-  // 这里保持相对保守，因为 Lark 的 Markdown 解析相对宽松
-  
-  return escapedText;
-};
-
-/**
- * 完整的 Lark 文本处理函数
- * @param text - 要处理的原始文本
- * @param options - 处理选项
- * @returns 处理后的文本
- */
-export const processLarkText = (
-  text: string, 
-  options: { 
-    escapeIndentation?: boolean; 
-    escapeSpecialChars?: boolean;
-    preserveCodeBlocks?: boolean;
-  } = {}
-): string => {
-  if (!text) return text;
-  
-  const { 
-    escapeIndentation = true, 
-    escapeSpecialChars = true,
-    preserveCodeBlocks = false 
-  } = options;
-  
-  let processedText = text;
-  
-  // 如果需要保留代码块，则先提取代码块内容
-  if (preserveCodeBlocks) {
-    // 提取并临时替换代码块
-    const codeBlockRegex = /(```[\s\S]*?```)/g;
-    const tempCodeBlocks: string[] = [];
-    processedText = processedText.replace(codeBlockRegex, (match) => {
-      tempCodeBlocks.push(match);
-      return `__CODE_BLOCK_${tempCodeBlocks.length - 1}__`;
-    });
-    
-    // 应用零宽空格转义（避免缩进被识别为代码块）
-    if (escapeIndentation) {
-      processedText = escapeLarkIndentation(processedText);
-    }
-    
-    // 应用特殊字符转义
-    if (escapeSpecialChars) {
-      processedText = escapeLarkSpecialChars(processedText);
-    }
-    
-    // 恢复代码块
-    processedText = processedText.replace(/__CODE_BLOCK_(\d+)__/g, (_, index) => {
-      return tempCodeBlocks[parseInt(index)] || '';
-    });
-  } else {
-    // 不保留代码块的情况
-    if (escapeIndentation) {
-      processedText = escapeLarkIndentation(processedText);
-    }
-    
-    if (escapeSpecialChars) {
-      processedText = escapeLarkSpecialChars(processedText);
-    }
-  }
-  
-  return processedText;
-};
-
-/**
- * 检测内容是否为JSON格式
- * @param content - 要检测的内容
- * @returns 是否为JSON格式
- */
-export const isJsonContent = (content: string): boolean => {
-  const trimmed = content.trim();
-  return (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
-         (trimmed.startsWith('[') && trimmed.endsWith(']'));
-};
-
-/**
- * 检测内容是否包含错误信息
- * @param content - 要检测的内容
- * @returns 是否包含错误信息
- */
-export const isErrorContent = (content: string): boolean => {
-  return content.toLowerCase().includes('error') || 
-         content.toLowerCase().includes('exception') ||
-         content.includes('stderr') ||
-         content.startsWith('Error:') ||
-         content.startsWith('Exception:');
-};
+import { inferLanguageType, isErrorContent } from './shared';
 
 /**
  * 检测工具类型
@@ -187,16 +54,6 @@ export const getToolType = (name: string): string => {
 };
 
 /**
- * 截断文本辅助函数（内部使用）
- */
-const truncateText = (text: string, limit: number): string => {
-  if (text.length <= limit) {
-    return text;
-  }
-  return text.substring(0, limit) + '...';
-};
-
-/**
  * 格式化文件系统工具结果
  */
 const formatFilesystemResult = (name: string, result: any): string => {
@@ -214,7 +71,9 @@ const formatFilesystemResult = (name: string, result: any): string => {
           return lsLines.map(item => `- \`${item}\``).join('\n');
         }
 
-        return `\`\`\`\n${trimmed}\n\`\`\``;
+        const lang = inferLanguageType(undefined, trimmed);
+        const langTag = lang ? lang : '';
+        return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
       
       case 'grep':
         // grep 工具返回的文本按换行符分割成匹配项
@@ -228,10 +87,10 @@ const formatFilesystemResult = (name: string, result: any): string => {
         // read_file 工具的字符串结果直接显示
         const lines = trimmed.split('\n').length;
         const chars = trimmed.length;
-        const preview = trimmed.length > 500 
-          ? truncateText(trimmed, 500) 
-          : trimmed;
-        return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`\n${preview}\n\`\`\``;
+        const preview = trimmed;
+        const fileLang = inferLanguageType(undefined, preview);
+        const fileLangTag = fileLang ? fileLang : '';
+        return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
       
       case 'glob':
         // glob 工具返回的文本按换行符分割成文件路径
@@ -244,7 +103,9 @@ const formatFilesystemResult = (name: string, result: any): string => {
       default:
         // 其他文件系统工具的字符串结果
         if (trimmed.includes('\n')) {
-          return `\`\`\`\n${trimmed}\n\`\`\``;
+          const lang = inferLanguageType(undefined, trimmed);
+          const langTag = lang ? lang : '';
+          return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
         } else {
           return `\`${trimmed}\``;
         }
@@ -258,25 +119,27 @@ const formatFilesystemResult = (name: string, result: any): string => {
         if (result.length === 0) return '目录为空';
         return result.map(item => `- ${item}`).join('\n');
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'read_file':
       if (result.content !== undefined) {
         const lines = result.content.split('\n').length;
         const chars = result.content.length;
-        const preview = result.content.length > 500 
-          ? truncateText(result.content, 500) 
-          : result.content;
-        return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`\n${preview}\n\`\`\``;
+        const preview = result.content;
+        // 尝试从结果对象中提取文件路径
+        const filePath = result.file_path || result.filePath || undefined;
+        const fileLang = inferLanguageType(filePath, preview);
+        const fileLangTag = fileLang ? fileLang : '';
+        return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'write_file':
     case 'edit_file':
       if (result.success) {
         return `✅ 文件操作成功\n**路径:** \`${result.file_path || result.filePath}\``;
       }
-      return `❌ 文件操作失败\n\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `❌ 文件操作失败\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'glob':
       if (Array.isArray(result)) {
@@ -285,7 +148,7 @@ const formatFilesystemResult = (name: string, result: any): string => {
                result.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
                (result.length > 10 ? `\n... 还有 ${result.length - 10} 个文件` : '');
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'grep':
       if (Array.isArray(result)) {
@@ -294,10 +157,10 @@ const formatFilesystemResult = (name: string, result: any): string => {
                result.slice(0, 10).map(match => `- ${match}`).join('\n') + 
                (result.length > 10 ? `\n... 还有 ${result.length - 10} 个匹配项` : '');
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     default:
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
   }
 };
 
@@ -313,10 +176,14 @@ const formatSystemResult = (name: string, result: any): string => {
     switch (name) {
       case 'execute_bash':
         // execute_bash 的字符串结果直接显示为标准输出
-        return `**标准输出:**\n\`\`\`\n${trimmed}\n\`\`\``;
+        const bashLang = inferLanguageType(undefined, trimmed);
+        const bashLangTag = bashLang ? bashLang : 'bash';
+        return `**标准输出:**\n\`\`\`${bashLangTag}\n${trimmed}\n\`\`\``;
       
       case 'echo':
-        return `💬 回显内容:\n\`\`\`\n${trimmed}\n\`\`\``;
+        const echoLang = inferLanguageType(undefined, trimmed);
+        const echoLangTag = echoLang ? echoLang : '';
+        return `💬 回显内容:\n\`\`\`${echoLangTag}\n${trimmed}\n\`\`\``;
       
       case 'sleep':
         // sleep 工具通常返回数字或简单消息
@@ -324,7 +191,9 @@ const formatSystemResult = (name: string, result: any): string => {
       
       default:
         if (trimmed.includes('\n')) {
-          return `\`\`\`\n${trimmed}\n\`\`\``;
+          const lang = inferLanguageType(undefined, trimmed);
+          const langTag = lang ? lang : '';
+          return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
         } else {
           return `\`${trimmed}\``;
         }
@@ -336,10 +205,14 @@ const formatSystemResult = (name: string, result: any): string => {
     case 'execute_bash':
       let output = '';
       if (result.stdout && result.stdout !== '(empty)') {
-        output += `**标准输出:**\n\`\`\`\n${result.stdout}\n\`\`\`\n\n`;
+        const stdoutLang = inferLanguageType(undefined, result.stdout);
+        const stdoutLangTag = stdoutLang ? stdoutLang : 'bash';
+        output += `**标准输出:**\n\`\`\`${stdoutLangTag}\n${result.stdout}\n\`\`\`\n\n`;
       }
       if (result.stderr && result.stderr !== '(empty)') {
-        output += `**标准错误:**\n\`\`\`\n${result.stderr}\n\`\`\``;
+        const stderrLang = inferLanguageType(undefined, result.stderr);
+        const stderrLangTag = stderrLang ? stderrLang : '';
+        output += `**标准错误:**\n\`\`\`${stderrLangTag}\n${result.stderr}\n\`\`\``;
       }
       if (result.command) {
         output = `**命令:** \`${result.command}\`\n\n` + output;
@@ -350,10 +223,12 @@ const formatSystemResult = (name: string, result: any): string => {
       return `⏱️ 延迟执行完成\n**时长:** ${result.duration || result.message?.match(/(\d+)/)?.[1] || '未知'} 毫秒`;
     
     case 'echo':
-      return `💬 回显内容:\n\`\`\`\n${result.echoed || result.message}\n\`\`\``;
+      const echoContentLang = inferLanguageType(undefined, result.echoed || result.message);
+      const echoContentLangTag = echoContentLang ? echoContentLang : '';
+      return `💬 回显内容:\n\`\`\`${echoContentLangTag}\n${result.echoed || result.message}\n\`\`\``;
     
     default:
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
   }
 };
 
@@ -363,9 +238,11 @@ const formatSystemResult = (name: string, result: any): string => {
 const formatGithubResult = (result: any): string => {
   if (result.content) {
     const lines = result.content.split('\n').length;
-    return `🐙 **GitHub文件内容**\n\n**行数:** ${lines}\n\n\`\`\`\n${truncateText(result.content, 800)}\n\`\`\``;
+    const githubLang = inferLanguageType(undefined, result.content);
+    const githubLangTag = githubLang ? githubLang : '';
+    return `🐙 **GitHub文件内容**\n\n**行数:** ${lines}\n\n\`\`\`${githubLangTag}\n${result.content}\n\`\`\``;
   }
-  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
 
 /**
@@ -374,9 +251,9 @@ const formatGithubResult = (result: any): string => {
 const formatCodeAnalysisResult = (result: any): string => {
   if (result.implementation || result.definition || result.references) {
     const content = result.implementation || result.definition || result.references;
-    return `🔍 **代码分析结果**\n\n\`\`\`typescript\n${truncateText(content, 1000)}\n\`\`\``;
+    return `🔍 **代码分析结果**\n\n\`\`\`typescript\n${content}\n\`\`\``;
   }
-  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
 
 /**
@@ -388,7 +265,7 @@ const formatKnowledgeResult = (name: string, result: any): string => {
       if (result.success) {
         return `📚 **知识添加成功**\n\n**标题:** ${result.title || '未知'}\n**关键词:** ${result.keywords?.join(', ') || '无'}`;
       }
-      return `❌ 知识添加失败\n\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `❌ 知识添加失败\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'get_knowledge_summaries':
       if (Array.isArray(result)) {
@@ -396,20 +273,20 @@ const formatKnowledgeResult = (name: string, result: any): string => {
         return `📚 **知识库摘要 (${result.length} 项)**\n\n` + 
                result.map((item: any) => `- **${item.title}** [${item.keywords?.join(', ') || '无关键词'}]`).join('\n');
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'search_knowledge':
       if (Array.isArray(result)) {
         if (result.length === 0) return '未找到匹配的知识';
         return `📚 **知识搜索结果 (${result.length} 项)**\n\n` + 
                result.map((item: any) => 
-                 `- **${item.title}**\n  ${truncateText(item.content || '', 100)}`
+                 `- **${item.title}**\n  ${item.content || ''}`
                ).join('\n\n');
       }
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     default:
-      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
   }
 };
 
@@ -470,7 +347,7 @@ const formatSearchResult = (result: any): string => {
     const safeUrl = url && url !== '#' ? url : '#';
     const linkText = safeUrl !== '#' ? `[${title}](${safeUrl})` : title;
     
-    return `${index + 1}. **${linkText}**\n   ${truncateText(String(snippet), 150)}`;
+    return `${index + 1}. **${linkText}**\n   ${String(snippet)}`;
   });
   
   return `🌐 **网络搜索结果 (${searchResults.length} 项)**\n\n` + formattedResults.join('\n\n');
@@ -490,7 +367,7 @@ const formatTaskManagementResult = (name: string, result: any): string => {
              ).join('\n');
     }
   }
-  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
 
 /**
@@ -505,14 +382,14 @@ const formatComposioResult = (name: string, result: any): string => {
       if (result.data[0].subject || result.data[0].title) {
         return `🔌 **${name.replace('COMPOSIO_', '')} 结果 (${result.data.length} 项)**\n\n` + 
                result.data.slice(0, 3).map((item: any, index: number) => 
-                 `- **${item.subject || item.title || '无标题'}**\n  ${truncateText(item.body || item.content || item.snippet || '无内容', 150)}`
+                 `- **${item.subject || item.title || '无标题'}**\n  ${item.body || item.content || item.snippet || '无内容'}`
                ).join('\n\n');
       }
     } else if (typeof result.data === 'object') {
-      return `🔌 **${name.replace('COMPOSIO_', '')} 结果**\n\n\`\`\`json\n${truncateText(JSON.stringify(result.data, null, 2), 800)}\n\`\`\``;
+      return `🔌 **${name.replace('COMPOSIO_', '')} 结果**\n\n\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``;
     }
   }
-  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
 
 /**
@@ -556,7 +433,9 @@ export const formatStructuredResult = (result: any, verbose: boolean): string =>
   if (result.error || result.message) {
     const errorMsg = result.error || result.message;
     if (typeof errorMsg === 'string' && errorMsg.includes('\n')) {
-      return `❌ **执行错误**:\n\`\`\`\n${errorMsg}\n\`\`\``;
+      const errorLang = inferLanguageType(undefined, errorMsg);
+      const errorLangTag = errorLang ? errorLang : '';
+      return `❌ **执行错误**:\n\`\`\`${errorLangTag}\n${errorMsg}\n\`\`\``;
     } else {
       return `❌ **${errorMsg}**`;
     }
@@ -592,7 +471,9 @@ export const formatStructuredResult = (result: any, verbose: boolean): string =>
       const stdout = String(result.stdout).trim();
       if (stdout && stdout !== "(empty)") {
         if (stdout.includes('\n') || stdout.length > 100) {
-          outputParts.push(`📋 **标准输出**:\n\`\`\`\n${stdout}\n\`\`\``);
+          const stdoutLang = inferLanguageType(undefined, stdout);
+          const stdoutLangTag = stdoutLang ? stdoutLang : 'bash';
+          outputParts.push(`📋 **标准输出**:\n\`\`\`${stdoutLangTag}\n${stdout}\n\`\`\``);
         } else {
           outputParts.push(`📋 **标准输出**: \`${stdout}\``);
         }
@@ -602,7 +483,9 @@ export const formatStructuredResult = (result: any, verbose: boolean): string =>
       const stderr = String(result.stderr).trim();
       if (stderr && stderr !== "(empty)") {
         if (stderr.includes('\n') || stderr.length > 100) {
-          outputParts.push(`❌ **标准错误**:\n\`\`\`\n${stderr}\n\`\`\``);
+          const stderrLang = inferLanguageType(undefined, stderr);
+          const stderrLangTag = stderrLang ? stderrLang : '';
+          outputParts.push(`❌ **标准错误**:\n\`\`\`${stderrLangTag}\n${stderr}\n\`\`\``);
         } else {
           outputParts.push(`❌ **标准错误**: \`${stderr}\``);
         }
@@ -639,10 +522,14 @@ const formatDefaultToolResult = (parsedResult: any): string => {
       // 类似Bash命令的输出
       let output = '';
       if (parsedResult.stdout && parsedResult.stdout !== '(empty)') {
-        output += `**标准输出:**\n\`\`\`\n${parsedResult.stdout}\n\`\`\`\n\n`;
+        const stdoutLang = inferLanguageType(undefined, parsedResult.stdout);
+        const stdoutLangTag = stdoutLang ? stdoutLang : 'bash';
+        output += `**标准输出:**\n\`\`\`${stdoutLangTag}\n${parsedResult.stdout}\n\`\`\`\n\n`;
       }
       if (parsedResult.stderr && parsedResult.stderr !== '(empty)') {
-        output += `**标准错误:**\n\`\`\`\n${parsedResult.stderr}\n\`\`\``;
+        const stderrLang = inferLanguageType(undefined, parsedResult.stderr);
+        const stderrLangTag = stderrLang ? stderrLang : '';
+        output += `**标准错误:**\n\`\`\`${stderrLangTag}\n${parsedResult.stderr}\n\`\`\``;
       }
       return output || '无输出';
     } else if (parsedResult.message) {
@@ -656,14 +543,18 @@ const formatDefaultToolResult = (parsedResult: any): string => {
     // 检查是否包含错误信息
     if (isErrorContent(trimmed)) {
       if (trimmed.includes('\n')) {
-        return `❌ **执行错误**\n\`\`\`\n${trimmed}\n\`\`\``;
+        const errorLang = inferLanguageType(undefined, trimmed);
+        const errorLangTag = errorLang ? errorLang : '';
+        return `❌ **执行错误**\n\`\`\`${errorLangTag}\n${trimmed}\n\`\`\``;
       } else {
         return `❌ **${trimmed}**`;
       }
     }
     // 普通文本内容
     if (trimmed.includes('\n')) {
-      return `\`\`\`\n${trimmed}\n\`\`\``;
+      const lang = inferLanguageType(undefined, trimmed);
+      const langTag = lang ? lang : '';
+      return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
     } else {
       return `\`${trimmed}\``;
     }

@@ -1,5 +1,5 @@
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
-import { OutputEvent, OutputEventType } from '@/core/agent/io-channel';
+import { OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import * as readline from 'readline';
 import { config } from '@/core/config/config';
 

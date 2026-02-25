@@ -1,20 +1,20 @@
 /**
- * 终端适配器 - 实现 I/O 通道接口的终端具体实现
+ * 终端适配器 - 实现适配器接口的终端具体实现
  * 
  * 中文名称：终端适配器
  * 
- * 这是 DefaultIOChannel 的具体实现，专门用于终端环境。
+ * 这是 DefaultAdapter 的具体实现，专门用于终端环境。
  * 所有原来的终端输出逻辑都移到这里，核心模块不再直接依赖终端 API。
  * 
  * @module terminal-adapter
  */
 
 import readline from 'readline';
-import { DefaultIOChannel, OutputEvent, OutputEventType } from '@/core/agent/io-channel';
+import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import { styled } from '@/presentation/styling/output-styler';
 import { config } from '@/core/config/config';
 
-export class TerminalAdapter extends DefaultIOChannel {
+export class TerminalAdapter extends DefaultAdapter {
   private _rl: readline.Interface | null = null;
   private abortController: AbortController | null = null;
   private isDestroyed = false;
