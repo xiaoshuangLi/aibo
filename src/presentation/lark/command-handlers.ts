@@ -17,6 +17,26 @@ import { getRestartCommand } from '@/shared/utils/restart-helper';
 // ==================== 内部命令处理器辅助函数 ====================
 
 /**
+ * 将Token数量格式化为带单位的字符串，并保留原始数字
+ * 
+ * @param tokenCount - Token数量
+ * @returns 格式化后的字符串，如 "1.39M (1,387,210)" 或 "5.53K (5,525)"
+ */
+function formatTokenWithUnit(tokenCount: number): string {
+  const originalFormatted = tokenCount.toLocaleString();
+  
+  if (tokenCount >= 1_000_000) {
+    const inMillions = tokenCount / 1_000_000;
+    return `${inMillions.toFixed(2)}M (${originalFormatted})`;
+  } else if (tokenCount >= 1_000) {
+    const inThousands = tokenCount / 1_000;
+    return `${inThousands.toFixed(2)}K (${originalFormatted})`;
+  } else {
+    return `${originalFormatted} (${originalFormatted})`;
+  }
+}
+
+/**
  * 将会话元数据转换为Markdown格式
  * 
  * 中文名称：将会话元数据转换为Markdown格式
@@ -25,6 +45,8 @@ import { getRestartCommand } from '@/shared/utils/restart-helper';
  * - 接收session metadata对象（AITelemetryRecord结构）
  * - 将其转换为格式化的Markdown字符串
  * - 包含模型使用量、token统计、执行时间等信息
+ * - Token数字转换为带单位格式（M/K）并在括号中显示原始数字
+ * - 移除"资源使用概览"部分和底部提示文本
  * - 返回Markdown格式的字符串
  * 
  * 行为分支：
@@ -46,31 +68,22 @@ export function formatSessionMetadataToMarkdown(metadata: any): string {
     const totalTokens = metadata.token_usage?.total_tokens || metadata.totalTokens || 0;
     const promptTokens = metadata.token_usage?.input_tokens || metadata.promptTokens || 0;
     const completionTokens = metadata.token_usage?.output_tokens || metadata.completionTokens || 0;
-    const executionTime = metadata.latency_ms ? `${(metadata.latency_ms / 1000).toFixed(2)}s` : 
-                        (metadata.executionTime ? `${(metadata.executionTime / 1000).toFixed(2)}s` : '未知');
     const timestamp = metadata.start_time ? new Date(metadata.start_time).toLocaleString('zh-CN') : 
                      (metadata.timestamp ? new Date(metadata.timestamp).toLocaleString('zh-CN') : '未知时间');
     const sessionId = metadata.session_info?.session_id || metadata.sessionId || '未知会话ID';
 
-    // 构建Markdown格式
+    // 构建Markdown格式 - 移除了"资源使用概览"部分和底部提示
     const markdown = `📊 **会话元数据统计**
 
 **会话信息**
 - 会话ID: \`${sessionId}\`
 - 时间戳: ${timestamp}
-- 执行时长: ${executionTime}
 
 **模型使用**
 - 模型: ${model}
-- 总Token数: ${totalTokens.toLocaleString()}
-- 输入Token: ${promptTokens.toLocaleString()}
-- 输出Token: ${completionTokens.toLocaleString()}
-
-**资源使用概览**
-- Token效率: ${(completionTokens / (promptTokens || 1)).toFixed(2)} (输出/输入比)
-- 平均响应时间: ${executionTime}
-
-> 💡 这些统计数据帮助您了解AI助手的使用情况和资源消耗。
+- 总Token数: ${formatTokenWithUnit(totalTokens)}
+- 输入Token: ${formatTokenWithUnit(promptTokens)}
+- 输出Token: ${formatTokenWithUnit(completionTokens)}
 `;
 
     return markdown;
