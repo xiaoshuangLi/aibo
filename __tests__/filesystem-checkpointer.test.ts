@@ -188,9 +188,10 @@ describe('FilesystemCheckpointer', () => {
       checkpoints.push(checkpoint);
     }
     
-    // Note: The current implementation of list() has a bug - it looks for .json files
-    // directly in sessionsDir, but files are actually stored in subdirectories.
-    // So it returns an empty array. We'll update this test to reflect the actual behavior.
-    expect(checkpoints).toHaveLength(0);
+    // Now that the list() method is fixed, it should return all 3 checkpoints
+    expect(checkpoints).toHaveLength(3);
+    expect(checkpoints[0].config.configurable.thread_id).toBe('thread3');
+    expect(checkpoints[1].config.configurable.thread_id).toBe('thread2');
+    expect(checkpoints[2].config.configurable.thread_id).toBe('thread1');
   });
 });

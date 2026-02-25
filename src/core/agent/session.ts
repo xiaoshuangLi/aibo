@@ -10,7 +10,6 @@
 
 import { IOChannel } from './io-channel';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
-import { styled } from '@/presentation/styling/output-styler';
 import { config } from '@/core/config/config';
 import { SessionManager } from '@/infrastructure/session/session-manager';
 
@@ -133,32 +132,33 @@ export class Session {
    * 记录工具调用
    */
   logToolCall(name: string, args: any): void {
-    this.logRawText(styled.toolCall(name, args));
+    this.ioChannel.emit({
+      type: 'toolCall',
+      data: { name, args },
+      timestamp: Date.now()
+    });
   }
 
   /**
    * 记录工具结果
    */
   logToolResult(name: string, success: boolean, preview: string): void {
-    this.logRawText(styled.toolResult(name, success, preview));
-    this.logRawText('\n');
+    this.ioChannel.emit({
+      type: 'toolResult',
+      data: { name, success, preview },
+      timestamp: Date.now()
+    });
   }
 
   /**
    * 记录思考过程
    */
   logThinkingProcess(steps: Array<{ content: string; status?: string }>): void {
-    let thinkingText = '\n🧠 AI 深度思考过程:';
-    steps.forEach(step => {
-      let emoji = '💭';
-      if (step.status === 'completed') {
-        emoji = '✅';
-      } else if (step.status === 'in_progress') {
-        emoji = '🔄';
-      }
-      thinkingText += `\n\n${emoji} ${step.content}`;
+    this.ioChannel.emit({
+      type: 'thinkingProcess',
+      data: { steps },
+      timestamp: Date.now()
     });
-    this.logRawText(thinkingText);
   }
 
   /**
@@ -166,7 +166,12 @@ export class Session {
    */
   async streamAIContent(content: string, isInitial: boolean, isFinal: boolean): Promise<void> {
     if (isInitial && !content) {
-      this.logRawText(styled.assistant("..."));
+      // 发送初始状态，让 TerminalAdapter 处理显示
+      await this.ioChannel.emit({
+        type: 'streamStart',
+        data: { placeholder: "..." },
+        timestamp: Date.now()
+      });
       return;
     }
     
@@ -194,14 +199,22 @@ export class Session {
    * 记录系统消息
    */
   logSystemMessage(message: string): void {
-    this.logRawText(styled.system(message));
+    this.ioChannel.emit({
+      type: 'systemMessage',
+      data: { message },
+      timestamp: Date.now()
+    });
   }
 
   /**
    * 记录错误消息
    */
   logErrorMessage(message: string): void {
-    this.logRawText(styled.error(message));
+    this.ioChannel.emit({
+      type: 'errorMessage',
+      data: { message },
+      timestamp: Date.now()
+    });
   }
 
   /**

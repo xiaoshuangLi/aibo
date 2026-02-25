@@ -7,6 +7,12 @@ import {
   handleAbortCommand,
   handleExitCommand,
   handleUnknownCommand,
+  handleRebotCommand,
+  handleShowFilesCommand,
+  handleShowDiffCommand,
+  handleDiffCommand,
+  handleRevertCommand,
+  handleStageCommand,
   createHandleInternalCommand
 } from '@/presentation/lark/command-handlers';
 
@@ -39,27 +45,96 @@ jest.mock('@/infrastructure/session/session-manager', () => {
   };
 });
 
+// Mock executeBashTool
+jest.mock('@/tools/bash', () => ({
+  executeBashTool: {
+    invoke: jest.fn()
+  }
+}));
+
+// Mock FileDiffVisualizer
+const mockFileDiffVisualizerInstance = {
+  getChangedFiles: jest.fn(),
+  getAllFilesDiff: jest.fn(),
+  getFileDiff: jest.fn(),
+  revertFile: jest.fn(),
+  stageFile: jest.fn()
+};
+
+// Mock the dynamic import for file-diff-visualizer
+jest.mock('@/presentation/lark/file-diff-visualizer', () => ({
+  FileDiffVisualizer: jest.fn().mockImplementation(() => mockFileDiffVisualizerInstance)
+}));
+
+// Also mock the relative import used in command-handlers.ts
+jest.mock('./file-diff-visualizer', () => ({
+  FileDiffVisualizer: jest.fn().mockImplementation(() => mockFileDiffVisualizerInstance)
+}), { virtual: true });
+
+// Mock getRestartCommand
+jest.mock('@/shared/utils/restart-helper', () => ({
+  getRestartCommand: jest.fn()
+}));
+
+// Mock child_process.spawn
+jest.mock('child_process', () => ({
+  spawn: jest.fn(() => ({
+    on: jest.fn(),
+    unref: jest.fn()
+  }))
+}));
+
 describe('Lark Command Handlers', () => {
+  let originalConfig: any;
+  
   beforeEach(() => {
     jest.clearAllMocks();
     mockConsoleLog.mockClear();
     mockProcessExit.mockClear();
     
+    // Store original config
+    originalConfig = { ...config.output };
+    
     // Reset config to default state
     config.output.verbose = false;
+  });
+  
+  afterEach(() => {
+    // Restore original config
+    config.output = originalConfig;
   });
 
   describe('handleHelpCommand', () => {
     it('should display help message and return true', async () => {
-      const result = await handleHelpCommand();
+      // Create a mock session object
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      
+      const result = await handleHelpCommand(mockSession);
       
       expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('可用命令'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('AIBO 助手命令指南'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/help'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/exit'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/verbose'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/new'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/abort'));
+      
+      // Verify that the message was emitted through ioChannel
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/help',
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
     });
   });
 
@@ -72,7 +147,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(config.output.verbose).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('详细模式'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('输出模式已切换'));
     });
 
     it('should toggle verbose mode from true to false', async () => {
@@ -84,7 +159,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(config.output.verbose).toBe(false);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('简略模式'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('输出模式已切换'));
     });
   });
 
@@ -101,7 +176,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(mockSession.threadId).toBe('new-session-id');
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('已创建新会话'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('新会话已创建'));
       expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
@@ -134,7 +209,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(mockAbortController.abort).toHaveBeenCalled();
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('当前操作已中断'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('操作已中断'));
       expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
@@ -142,7 +217,7 @@ describe('Lark Command Handlers', () => {
             command: '/abort',
             result: expect.objectContaining({
               success: true,
-              message: '🔄 当前操作已中断'
+              message: expect.stringContaining('操作已中断')
             })
           })
         })
@@ -160,7 +235,7 @@ describe('Lark Command Handlers', () => {
       const result = await handleAbortCommand(mockSession as any);
       
       expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('没有正在进行的操作'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('无操作可中断'));
       expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
@@ -168,7 +243,7 @@ describe('Lark Command Handlers', () => {
             command: '/abort',
             result: expect.objectContaining({
               success: false,
-              message: 'ℹ️ 没有正在进行的操作'
+              message: expect.stringContaining('无操作可中断')
             })
           })
         })
@@ -191,7 +266,7 @@ describe('Lark Command Handlers', () => {
       
       expect(result).toBe(true);
       expect(mockAbortController.abort).not.toHaveBeenCalled();
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('没有正在进行的操作'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('无操作可中断'));
       expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'commandExecuted',
@@ -199,7 +274,7 @@ describe('Lark Command Handlers', () => {
             command: '/abort',
             result: expect.objectContaining({
               success: false,
-              message: 'ℹ️ 没有正在进行的操作'
+              message: expect.stringContaining('无操作可中断')
             })
           })
         })
@@ -228,8 +303,556 @@ describe('Lark Command Handlers', () => {
       const result = await handleUnknownCommand(unknownCommand);
       
       expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`未知命令: ${unknownCommand}`));
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('输入 /help 查看可用命令'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('未知命令'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('请输入 `/help` 查看所有可用命令'));
+    });
+  });
+
+  describe('handleRebotCommand', () => {
+    // Mock the executeBashTool
+    const originalExecuteBashTool = require('@/tools/bash').executeBashTool;
+    const mockExecuteBashTool = {
+      invoke: jest.fn()
+    };
+    
+    // Mock the getRestartCommand
+    const originalGetRestartCommand = require('@/shared/utils/restart-helper').getRestartCommand;
+    const mockGetRestartCommand = jest.fn();
+    
+    // Mock spawn
+    const mockSpawn = jest.fn(() => ({
+      on: jest.fn(),
+      unref: jest.fn()
+    }));
+    
+    beforeEach(() => {
+      // Mock the imports
+      jest.mock('@/tools/bash', () => ({
+        executeBashTool: mockExecuteBashTool
+      }));
+      
+      jest.mock('@/shared/utils/restart-helper', () => ({
+        getRestartCommand: mockGetRestartCommand
+      }));
+      
+      // Mock child_process.spawn
+      jest.mock('child_process', () => ({
+        spawn: mockSpawn
+      }));
+    });
+    
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+    
+    it('should handle successful build and restart', async () => {
+      // Mock successful build result
+      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockResolvedValue(
+        JSON.stringify({ success: true, stdout: 'Build successful', stderr: '' })
+      );
+      
+      // Mock restart command
+      (require('@/shared/utils/restart-helper').getRestartCommand as jest.Mock).mockReturnValue({
+        restartCommand: 'node',
+        restartArgs: ['dist/index.js']
+      });
+      
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        },
+        end: jest.fn()
+      };
+      
+      const result = await handleRebotCommand(mockSession as any);
+      
+      expect(result).toBe(true);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建成功！'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/rebot',
+            result: expect.objectContaining({
+              success: true,
+              message: expect.stringContaining('构建成功')
+            })
+          })
+        })
+      );
+      expect(mockSession.end).toHaveBeenCalled();
+      // 在测试环境中，spawn 会被调用但不会实际执行
+      expect(require('child_process').spawn).toHaveBeenCalled();
+    });
+    
+    it('should handle build failure gracefully', async () => {
+      // Mock failed build result
+      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockResolvedValue(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Build error', 
+          message: 'Compilation failed',
+          stdout: '',
+          stderr: 'Error details'
+        })
+      );
+      
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        },
+        end: jest.fn()
+      };
+      
+      const result = await handleRebotCommand(mockSession as any);
+      
+      expect(result).toBe(false);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建失败'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/rebot',
+            result: expect.objectContaining({
+              success: false,
+              message: expect.stringContaining('构建失败')
+            })
+          })
+        })
+      );
+      expect(mockSession.end).not.toHaveBeenCalled();
+    });
+    
+    it('should handle execution errors gracefully', async () => {
+      // Mock execution error
+      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockRejectedValue(new Error('Execution failed'));
+      
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        },
+        end: jest.fn()
+      };
+      
+      const result = await handleRebotCommand(mockSession as any);
+      
+      expect(result).toBe(false);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('执行构建时发生错误'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/rebot',
+            result: expect.objectContaining({
+              success: false,
+              message: expect.stringContaining('重启失败')
+            })
+          })
+        })
+      );
+      expect(mockSession.end).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleShowFilesCommand', () => {
+    it('should show modified files successfully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock
+      mockFileDiffVisualizerInstance.getChangedFiles.mockResolvedValue({
+        success: true,
+        files: [
+          { path: 'file1.ts', status: 'modified', emoji: '📝' },
+          { path: 'file2.ts', status: 'modified', emoji: '📝' }
+        ],
+        message: '📋 **当前工作区状态**\n\n- 📝 `file1.ts` (modified)\n\n- 📝 `file2.ts` (modified)\n\n💡 小贴士：使用 `/show-diff` 查看详细改动哦～'
+      });
+
+      const result = await handleShowFilesCommand(mockSession as any);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('当前工作区状态'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/show-files',
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle empty working directory', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock for empty case
+      mockFileDiffVisualizerInstance.getChangedFiles.mockResolvedValue({
+        success: true,
+        files: [],
+        message: '📋 **当前工作区状态**\n\n✅ **工作区很干净，没有文件改动！**\n\n💡 小贴士：使用 `/show-diff` 查看详细改动哦～',
+        isEmpty: true
+      });
+
+      const result = await handleShowFilesCommand(mockSession as any);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('工作区很干净'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/show-files',
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle git status error gracefully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock to throw error
+      mockFileDiffVisualizerInstance.getChangedFiles.mockRejectedValue(new Error('Git command failed'));
+
+      const result = await handleShowFilesCommand(mockSession as any);
+      
+      expect(result).toBe(false);
+      expect(mockFileDiffVisualizerInstance.getChangedFiles).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('获取文件列表失败'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/show-files',
+            result: expect.objectContaining({
+              success: false
+            })
+          })
+        })
+      );
+    });
+  });
+
+  describe('handleShowDiffCommand', () => {
+    it('should show diff of all files successfully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock
+      mockFileDiffVisualizerInstance.getAllFilesDiff.mockResolvedValue({
+        success: true,
+        diffs: [
+          {
+            success: true,
+            filePath: 'file1.ts',
+            type: 'modified',
+            additions: 5,
+            deletions: 3,
+            diff: 'diff content for file1',
+            summary: '5 insertions(+), 3 deletions(-)'
+          }
+        ]
+      });
+
+      const result = await handleShowDiffCommand(mockSession as any);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Diff 概览'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledTimes(2); // Summary + file detail
+    });
+
+    it('should handle no file changes', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock for no changes
+      mockFileDiffVisualizerInstance.getAllFilesDiff.mockResolvedValue({
+        success: true,
+        diffs: []
+      });
+
+      const result = await handleShowDiffCommand(mockSession as any);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('没有检测到文件改动'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/show-diff',
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle git diff error gracefully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+
+      // Setup mock to return error
+      mockFileDiffVisualizerInstance.getAllFilesDiff.mockResolvedValue({
+        success: false,
+        error: 'Git diff failed'
+      });
+
+      const result = await handleShowDiffCommand(mockSession as any);
+      
+      expect(result).toBe(false);
+      expect(mockFileDiffVisualizerInstance.getAllFilesDiff).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Git diff failed'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/show-diff',
+            result: expect.objectContaining({
+              success: false
+            })
+          })
+        })
+      );
+    });
+  });
+
+  describe('handleDiffCommand', () => {
+    it('should show diff for specific file successfully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'test.ts';
+
+      // Setup mock
+      mockFileDiffVisualizerInstance.getFileDiff.mockResolvedValue({
+        success: true,
+        filePath: filename,
+        type: 'modified',
+        additions: 10,
+        deletions: 5,
+        diff: 'diff content',
+        summary: '10 insertions(+), 5 deletions(-)'
+      });
+
+      const result = await handleDiffCommand(mockSession as any, filename);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.getFileDiff).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`**路径**: \`${filename}\``));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/diff ${filename}`,
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle git diff for specific file error gracefully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'nonexistent.ts';
+
+      // Setup mock to return error
+      mockFileDiffVisualizerInstance.getFileDiff.mockResolvedValue({
+        success: false,
+        error: 'File not found',
+        filePath: filename
+      });
+
+      const result = await handleDiffCommand(mockSession as any, filename);
+      
+      expect(result).toBe(false);
+      expect(mockFileDiffVisualizerInstance.getFileDiff).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('File not found'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/diff ${filename}`,
+            result: expect.objectContaining({
+              success: false
+            })
+          })
+        })
+      );
+    });
+  });
+
+  describe('handleRevertCommand', () => {
+    it('should revert specific file successfully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'test.ts';
+
+      // Setup mock
+      mockFileDiffVisualizerInstance.revertFile.mockResolvedValue({
+        success: true,
+        message: `✅ 文件 ${filename} 已成功撤销改动`
+      });
+
+      const result = await handleRevertCommand(mockSession as any, filename);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.revertFile).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`文件 ${filename} 已成功撤销改动`));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/revert ${filename}`,
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle git checkout error gracefully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'nonexistent.ts';
+
+      // Setup mock to return error
+      mockFileDiffVisualizerInstance.revertFile.mockResolvedValue({
+        success: false,
+        error: '撤销文件失败: File not found',
+        filePath: filename
+      });
+
+      const result = await handleRevertCommand(mockSession as any, filename);
+      
+      expect(result).toBe(false);
+      expect(mockFileDiffVisualizerInstance.revertFile).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('撤销文件失败'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/revert ${filename}`,
+            result: expect.objectContaining({
+              success: false
+            })
+          })
+        })
+      );
+    });
+  });
+
+  describe('handleStageCommand', () => {
+    it('should stage specific file successfully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'test.ts';
+
+      // Setup mock
+      mockFileDiffVisualizerInstance.stageFile.mockResolvedValue({
+        success: true,
+        message: `✅ 文件 ${filename} 已成功暂存`
+      });
+
+      const result = await handleStageCommand(mockSession as any, filename);
+      
+      expect(result).toBe(true);
+      expect(mockFileDiffVisualizerInstance.stageFile).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining(`文件 ${filename} 已成功暂存`));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/stage ${filename}`,
+            result: expect.objectContaining({
+              success: true
+            })
+          })
+        })
+      );
+    });
+
+    it('should handle git add error gracefully', async () => {
+      const mockSession = {
+        ioChannel: {
+          emit: jest.fn()
+        }
+      };
+      const filename = 'nonexistent.ts';
+
+      // Setup mock to return error
+      mockFileDiffVisualizerInstance.stageFile.mockResolvedValue({
+        success: false,
+        error: '暂存文件失败: File not found',
+        filePath: filename
+      });
+
+      const result = await handleStageCommand(mockSession as any, filename);
+      
+      expect(result).toBe(false);
+      expect(mockFileDiffVisualizerInstance.stageFile).toHaveBeenCalledWith(filename);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('暂存文件失败'));
+      expect(mockSession.ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: `/stage ${filename}`,
+            result: expect.objectContaining({
+              success: false
+            })
+          })
+        })
+      );
     });
   });
 
@@ -255,7 +878,7 @@ describe('Lark Command Handlers', () => {
     it('should handle /help command', async () => {
       const result = await handleCommand('/help');
       expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('可用命令'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('AIBO 助手命令指南'));
     });
 
     it('should handle /verbose command', async () => {
@@ -299,7 +922,7 @@ describe('Lark Command Handlers', () => {
     it('should handle unknown command', async () => {
       const result = await handleCommand('/unknown');
       expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('未知命令: /unknown'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('未知命令'));
     });
   });
 

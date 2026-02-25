@@ -69,19 +69,6 @@ describe('SessionManager', () => {
       expect(fs.mkdirSync).toHaveBeenCalledWith(mockSessionsDir, { recursive: true });
     });
 
-    it('should load current session on initialization', () => {
-      const mockMetadata = { currentSessionId: 'session-existing' };
-      (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify(mockMetadata));
-      
-      // Reset the singleton instance
-      (SessionManager as any).instance = null;
-      const manager = SessionManager.getInstance();
-      
-      // Access private method to check current session ID
-      const currentSessionId = (manager as any).currentSessionId;
-      expect(currentSessionId).toBe('session-existing');
-    });
-
     it('should handle metadata file read errors gracefully', () => {
       (fs.readFileSync as jest.Mock).mockImplementation(() => {
         throw new Error('Read error');

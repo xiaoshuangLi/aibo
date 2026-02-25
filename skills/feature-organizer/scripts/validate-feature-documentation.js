@@ -32,13 +32,21 @@ const latestFeature = path.join('features', featureFiles[featureFiles.length - 1
 console.log(`📄 最新功能文档: ${latestFeature}`);
 
 // 检查文档是否包含必需的章节
-const requiredSections = ['Specification', 'Technical Design', 'Implementation Plan', 'Usage Guide', 'Impact Analysis'];
+const requiredSections = [
+    '## 📋 Specification (规格说明)',
+    '## 🏗️ Technical Design (技术设计)',
+    '## 📝 Implementation Plan (实施计划)',
+    '## 🚀 Usage Guide (使用指南)',
+    '## 📊 Impact Analysis (影响分析)'
+];
 const featureContent = fs.readFileSync(latestFeature, 'utf8');
 
 const missingSections = [];
 for (const section of requiredSections) {
-    if (!featureContent.includes(`## ${section}`)) {
-        missingSections.push(section);
+    if (!featureContent.includes(section)) {
+        // 提取章节名称用于错误显示（去掉##和emoji）
+        const sectionName = section.replace(/^##\s*[^\s]+\s*/, '');
+        missingSections.push(sectionName);
     }
 }
 

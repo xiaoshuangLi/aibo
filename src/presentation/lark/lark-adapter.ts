@@ -12,8 +12,9 @@
 import * as lark from '@larksuiteoapi/node-sdk';
 import { DefaultIOChannel, OutputEvent, OutputEventType } from '@/core/agent/io-channel';
 import { config } from '@/core/config/config';
-import { styled } from '@/presentation/styling/output-styler';
 import { SessionManager } from '@/infrastructure/session/session-manager';
+
+import { styled } from './output-styler';
 
 // 飞书配置类型
 interface LarkConfig {
@@ -186,7 +187,7 @@ export class LarkAdapter extends DefaultIOChannel {
   /**
    * 发送消息到指定接收ID
    */
-  private async sendMessage(content: string, msgType: string = 'text'): Promise<void> {
+  async sendMessage(content: string, msgType: string = 'text'): Promise<void> {
     if (this.isDestroyed) {
       throw new Error('Lark adapter is destroyed');
     }
@@ -199,29 +200,38 @@ export class LarkAdapter extends DefaultIOChannel {
       return;
     }
 
-    const source = content
-      .replace(/(^|\n)={4,}(\n|$)/, '\n')
-      .replace(/^[\s\n]+/, '')
-      .replace(/[\s\n]+$/, '');
+    const create = (text: any = '') => {
+      const more = (() => {
+        const content = JSON.stringify({ text });
+        const base = { content };
 
-    const create = (text = '') => {
+        try {
+          const got = JSON.parse(text);
+
+          return got.msg_type ? got : base;
+        } catch (e) {
+          return base;
+        }
+      })();
+
       return this.client.im.message.create({
         params: {
           receive_id_type: 'user_id',
         },
         data: {
+          msg_type: 'text',
           receive_id: targetReceiveId,
-          content: JSON.stringify({ text }),
-          msg_type: msgType,
+          ...more
         },
       })
     };
 
     try {
       // 飞书支持多行文本，直接发送格式化后的内容
-      await create(source);
+      await create(content);
     } catch (error) {
-      console.error('❌ 发送消息失败:', error);
+      console.error('❌ 发送消息失败:', (error as any).response.data);
+      console.error('📃 发送消息内容:', (error as any).response.config.data);
       await create('【敏感内容】');
     }
   }
@@ -229,7 +239,7 @@ export class LarkAdapter extends DefaultIOChannel {
   /**
    * 请求用户输入（在飞书环境中，这主要是设置状态）
    */
-  async requestUserInput(prompt: string = "👤 请发送您的消息: "): Promise<void> {
+  async requestUserInput(prompt: string = "请发送您的消息"): Promise<void> {
     if (this.isDestroyed) {
       throw new Error('Lark adapter is destroyed');
     }
@@ -288,14 +298,15 @@ export class LarkAdapter extends DefaultIOChannel {
   // 事件处理器方法
   private async handleAIResponse(data: { content: string }): Promise<void> {
     if (!data?.content) return;
-    // AI响应直接发送内容，不需要额外格式化
-    await this.sendMessage(data.content);
+    // 使用富文本格式化 AI 响应
+    const formattedContent = styled.assistant(data.content);
+    await this.sendMessage(formattedContent);
   }
 
   private async handleToolCall(data: { name: string; args: any }): Promise<void> {
     if (!data?.name) return;
     
-    // 使用styled格式化工具调用信息
+    // 使用富文本格式化工具调用信息
     const toolCallMessage = styled.toolCall(data.name, data.args);
     await this.sendMessage(toolCallMessage);
   }
@@ -305,14 +316,14 @@ export class LarkAdapter extends DefaultIOChannel {
     
     // 如果已经有 preview 字段，直接使用（向后兼容）
     if (data.preview !== undefined) {
+      // 在 Lark 模式下，确保 preview 内容不被截断
       const toolResultMessage = styled.toolResult(data.name, data.success, data.preview);
       await this.sendMessage(toolResultMessage);
       return;
     }
     
-    // 处理新的数据结构
+    // 处理新的数据结构 - Lark 模式下绝不截断任何内容
     let preview = "";
-    const verbose = config.output.verbose;
     
     // 特别处理 task 工具的结果
     if (data.isTaskResult) {
@@ -320,7 +331,8 @@ export class LarkAdapter extends DefaultIOChannel {
       if (typeof data.result === 'string' && data.result.includes('▸ 结果:')) {
         preview = data.result;
       } else {
-        preview = `▸ 结果: ${styled.truncated(data.result, verbose ? 300 : 150)}`;
+        // Lark 模式下不截断，直接显示完整内容
+        preview = `▸ 结果: ${data.result}`;
       }
       
       const toolResultMessage = styled.toolResult(type, data.success, preview);
@@ -328,24 +340,24 @@ export class LarkAdapter extends DefaultIOChannel {
       return;
     }
     
-    // 处理文本结果
+    // 处理文本结果 - Lark 模式下不截断
     if (data.isTextResult) {
-      preview = styled.truncated(data.result, verbose ? 300 : 150);
+      preview = data.result; // 直接使用完整内容，不截断
       const toolResultMessage = styled.toolResult(data.name, data.success, preview);
       await this.sendMessage(toolResultMessage);
       return;
     }
     
-    // 处理 JSON 结果
+    // 处理 JSON 结果 - 优先使用新的 JSON 格式化器
     if (data.isJsonResult && data.result) {
       const parsed = data.result;
       
       // 特别处理 task 工具的 JSON 结果
       if (data.name === '子代理任务' || data.name === 'task') {
         if (parsed.message) {
-          preview = `▸ 结果: ${styled.truncated(parsed.message, verbose ? 300 : 150)}`;
+          preview = `▸ 结果: ${parsed.message}`; // 不截断
         } else if (typeof parsed === 'string') {
-          preview = `▸ 结果: ${styled.truncated(parsed, verbose ? 300 : 150)}`;
+          preview = `▸ 结果: ${parsed}`; // 不截断
         } else {
           preview = `▸ 任务已完成`;
         }
@@ -355,21 +367,31 @@ export class LarkAdapter extends DefaultIOChannel {
         return;
       }
       
-      if (parsed.command) {
-        preview = `▸ 命令: ${styled.truncated(parsed.command, 80)}`;
-      } else if (parsed.filepath) {
-        preview = `▸ 文件: ${parsed.filepath}`;
-      }
-      
-      if (parsed.stdout) {
-        const out = String(parsed.stdout).trim();
-        if (out && out !== "(empty)") {
-          preview += `\n▸ 输出: ${styled.truncated(out.split('\n')[0] || out, verbose ? 200 : 80)}`;
+      // 尝试将任何对象都用 JSON 格式化器处理
+      if (typeof parsed === 'object' && parsed !== null) {
+        try {
+          // 使用标准 JSON 格式化（不截断）
+          preview = JSON.stringify(parsed, null, 2);
+        } catch (error) {
+          // 如果格式化失败，使用完整 JSON 字符串（不截断）
+          preview = JSON.stringify(parsed, null, 2);
         }
-      }
-      
-      if (parsed.stderr?.trim() !== "(empty)") {
-        preview += `\n▸ 错误: ${styled.truncated(parsed.stderr.split('\n')[0], verbose ? 100 : 60)}`;
+      } else if (typeof parsed === 'string') {
+        // 尝试解析字符串是否为 JSON
+        try {
+          const jsonStringParsed = JSON.parse(parsed);
+          if (typeof jsonStringParsed === 'object' && jsonStringParsed !== null) {
+            preview = JSON.stringify(jsonStringParsed, null, 2);
+          } else {
+            preview = parsed; // 直接使用完整字符串
+          }
+        } catch (error) {
+          // 不是 JSON 字符串，直接使用完整内容
+          preview = parsed;
+        }
+      } else {
+        // 其他类型，转换为字符串（不截断）
+        preview = String(parsed);
       }
       
       const toolResultMessage = styled.toolResult(data.name || "unknown", data.success, preview || "无输出");
@@ -377,9 +399,25 @@ export class LarkAdapter extends DefaultIOChannel {
       return;
     }
     
-    // 处理原始结果字符串
+    // 处理原始结果字符串 - Lark 模式下绝不截断
     if (data.result) {
-      preview = styled.truncated(data.result, verbose ? 300 : 150);
+      // 检查是否是 JSON 字符串
+      if (typeof data.result === 'string') {
+        try {
+          const parsedJson = JSON.parse(data.result);
+          if (typeof parsedJson === 'object' && parsedJson !== null) {
+            preview = JSON.stringify(parsedJson, null, 2);
+          } else {
+            preview = data.result; // 完整字符串，不截断
+          }
+        } catch (error) {
+          // 不是 JSON，使用完整内容
+          preview = data.result;
+        }
+      } else {
+        // 非字符串类型，转换为完整字符串
+        preview = String(data.result);
+      }
       const toolResultMessage = styled.toolResult(data.name || "unknown", data.success, preview);
       await this.sendMessage(toolResultMessage);
     }
@@ -388,7 +426,7 @@ export class LarkAdapter extends DefaultIOChannel {
   private async handleThinkingProcess(data: { steps: Array<{ content: string; status?: string }> }): Promise<void> {
     if (!data?.steps?.length) return;
     
-    // 使用styled格式化思考过程
+    // 使用富文本格式化思考过程
     const thinkingMessage = styled.thinkingProcess(data.steps);
     await this.sendMessage(thinkingMessage);
   }
@@ -413,9 +451,11 @@ export class LarkAdapter extends DefaultIOChannel {
 
   private async handleStreamStart(data: { initialContent?: string }): Promise<void> {
     if (data?.initialContent) {
-      await this.sendMessage(`🤖 ${data.initialContent}`);
+      const formattedContent = styled.assistant(data.initialContent);
+      await this.sendMessage(formattedContent);
     } else {
-      await this.sendMessage(styled.assistant("..."));
+      const formattedContent = styled.assistant("...");
+      await this.sendMessage(formattedContent);
     }
   }
 
@@ -429,14 +469,19 @@ export class LarkAdapter extends DefaultIOChannel {
     // 流结束不需要特殊处理，飞书会自动显示完整消息
   }
 
-  private async handleSessionStart(data: { welcomeMessage?: string; modelInfo?: string }): Promise<void> {
-    let sessionMessage = "";
-    sessionMessage += "🚀 AI Assistant 启动成功 | " + (data?.modelInfo || 'Unknown Model') + "\n";
-    sessionMessage += `📁 工作目录: ${process.cwd()}\n`;
-    sessionMessage += `🛡️  安全模式: ${config.output.verbose ? '详细输出' : '简略输出（自动截断长内容）'}\n`;
-    sessionMessage += "⌨️  命令: /help 查看命令 | /verbose 切换输出模式 | /new 新会话 | /abort 中断操作\n";
+  private async handleSessionStart(data: { welcomeMessage?: string; modelInfo?: string; session?: any }): Promise<void> {
+    let sessionMessage = `✨ **基本信息**
+• 模型: ${data?.modelInfo || '未知模型'}
+• 工作目录: \`${process.cwd()}\`
+
+🚀 **快速开始**
+• 输入 \`/help\` 查看所有可用命令
+• 直接描述您的需求，我会帮您完成
+• 支持文件操作、代码分析、知识管理等功能
+`;
     
-    await this.sendMessage(sessionMessage);
+    // 对于 session start 消息，使用系统消息样式
+    await this.sendMessage(styled.system('🤖 AIBO 助手已启动', sessionMessage));
   }
 
   private async handleSessionEnd(data: { message: string }): Promise<void> {

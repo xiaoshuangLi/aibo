@@ -1,494 +1,379 @@
 import { LspClient } from '@/infrastructure/code-analysis/lsp-client';
-import { ChildProcess } from 'child_process';
 
-// Mock child_process.spawn
-jest.mock('child_process', () => {
-  const mockChildProcess = {
-    stdout: {
-      on: jest.fn(),
-      pipe: jest.fn()
-    },
-    stdin: {
-      write: jest.fn(),
-      end: jest.fn()
-    },
-    stderr: {
-      on: jest.fn()
-    },
-    on: jest.fn(),
-    kill: jest.fn(),
-    pid: 12345
+// Mock console.log to prevent actual output during tests
+const originalConsoleLog = console.log;
+const mockConsoleLog = jest.fn();
+console.log = mockConsoleLog;
+
+// Mock console.error to prevent actual output during tests  
+const originalConsoleError = console.error;
+const mockConsoleError = jest.fn();
+console.error = mockConsoleError;
+
+// Mock child_process
+const mockChildProcess = {
+  stdin: {
+    write: jest.fn()
+  },
+  stdout: {
+    on: jest.fn()
+  },
+  stderr: {
+    on: jest.fn()
+  },
+  on: jest.fn(),
+  unref: jest.fn()
+};
+
+jest.mock('child_process', () => ({
+  spawn: jest.fn(() => mockChildProcess)
+}));
+
+describe('LSP Client', () => {
+  let lspClient: any;
+  const testConfig = {
+    serverCommand: 'test-server',
+    workingDirectory: '/test',
+    serverArgs: ['--stdio']
   };
-
-  return {
-    spawn: jest.fn().mockReturnValue(mockChildProcess)
-  };
-});
-
-describe('LspClient', () => {
-  let lspClient: LspClient;
-  let mockChildProcess: any;
 
   beforeEach(() => {
-    // Reset mocks
     jest.clearAllMocks();
-    
-    // Create mock child process
-    mockChildProcess = {
-      stdout: {
-        on: jest.fn(),
-        pipe: jest.fn()
-      },
-      stdin: {
-        write: jest.fn(),
-        end: jest.fn()
-      },
-      stderr: {
-        on: jest.fn()
-      },
-      on: jest.fn(),
-      kill: jest.fn(),
-      pid: 12345
-    };
-
-    // Mock spawn to return our mock child process
-    const spawnMock = require('child_process').spawn as jest.MockedFunction<typeof import('child_process').spawn>;
-    spawnMock.mockReturnValue(mockChildProcess);
-
-    const config = {
-      serverCommand: 'typescript-language-server',
-      serverArgs: ['--stdio'],
-      workingDirectory: '/test',
-      timeout: 5000
-    };
-
-    lspClient = new LspClient(config);
+    mockConsoleLog.mockClear();
+    mockConsoleError.mockClear();
+    (require('child_process').spawn as jest.Mock).mockReturnValue(mockChildProcess);
   });
 
-  describe('constructor', () => {
-    test('should initialize with correct configuration', () => {
-      expect(lspClient).toBeDefined();
+  describe('Constructor', () => {
+    it('should initialize with default config values', () => {
+      lspClient = new LspClient(testConfig);
       
-      // Test private properties indirectly
-      expect((lspClient as any).config).toBeDefined();
-      expect((lspClient as any).requestCounter).toBe(1);
-      expect((lspClient as any).isInitialized).toBe(false);
+      expect(lspClient.config.timeout).toBe(10000);
+      expect(lspClient.config.maxBufferSize).toBe(10 * 1024 * 1024);
+      expect(lspClient.initialized).toBe(false);
+      expect(lspClient.openedDocuments.size).toBe(0);
     });
 
-    test('should set default timeout if not provided', () => {
-      const config = {
-        serverCommand: 'typescript-language-server',
-        serverArgs: ['--stdio'],
-        workingDirectory: '/test'
+    it('should use custom config values when provided', () => {
+      const customConfig = {
+        ...testConfig,
+        timeout: 5000,
+        maxBufferSize: 5 * 1024 * 1024
       };
-
-      const client = new LspClient(config);
-      expect((client as any).config.timeout).toBe(30000);
+      
+      lspClient = new LspClient(customConfig);
+      
+      expect(lspClient.config.timeout).toBe(5000);
+      expect(lspClient.config.maxBufferSize).toBe(5 * 1024 * 1024);
     });
   });
 
-  describe('start', () => {
-    test('should throw error if LSP server is already running', async () => {
-      (lspClient as any).childProcess = {} as ChildProcess;
+  describe('startProcess', () => {
+    it('should start child process with correct parameters', () => {
+      lspClient = new LspClient(testConfig);
+      // @ts-ignore - accessing private method for testing
+      lspClient.startProcess();
       
-      await expect(lspClient.start()).rejects.toThrow('LSP server is already running');
-    });
-
-    test('should start LSP server process successfully', async () => {
-      const spawnMock = require('child_process').spawn as jest.MockedFunction<typeof import('child_process').spawn>;
-      
-      // Mock successful process creation
-      mockChildProcess.stdout = { on: jest.fn() } as any;
-      mockChildProcess.stdin = { write: jest.fn() } as any;
-      mockChildProcess.stderr = { on: jest.fn() } as any;
-      mockChildProcess.on = jest.fn();
-      mockChildProcess.kill = jest.fn();
-      
-      spawnMock.mockReturnValue(mockChildProcess);
-      
-      // Mock initializeServer to resolve
-      (lspClient as any).initializeServer = jest.fn().mockResolvedValue(undefined);
-      
-      await expect(lspClient.start()).resolves.toBeUndefined();
-      
-      expect(spawnMock).toHaveBeenCalledWith(
-        'typescript-language-server',
+      expect(require('child_process').spawn).toHaveBeenCalledWith(
+        'test-server',
         ['--stdio'],
         expect.objectContaining({
-          cwd: '/test',
-          stdio: ['pipe', 'pipe', 'pipe']
+          cwd: '/test'
         })
       );
       
-      expect((lspClient as any).isInitialized).toBe(true);
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Starting LSP client'));
     });
 
-    test('should handle spawn error and cleanup', async () => {
-      const spawnMock = require('child_process').spawn as jest.MockedFunction<typeof import('child_process').spawn>;
-      spawnMock.mockImplementation(() => {
-        throw new Error('Spawn failed');
-      });
+    it('should handle missing serverArgs', () => {
+      const configWithoutArgs = {
+        serverCommand: 'test-server',
+        workingDirectory: '/test'
+      };
       
-      const cleanupSpy = jest.spyOn(lspClient as any, 'cleanup');
+      lspClient = new LspClient(configWithoutArgs);
+      // @ts-ignore
+      lspClient.startProcess();
       
-      await expect(lspClient.start()).rejects.toThrow('Failed to start LSP server');
-      expect(cleanupSpy).toHaveBeenCalled();
-    });
-
-    test('should handle missing stdout/stdin', async () => {
-      mockChildProcess.stdout = null;
-      mockChildProcess.stdin = null;
-      
-      await expect(lspClient.start()).rejects.toThrow('Failed to get stdout or stdin from LSP server');
-    });
-
-    test('should setup event listeners correctly', async () => {
-      // Mock initializeServer
-      (lspClient as any).initializeServer = jest.fn().mockResolvedValue(undefined);
-      
-      await lspClient.start();
-      
-      // Check that stdout data listener was set up
-      expect(mockChildProcess.stdout.on).toHaveBeenCalledWith('data', expect.any(Function));
-      
-      // Check that stderr data listener was set up
-      expect(mockChildProcess.stderr.on).toHaveBeenCalledWith('data', expect.any(Function));
-      
-      // Check that exit listener was set up
-      expect(mockChildProcess.on).toHaveBeenCalledWith('exit', expect.any(Function));
-    });
-  });
-
-  describe('initializeServer', () => {
-    test('should send initialize and initialized requests', async () => {
-      const sendRequestMock = jest.fn().mockResolvedValue({});
-      const sendNotificationMock = jest.fn().mockResolvedValue(undefined);
-      
-      (lspClient as any).sendRequest = sendRequestMock;
-      (lspClient as any).sendNotification = sendNotificationMock;
-      
-      await (lspClient as any).initializeServer();
-      
-      expect(sendRequestMock).toHaveBeenCalledWith('initialize', expect.objectContaining({
-        processId: expect.any(Number),
-        rootUri: 'file:///test',
-        capabilities: expect.objectContaining({
-          textDocument: expect.objectContaining({
-            completion: {},
-            hover: {},
-            definition: {},
-            references: {},
-            rename: {}
-          }),
-          workspace: expect.objectContaining({
-            symbol: {},
-            workspaceFolders: expect.objectContaining({
-              supported: true,
-              changeNotifications: true
-            })
-          })
-        }),
-        workspaceFolders: expect.arrayContaining([
-          expect.objectContaining({
-            uri: 'file:///test',
-            name: 'aibo'
-          })
-        ])
-      }), true);
-      
-      expect(sendNotificationMock).toHaveBeenCalledWith('initialized', {}, true);
+      expect(require('child_process').spawn).toHaveBeenCalledWith(
+        'test-server',
+        [],
+        expect.objectContaining({
+          cwd: '/test'
+        })
+      );
     });
   });
 
   describe('handleMessage', () => {
-    test('should handle response messages with callbacks', () => {
-      const callback = jest.fn();
-      (lspClient as any).pendingRequests.set(1, callback);
+    it('should handle response message correctly', async () => {
+      lspClient = new LspClient(testConfig);
       
-      const message = {
-        jsonrpc: '2.0' as const,
+      const mockResolve = jest.fn();
+      const mockReject = jest.fn();
+      // @ts-ignore
+      lspClient.responsePromises.set(1, { resolve: mockResolve, reject: mockReject });
+      
+      const testMessage = {
+        jsonrpc: "2.0",
         id: 1,
-        result: { capabilities: {} }
+        result: {"capabilities": {}}
       };
       
-      (lspClient as any).handleMessage(message);
+      // @ts-ignore
+      await lspClient.handleMessage(testMessage);
       
-      expect(callback).toHaveBeenCalledWith({ capabilities: {} });
-      expect((lspClient as any).pendingRequests.size).toBe(0);
+      expect(mockResolve).toHaveBeenCalledWith({"capabilities": {}});
     });
 
-    test('should handle error responses', () => {
-      const callback = jest.fn();
-      (lspClient as any).pendingRequests.set(1, callback);
+    it('should handle error response message correctly', async () => {
+      lspClient = new LspClient(testConfig);
       
-      const message = {
-        jsonrpc: '2.0' as const,
-        id: 1,
-        error: { code: -32601, message: 'Method not found' }
+      const mockResolve = jest.fn();
+      const mockReject = jest.fn();
+      // @ts-ignore
+      lspClient.responsePromises.set(2, { resolve: mockResolve, reject: mockReject });
+      
+      const testMessage = {
+        jsonrpc: "2.0",
+        id: 2,
+        error: {"code": -32601, "message": "Method not found"}
       };
       
-      (lspClient as any).handleMessage(message);
+      // @ts-ignore
+      await lspClient.handleMessage(testMessage);
       
-      expect(callback).toHaveBeenCalledWith({ error: { code: -32601, message: 'Method not found' } });
+      expect(mockReject).toHaveBeenCalledWith({"code": -32601, "message": "Method not found"});
     });
 
-    test('should emit notification events', () => {
-      const onSpy = jest.spyOn(lspClient, 'on');
-      const emitSpy = jest.spyOn(lspClient, 'emit');
+    it('should handle notification message correctly', async () => {
+      lspClient = new LspClient(testConfig);
       
-      const message = {
-        jsonrpc: '2.0' as const,
-        method: 'textDocument/publishDiagnostics',
-        params: { uri: 'file:///test/file.ts', diagnostics: [] }
+      const testMessage = {
+        jsonrpc: "2.0",
+        method: "textDocument/publishDiagnostics",
+        params: {
+          uri: "file:///test/file.ts",
+          diagnostics: [
+            {
+              range: {
+                start: { line: 0, character: 0 },
+                end: { line: 0, character: 5 }
+              },
+              severity: 1,
+              message: "Error"
+            }
+          ]
+        }
       };
       
-      (lspClient as any).handleMessage(message);
+      // @ts-ignore
+      await lspClient.handleMessage(testMessage);
       
-      expect(emitSpy).toHaveBeenCalledWith('notification', {
-        method: 'textDocument/publishDiagnostics',
-        params: { uri: 'file:///test/file.ts', diagnostics: [] }
-      });
+      // @ts-ignore
+      expect(lspClient.documentDiagnostics.get("file:///test/file.ts")).toEqual([
+        {
+          range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 5 }
+          },
+          severity: 1,
+          message: "Error"
+        }
+      ]);
     });
   });
 
   describe('sendRequest', () => {
-    test('should throw error if server is not initialized', async () => {
-      await expect(lspClient.sendRequest('textDocument/definition', {})).rejects.toThrow('LSP server is not initialized');
+    it('should reject if process not started', async () => {
+      lspClient = new LspClient(testConfig);
+      
+      await expect(
+        // @ts-ignore
+        lspClient.sendRequest('test/method')
+      ).rejects.toThrow('LSP process not started');
     });
 
-    test('should send request with proper JSON-RPC format', async () => {
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).sendMessage = jest.fn();
-      (lspClient as any).stdin = { write: jest.fn() } as any;
+    it('should send request with proper LSP header format', async () => {
+      lspClient = new LspClient(testConfig);
+      // @ts-ignore
+      lspClient.childProcess = mockChildProcess;
       
-      const promise = lspClient.sendRequest('textDocument/definition', { 
-        textDocument: { uri: 'file:///test/file.ts' },
-        position: { line: 1, character: 2 }
-      });
+      const promise = // @ts-ignore
+        lspClient.sendRequest('test/method', { param: 'value' });
       
-      // Resolve the pending request
-      const callback = (lspClient as any).pendingRequests.get(1);
-      callback('definition-result');
-      
-      await expect(promise).resolves.toBe('definition-result');
-      
-      expect((lspClient as any).sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-        jsonrpc: '2.0',
+      const expectedRequest = {
+        jsonrpc: "2.0",
         id: 1,
-        method: 'textDocument/definition',
-        params: {
-          textDocument: { uri: 'file:///test/file.ts' },
-          position: { line: 1, character: 2 }
-        }
-      }));
+        method: "test/method", 
+        params: { param: "value" }
+      };
+      
+      const content = JSON.stringify(expectedRequest);
+      const header = `Content-Length: ${Buffer.byteLength(content)}\r\n\r\n`;
+      
+      expect(mockChildProcess.stdin.write).toHaveBeenCalledWith(header + content);
+      
+      // Resolve the promise to avoid hanging
+      // @ts-ignore
+      const responsePromise = lspClient.responsePromises.get(1);
+      if (responsePromise) {
+        responsePromise.resolve({ result: 'success' });
+      }
+      
+      await expect(promise).resolves.toEqual({ result: 'success' });
     });
 
-    test('should handle request timeout', async () => {
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).config.timeout = 1; // Very short timeout
-      (lspClient as any).stdin = { write: jest.fn() } as any;
+    it('should handle request timeout', async () => {
+      lspClient = new LspClient({
+        ...testConfig,
+        timeout: 10 // very short timeout for testing
+      });
+      // @ts-ignore
+      lspClient.childProcess = mockChildProcess;
       
-      await expect(lspClient.sendRequest('textDocument/definition', {})).rejects.toThrow('LSP request timeout');
-    });
-
-    test('should handle request errors', async () => {
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).stdin = { write: jest.fn() } as any;
-      
-      const promise = lspClient.sendRequest('textDocument/definition', {});
-      
-      // Reject the pending request with error
-      const callback = (lspClient as any).pendingRequests.get(1);
-      callback({ error: { code: -32601, message: 'Method not found' } });
-      
-      await expect(promise).rejects.toThrow('LSP request failed: Method not found (code: -32601)');
+      await expect(
+        // @ts-ignore
+        lspClient.sendRequest('test/method')
+      ).rejects.toThrow('Timeout waiting for response');
     });
   });
 
   describe('sendNotification', () => {
-    test('should throw error if server is not initialized', () => {
-      expect(() => {
-        lspClient.sendNotification('textDocument/didOpen', {});
-      }).toThrow('LSP server is not initialized');
+    it('should log error if process not started', () => {
+      lspClient = new LspClient(testConfig);
+      
+      // @ts-ignore
+      lspClient.sendNotification('test/notification');
+      
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('LSP process not started'));
     });
 
-    test('should send notification with proper JSON-RPC format', () => {
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).sendMessage = jest.fn();
+    it('should send notification with proper format', () => {
+      lspClient = new LspClient(testConfig);
+      // @ts-ignore
+      lspClient.childProcess = mockChildProcess;
       
-      lspClient.sendNotification('textDocument/didOpen', {
-        textDocument: { uri: 'file:///test/file.ts', languageId: 'typescript', version: 1, text: 'console.log("test");' }
-      });
+      // @ts-ignore
+      lspClient.sendNotification('test/notification', { param: 'value' });
       
-      expect((lspClient as any).sendMessage).toHaveBeenCalledWith({
-        jsonrpc: '2.0',
-        method: 'textDocument/didOpen',
+      const expectedNotification = {
+        jsonrpc: "2.0",
+        method: "test/notification",
+        params: { param: "value" }
+      };
+      
+      const content = JSON.stringify(expectedNotification);
+      const header = `Content-Length: ${Buffer.byteLength(content)}\r\n\r\n`;
+      
+      expect(mockChildProcess.stdin.write).toHaveBeenCalledWith(header + content);
+    });
+  });
+
+  describe('handleMessage', () => {
+    it('should handle response messages', async () => {
+      lspClient = new LspClient(testConfig);
+      
+      const mockResolve = jest.fn();
+      const mockReject = jest.fn();
+      // @ts-ignore
+      lspClient.responsePromises.set(1, { resolve: mockResolve, reject: mockReject });
+      
+      const responseMessage = {
+        jsonrpc: "2.0",
+        id: 1,
+        result: { data: "success" }
+      };
+      
+      // @ts-ignore
+      await lspClient.handleMessage(responseMessage);
+      
+      expect(mockResolve).toHaveBeenCalledWith({ data: "success" });
+      expect(lspClient.responsePromises.size).toBe(0);
+    });
+
+    it('should handle error response messages', async () => {
+      lspClient = new LspClient(testConfig);
+      
+      const mockResolve = jest.fn();
+      const mockReject = jest.fn();
+      // @ts-ignore
+      lspClient.responsePromises.set(1, { resolve: mockResolve, reject: mockReject });
+      
+      const errorMessage = {
+        jsonrpc: "2.0", 
+        id: 1,
+        error: { code: -32601, message: "Method not found" }
+      };
+      
+      // @ts-ignore
+      await lspClient.handleMessage(errorMessage);
+      
+      expect(mockReject).toHaveBeenCalledWith({ code: -32601, message: "Method not found" });
+      expect(lspClient.responsePromises.size).toBe(0);
+    });
+
+    it('should handle publishDiagnostics notification', async () => {
+      lspClient = new LspClient(testConfig);
+      
+      const diagnosticsMessage = {
+        jsonrpc: "2.0",
+        method: "textDocument/publishDiagnostics",
         params: {
-          textDocument: { uri: 'file:///test/file.ts', languageId: 'typescript', version: 1, text: 'console.log("test");' }
+          uri: "file:///test.ts",
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+              severity: 1,
+              message: "Error message"
+            }
+          ]
         }
+      };
+      
+      // @ts-ignore
+      await lspClient.handleMessage(diagnosticsMessage);
+      
+      // @ts-ignore
+      expect(lspClient.documentDiagnostics.get("file:///test.ts")).toEqual([
+        {
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+          severity: 1,
+          message: "Error message"
+        }
+      ]);
+    });
+  });
+
+  describe('handleData', () => {
+    it('should handle incomplete message', () => {
+      lspClient = new LspClient(testConfig);
+      
+      const incompleteData = Buffer.from('Content-Length: 100\r\n\r\n{"jsonrpc":"2.0"');
+      // @ts-ignore
+      lspClient.handleData(incompleteData);
+      
+      expect(lspClient.buffer).toBe('Content-Length: 100\r\n\r\n{"jsonrpc":"2.0"');
+    });
+
+    it('should handle buffer size limit', () => {
+      lspClient = new LspClient({
+        ...testConfig,
+        maxBufferSize: 10
       });
+      
+      const largeData = Buffer.from('a'.repeat(20));
+      // @ts-ignore
+      lspClient.handleData(largeData);
+      
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Buffer size exceeded'));
+      expect(lspClient.buffer.length).toBeLessThanOrEqual(10);
     });
   });
 
-  describe('sendMessage', () => {
-    test('should throw error if stdin is not available', () => {
-      (lspClient as any).stdin = null;
-      
-      expect(() => {
-        (lspClient as any).sendMessage({ jsonrpc: '2.0', method: 'test' });
-      }).toThrow('LSP server stdin is not available');
-    });
-
-    test('should send properly formatted LSP message', () => {
-      const mockStdinWrite = jest.fn();
-      (lspClient as any).stdin = { write: mockStdinWrite } as any;
-      
-      const message = { jsonrpc: '2.0', method: 'test', params: { key: 'value' } };
-      (lspClient as any).sendMessage(message);
-      
-      const expectedContent = JSON.stringify(message);
-      const expectedHeader = `Content-Length: ${Buffer.byteLength(expectedContent, 'utf8')}\r\n\r\n`;
-      const expectedFullMessage = expectedHeader + expectedContent;
-      
-      expect(mockStdinWrite).toHaveBeenCalledWith(expectedFullMessage);
-    });
-  });
-
-  describe('LSP method wrappers', () => {
-    beforeEach(() => {
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).sendRequest = jest.fn().mockResolvedValue('mock-result');
-    });
-
-    test('should call getDefinition with correct parameters', async () => {
-      const result = await lspClient.getDefinition('/test/file.ts', { line: 5, character: 10 });
-      
-      expect(result).toBe('mock-result');
-      expect((lspClient as any).sendRequest).toHaveBeenCalledWith('textDocument/definition', {
-        textDocument: { uri: 'file:///test/file.ts' },
-        position: { line: 5, character: 10 }
-      });
-    });
-
-    test('should call findReferences with correct parameters', async () => {
-      const result = await lspClient.findReferences('/test/file.ts', { line: 5, character: 10 });
-      
-      expect(result).toBe('mock-result');
-      expect((lspClient as any).sendRequest).toHaveBeenCalledWith('textDocument/references', {
-        textDocument: { uri: 'file:///test/file.ts' },
-        position: { line: 5, character: 10 }
-      });
-    });
-
-    test('should call getHover with correct parameters', async () => {
-      const result = await lspClient.getHover('/test/file.ts', { line: 5, character: 10 });
-      
-      expect(result).toBe('mock-result');
-      expect((lspClient as any).sendRequest).toHaveBeenCalledWith('textDocument/hover', {
-        textDocument: { uri: 'file:///test/file.ts' },
-        position: { line: 5, character: 10 }
-      });
-    });
-
-    test('should call getWorkspaceSymbols with correct parameters', async () => {
-      const result = await lspClient.getWorkspaceSymbols('MyClass');
-      
-      expect(result).toBe('mock-result');
-      expect((lspClient as any).sendRequest).toHaveBeenCalledWith('workspace/symbol', { query: 'MyClass' });
-    });
-  });
-
-  describe('shutdown', () => {
-    test('should send shutdown and exit notifications', async () => {
-      (lspClient as any).childProcess = {} as ChildProcess;
-      (lspClient as any).sendRequest = jest.fn().mockResolvedValue(undefined);
-      (lspClient as any).sendNotification = jest.fn();
-      (lspClient as any).cleanup = jest.fn();
-      
-      await lspClient.shutdown();
-      
-      expect((lspClient as any).sendRequest).toHaveBeenCalledWith('shutdown', null);
-      expect((lspClient as any).sendNotification).toHaveBeenCalledWith('exit', null);
-      expect((lspClient as any).cleanup).toHaveBeenCalled();
-    });
-
-    test('should handle shutdown errors gracefully', async () => {
-      (lspClient as any).childProcess = {} as ChildProcess;
-      (lspClient as any).sendRequest = jest.fn().mockRejectedValue(new Error('Shutdown failed'));
-      (lspClient as any).sendNotification = jest.fn();
-      (lspClient as any).cleanup = jest.fn();
-      
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
-      await lspClient.shutdown();
-      
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error during LSP shutdown:', expect.any(Error));
-      expect((lspClient as any).cleanup).toHaveBeenCalled();
-      
-      consoleErrorSpy.mockRestore();
-    });
-
-    test('should cleanup even if childProcess is null', async () => {
-      (lspClient as any).childProcess = null;
-      (lspClient as any).cleanup = jest.fn();
-      
-      await lspClient.shutdown();
-      
-      expect((lspClient as any).cleanup).toHaveBeenCalled();
-    });
-  });
-
-  describe('cleanup', () => {
-    test('should reset all internal state and kill child process', () => {
-      const mockKill = jest.fn();
-      (lspClient as any).childProcess = { kill: mockKill } as any;
-      (lspClient as any).isInitialized = true;
-      (lspClient as any).pendingRequests.set(1, jest.fn());
-      (lspClient as any).messageParser = { clear: jest.fn() } as any;
-      
-      (lspClient as any).cleanup();
-      
-      expect((lspClient as any).isInitialized).toBe(false);
-      expect((lspClient as any).pendingRequests.size).toBe(0);
-      expect((lspClient as any).messageParser.clear).toHaveBeenCalled();
-      expect(mockKill).toHaveBeenCalled();
-      
-      expect((lspClient as any).childProcess).toBeNull();
-      expect((lspClient as any).stdout).toBeNull();
-      expect((lspClient as any).stdin).toBeNull();
-    });
-
-    test('should handle null childProcess gracefully', () => {
-      (lspClient as any).childProcess = null;
-      (lspClient as any).messageParser = { clear: jest.fn() } as any;
-      
-      expect(() => {
-        (lspClient as any).cleanup();
-      }).not.toThrow();
-    });
-  });
-
-  describe('process exit handling', () => {
-    test('should cleanup on process exit', async () => {
-      // Mock initializeServer to resolve
-      (lspClient as any).initializeServer = jest.fn().mockResolvedValue(undefined);
-      
-      await lspClient.start();
-      
-      // Get the exit callback
-      const exitCallback = (mockChildProcess.on as jest.Mock).mock.calls.find(call => call[0] === 'exit')?.[1];
-      
-      if (exitCallback) {
-        const cleanupSpy = jest.spyOn(lspClient as any, 'cleanup');
-        const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-        
-        exitCallback(0, null);
-        
-        expect(cleanupSpy).toHaveBeenCalled();
-        expect(consoleLogSpy).toHaveBeenCalledWith('LSP Server exited with code 0, signal null');
-        
-        consoleLogSpy.mockRestore();
-      }
-    });
+  // Clean up after all tests
+  afterAll(() => {
+    console.log = originalConsoleLog;
+    console.error = originalConsoleError;
   });
 });

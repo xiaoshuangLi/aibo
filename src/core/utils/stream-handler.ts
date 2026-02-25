@@ -249,6 +249,10 @@ export async function handleAIContent(msg: any, state: StreamState, session: any
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
   const currentContent = String(msg.content);
+
+  if (state.fullResponse && !currentContent.startsWith(state.fullResponse)) {
+    state.fullResponse = '';
+  }
   // 只显示新增的内容，避免重复
   if (currentContent.length <= state.fullResponse.length) return;
   

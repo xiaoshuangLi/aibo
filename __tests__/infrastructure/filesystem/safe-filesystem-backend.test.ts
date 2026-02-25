@@ -79,6 +79,12 @@ describe('SafeFilesystemBackend', () => {
       const deepPath = path.join(testRoot, 'level1', 'level2', 'level3', 'level4', 'file.txt');
       expect(safeBackend.isWithinDepthLimit(deepPath)).toBe(false);
     });
+
+    test('should return false for paths outside project root (starting with ..)', () => {
+      // This simulates a path that would be outside the project root
+      const outsidePath = path.join(testRoot, '..', 'other-project', 'file.txt');
+      expect(safeBackend.isWithinDepthLimit(outsidePath)).toBe(false);
+    });
   });
 
   describe('shouldIgnoreDirectory', () => {
@@ -114,6 +120,11 @@ describe('SafeFilesystemBackend', () => {
       await expect(safeBackend.read('nonexistent.bin')).rejects.toThrow('blocked file extension');
     });
 
+    test('should throw error for files exceeding depth limit', async () => {
+      const deepPath = 'level1/level2/level3/level4/file.txt';
+      await expect(safeBackend.read(deepPath)).rejects.toThrow('exceeds maximum depth limit');
+    });
+
     test('should handle permission errors gracefully', async () => {
       // Create a temporary file and then make it unreadable
       const tempFile = path.join(testRoot, 'temp-permission-test.txt');
@@ -146,6 +157,34 @@ describe('SafeFilesystemBackend', () => {
     test('should throw error for directories outside project root', async () => {
       await expect(safeBackend.lsInfo('/tmp')).rejects.toThrow('Access denied');
     });
+
+    test('should throw error for directories exceeding depth limit', async () => {
+      const deepPath = 'level1/level2/level3/level4';
+      await expect(safeBackend.lsInfo(deepPath)).rejects.toThrow('exceeds maximum depth limit');
+    });
+
+    test('should handle permission errors gracefully', async () => {
+      // Create a temporary directory and then make it unreadable
+      const tempDir = path.join(testRoot, 'temp-permission-test-dir');
+      await fs.promises.mkdir(tempDir, { recursive: true });
+      
+      // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
+      try {
+        await fs.promises.chmod(tempDir, 0o000);
+        await expect(safeBackend.lsInfo('temp-permission-test-dir')).rejects.toThrow('Permission denied');
+      } catch (error) {
+        // Skip this test if we can't change permissions
+        console.log('Skipping lsInfo permission test due to system restrictions');
+      } finally {
+        // Clean up - first restore permissions, then remove
+        try {
+          await fs.promises.chmod(tempDir, 0o755);
+          await fs.promises.rmdir(tempDir);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+    });
   });
 
   describe('grepRaw', () => {
@@ -158,6 +197,32 @@ describe('SafeFilesystemBackend', () => {
       const result = await safeBackend.grepRaw('pattern', path.join(testRoot, 'node_modules'));
       expect(Array.isArray(result)).toBe(true);
     });
+
+    test('should handle permission errors gracefully', async () => {
+      // Create a temporary directory and then make it unreadable
+      const tempDir = path.join(testRoot, 'temp-grep-permission-test-dir');
+      await fs.promises.mkdir(tempDir, { recursive: true });
+      await fs.promises.writeFile(path.join(tempDir, 'test.txt'), 'test content for grep');
+      
+      // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
+      try {
+        await fs.promises.chmod(tempDir, 0o000);
+        const result = await safeBackend.grepRaw('test', 'temp-grep-permission-test-dir');
+        expect(typeof result).toBe('string');
+        expect(result).toContain('Permission denied');
+      } catch (error) {
+        // Skip this test if we can't change permissions
+        console.log('Skipping grepRaw permission test due to system restrictions');
+      } finally {
+        // Clean up - first restore permissions, then remove
+        try {
+          await fs.promises.chmod(tempDir, 0o755);
+          await fs.promises.rm(tempDir, { recursive: true });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+    });
   });
 
   describe('globInfo', () => {
@@ -168,6 +233,35 @@ describe('SafeFilesystemBackend', () => {
 
     test('should throw error for search paths outside project root', async () => {
       await expect(safeBackend.globInfo('**/*.ts', '/tmp')).rejects.toThrow('Access denied');
+    });
+
+    test('should throw error for search paths exceeding depth limit', async () => {
+      const deepPath = 'level1/level2/level3/level4';
+      await expect(safeBackend.globInfo('*.txt', deepPath)).rejects.toThrow('exceeds maximum depth limit');
+    });
+
+    test('should handle permission errors gracefully', async () => {
+      // Create a temporary directory and then make it unreadable
+      const tempDir = path.join(testRoot, 'temp-glob-permission-test-dir');
+      await fs.promises.mkdir(tempDir, { recursive: true });
+      await fs.promises.writeFile(path.join(tempDir, 'test.txt'), 'test content');
+      
+      // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
+      try {
+        await fs.promises.chmod(tempDir, 0o000);
+        await expect(safeBackend.globInfo('*.txt', 'temp-glob-permission-test-dir')).rejects.toThrow('Permission denied');
+      } catch (error) {
+        // Skip this test if we can't change permissions
+        console.log('Skipping globInfo permission test due to system restrictions');
+      } finally {
+        // Clean up - first restore permissions, then remove
+        try {
+          await fs.promises.chmod(tempDir, 0o755);
+          await fs.promises.rm(tempDir, { recursive: true });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     });
   });
 });

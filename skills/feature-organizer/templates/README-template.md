@@ -80,13 +80,13 @@ project-root/
 - **测试类型**：包括单元测试、集成测试和端到端测试
 
 ### 提交规范
-- 使用 `template/git-commit-template.md` 中定义的提交模板
+- 使用 `skills/feature-organizer/templates/git-commit-template.md` 中定义的提交模板
 - 遵循 conventional commits 规范
 - 提交信息必须包含相关功能描述和变更说明
 
 ### 文档更新
 - 每个新功能必须在 `features/` 目录创建对应的文档
-- 使用 `templates/feature-template.md` 作为文档模板
+- 使用 `skills/feature-organizer/templates/feature-template.md` 作为文档模板
 - 更新此 README.md 文件以反映新功能
 
 ## 8. 贡献指南 (Contributing)

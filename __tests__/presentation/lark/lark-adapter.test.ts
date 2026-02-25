@@ -79,7 +79,8 @@ describe('LarkAdapter', () => {
     config.lark = {
       appId: 'test-app-id',
       appSecret: 'test-app-secret',
-      receiveId: 'test-receive-id'
+      receiveId: 'test-receive-id',
+      interactiveTemplateId: 'test-template-id'
     };
   });
 
@@ -144,6 +145,71 @@ describe('LarkAdapter', () => {
       
       // Access private property for testing (not ideal but necessary)
       expect((adapter as any).userMessageCallback).toBe(callback);
+    });
+  });
+
+  describe('setAbortSignal', () => {
+    it('should handle AbortSignal input and create controller', () => {
+      const adapter = new LarkAdapter();
+      const controller = new AbortController();
+      const signal = controller.signal;
+      
+      adapter.setAbortSignal(signal);
+      
+      expect((adapter as any).abortController).toBeDefined();
+    });
+
+    it('should abort existing controller when setting new signal', () => {
+      const adapter = new LarkAdapter();
+      const oldController = new AbortController();
+      (adapter as any).abortController = oldController;
+      
+      const newController = new AbortController();
+      adapter.setAbortSignal(newController.signal);
+      
+      expect(oldController.signal.aborted).toBe(true);
+      expect((adapter as any).abortController).toBeDefined();
+    });
+  });
+
+  describe('destroy', () => {
+    it('should destroy adapter and abort controller', () => {
+      const adapter = new LarkAdapter();
+      const controller = new AbortController();
+      (adapter as any).abortController = controller;
+      
+      adapter.destroy();
+      
+      expect((adapter as any).isDestroyed).toBe(true);
+      expect(controller.signal.aborted).toBe(true);
+      expect(mockConsoleLog).toHaveBeenCalledWith('🔌 飞书适配器已销毁');
+    });
+
+    it('should not destroy twice', () => {
+      const adapter = new LarkAdapter();
+      adapter.destroy();
+      
+      // Reset mock to check if destroy is called again
+      mockConsoleLog.mockClear();
+      adapter.destroy();
+      
+      // Should not log again
+      expect(mockConsoleLog).not.toHaveBeenCalledWith('🔌 飞书适配器已销毁');
+    });
+
+    it('should handle error during destruction', () => {
+      const adapter = new LarkAdapter();
+      // Mock console.log to throw an error
+      console.log = jest.fn().mockImplementationOnce(() => {
+        throw new Error('Destruction error');
+      });
+      
+      adapter.destroy();
+      
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 销毁飞书适配器时出错:', expect.any(Error));
+      
+      // Restore original console.log
+      console.log = mockConsoleLog;
     });
   });
 
@@ -295,14 +361,22 @@ describe('LarkAdapter', () => {
 
     it('should handle send errors and send fallback message', async () => {
       const adapter = new LarkAdapter();
+      const mockError = new Error('Send failed') as any;
+      mockError.response = {
+        data: 'error response data',
+        config: {
+          data: 'request config data'
+        }
+      };
       mockLarkClient.im.message.create
-        .mockRejectedValueOnce(new Error('Send failed'))
+        .mockRejectedValueOnce(mockError)
         .mockResolvedValueOnce({ code: 0 });
       
       await (adapter as any).sendMessage('Sensitive content');
       
       expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(2);
-      expect(mockConsoleError).toHaveBeenCalledWith('❌ 发送消息失败:', expect.any(Error));
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 发送消息失败:', 'error response data');
+      expect(mockConsoleError).toHaveBeenCalledWith('📃 发送消息内容:', 'request config data');
       
       const secondCallContent = mockLarkClient.im.message.create.mock.calls[1][0].data.content;
       const secondParsedContent = JSON.parse(secondCallContent);

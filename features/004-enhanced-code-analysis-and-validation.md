@@ -1,6 +1,6 @@
-# 004 - 增强的代码分析与验证框架
+# 增强的代码分析与验证框架
 
-## 规格说明
+## 📋 Specification (规格说明)
 
 ### 🎯 用户故事
 作为开发者，我想要增强的代码分析能力（包括依赖分析、智能上下文选择和准确的token计数）以及系统化的功能组织验证框架，以便我能更高效地理解复杂代码库、减少60-90%的token使用量，并确保我的代码更改经过适当的测试、文档化和验证后才能提交到生产环境。
@@ -21,7 +21,7 @@
 
 ---
 
-## 技术设计
+## 🏗️ Technical Design (技术设计)
 
 ### 📐 架构概述
 增强的代码分析框架建立在现有的混合代码读取器基础上，通过三个核心组件协同工作：
@@ -89,7 +89,7 @@ class TokenCounter {
 
 ---
 
-## 实施计划
+## 📝 Implementation Plan (实施计划)
 
 ### 📋 任务分解
 1. **实现依赖分析器** - 解析导入/导出语句，提取依赖关系 (预计: 4小时)
@@ -119,7 +119,7 @@ class TokenCounter {
 
 ---
 
-## Usage Guide
+## 🚀 Usage Guide (使用指南)
 
 ### 📦 Installation/Configuration
 无需额外安装，所有功能已集成到现有AIBO系统中。确保项目根目录存在`.env`文件配置必要的API密钥。
@@ -150,7 +150,7 @@ const result = await hybrid_code_reader({
 
 ---
 
-## Impact Analysis
+## 📊 Impact Analysis (影响分析)
 
 ### 文件变更影响
 - **新增文件**: 
@@ -165,7 +165,7 @@ const result = await hybrid_code_reader({
   - `src/infrastructure/code-analysis/ast-abstract-layer.ts`
   - `src/tools/hybrid-code-reader.ts`
   - `skills/feature-organizer/SKILL.md`
-  - `templates/feature-template.md`
+  - `skills/feature-organizer/templates/feature-template.md`
   - 多个测试文件和配置文件
 
 ### 向后兼容性

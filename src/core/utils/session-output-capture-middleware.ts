@@ -11,7 +11,6 @@
 import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent/session';
-import { styled } from '@/presentation/styling/output-styler';
 import { config } from '@/core/config/config';
 
 /**
@@ -91,9 +90,7 @@ export function createSessionOutputCaptureMiddleware(
             }
           }
           const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
-          const truncateLimit = config.output.verbose ? 300 : 150;
-          const truncatedPreview = styled.truncated(preview, truncateLimit);
-          session.logToolResult(toolName, success, truncatedPreview);
+          session.logToolResult(toolName, success, preview);
         }
         
         return result;
@@ -104,9 +101,7 @@ export function createSessionOutputCaptureMiddleware(
           const errorMessage = (error as Error).message || 'Unknown error';
           const preview: string = String(errorMessage);
           const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
-          const truncateLimit = config.output.verbose ? 300 : 150;
-          const truncatedPreview = styled.truncated(preview, truncateLimit);
-          session.logToolResult(toolName, success, truncatedPreview);
+          session.logToolResult(toolName, success, preview);
         }
         
         if (session && typeof session.logErrorMessage === 'function') {

@@ -1,6 +1,6 @@
-# 005 - 增强的会话监控与强制并行执行框架
+# 增强的会话监控与强制并行执行框架
 
-## 规格说明
+## 📋 Specification (规格说明)
 
 ### 🎯 用户故事
 作为开发者，我想要一个全面的会话监控系统和强制并行执行框架，以便能够实时跟踪智能体的所有活动，并确保复杂任务被自动分解为并行子任务以最大化性能。
@@ -18,7 +18,7 @@
 - **性能要求**: 中间件不应显著影响执行性能，日志记录应高效
 - **安全要求**: 遵循现有的安全最佳实践，不引入新的安全漏洞
 
-## 技术设计
+## 🏗️ Technical Design (技术设计)
 
 ### 架构概述
 该功能在现有AIBO架构的基础上增加了两个主要组件：
@@ -77,7 +77,7 @@ class Session {
 #### 废弃的 API
 - 无废弃的API
 
-## 实施计划
+## 📝 Implementation Plan (实施计划)
 
 ### 任务分解
 1. 实现SessionOutputCaptureMiddleware - 创建中间件类和工厂函数 (预计: 4小时)
@@ -105,7 +105,7 @@ class Session {
 - 性能指标: 中间件增加的执行时间 < 5%
 - 用户体验: 开发者能够清晰看到智能体的所有活动，复杂任务自动并行执行
 
-## Usage Guide
+## 🚀 Usage Guide (使用指南)
 
 ### Installation/Configuration
 该功能已集成到AIBO核心系统中，无需额外安装。确保使用最新版本的AIBO。
@@ -156,7 +156,7 @@ const agent = createAgent({
   - beforeAgent和afterAgent钩子目前被注释掉，将在未来版本中启用
   - 思考过程日志功能已在注释中预留，但尚未实现
 
-## Impact Analysis
+## 📊 Impact Analysis (影响分析)
 
 ### Performance Impact
 - 内存使用: 轻微增加 + 2-5MB（由于中间件状态管理）

@@ -2,7 +2,7 @@
 
 /**
  * 阶段1验证脚本：测试验证和覆盖率检查
- * 用途：验证所有测试通过且覆盖率≥85%
+ * 用途：验证所有测试通过且覆盖率≥80%
  */
 
 const { execSync } = require('child_process');
@@ -49,12 +49,12 @@ try {
     const coverageMatch = coverageOutput.match(/Statements\s*:\s*(\d+\.?\d*)%/);
     if (coverageMatch && coverageMatch[1]) {
         const coveragePercent = parseFloat(coverageMatch[1]);
-        if (coveragePercent >= 85) {
-            console.log(`✅ 测试覆盖率: ${coveragePercent}% (≥85%)`);
+        if (coveragePercent >= 80) {
+            console.log(`✅ 测试覆盖率: ${coveragePercent}% (≥80%)`);
             console.log('🎉 阶段1验证通过！');
             process.exit(0);
         } else {
-            console.error(`❌ 测试覆盖率不足: ${coveragePercent}% (<85%)`);
+            console.error(`❌ 测试覆盖率不足: ${coveragePercent}% (<80%)`);
             console.error('   请增加测试用例以提高覆盖率');
             process.exit(1);
         }

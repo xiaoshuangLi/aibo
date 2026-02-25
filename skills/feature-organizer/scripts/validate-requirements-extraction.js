@@ -29,14 +29,12 @@ try {
     console.log(modifiedFiles);
 }
 
-// 检查是否生成了需求提取文件
 const requirementsFile = 'temp_requirements.txt';
 if (!fs.existsSync(requirementsFile)) {
     console.error('❌ 错误：未找到需求提取文件 (temp_requirements.txt)');
     console.error('   请确保在阶段2中生成了需求提取文件');
     process.exit(1);
 }
-
 console.log(`✅ 找到需求提取文件: ${requirementsFile}`);
 const requirementsContent = fs.readFileSync(requirementsFile, 'utf8');
 console.log('📄 需求内容预览：');

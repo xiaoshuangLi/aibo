@@ -128,6 +128,7 @@ const envSchema = z.object({
   AIBO_LARK_APP_ID: z.string().optional(),
   AIBO_LARK_APP_SECRET: z.string().optional(),
   AIBO_LARK_RECEIVE_ID: z.string().optional(),
+  AIBO_LARK_INTERACTIVE_TEMPLATE_ID: z.string().optional(),
   // Interaction Mode Configuration (for backward compatibility and default resolution)
   AIBO_INTERACTION: z.enum(['console', 'lark']).default('console'),
 });
@@ -193,6 +194,7 @@ export const config = {
     appId: env.AIBO_LARK_APP_ID,
     appSecret: env.AIBO_LARK_APP_SECRET,
     receiveId: env.AIBO_LARK_RECEIVE_ID,
+    interactiveTemplateId: env.AIBO_LARK_INTERACTIVE_TEMPLATE_ID,
   },
   advanced: {
     maxConcurrentSubtasks: env.AIBO_MAX_CONCURRENT_SUBTASKS,

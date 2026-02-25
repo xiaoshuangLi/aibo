@@ -137,18 +137,24 @@ export class FilesystemCheckpointer extends BaseCheckpointSaver {
     let remainingLimit = limit;
     
     try {
-      const files = fs.readdirSync(this.sessionsDir);
-      const checkpointFiles = files.filter(file => file.endsWith('.json'));
+      // 读取 sessionsDir 下的所有子目录（每个子目录代表一个 thread_id）
+      const threadDirs = fs.readdirSync(this.sessionsDir, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name);
       
-      // 按文件名排序（假设文件名包含时间戳或ID）
-      const sortedFiles = checkpointFiles.sort((a, b) => b.localeCompare(a));
+      // 按线程ID排序（倒序）
+      const sortedThreadDirs = threadDirs.sort((a, b) => b.localeCompare(a));
       
-      for (const file of sortedFiles) {
+      for (const threadId of sortedThreadDirs) {
         if (remainingLimit !== undefined && remainingLimit <= 0) {
           break;
         }
         
-        const threadId = file.replace('.json', '');
+        // 检查是否匹配 config 中的 thread_id 过滤条件
+        if (config.configurable?.thread_id && config.configurable.thread_id !== threadId) {
+          continue;
+        }
+        
         const fileConfig = { configurable: { thread_id: threadId } };
         const tuple = await this.getTuple(fileConfig);
         

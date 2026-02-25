@@ -117,9 +117,12 @@ export class TerminalAdapter extends DefaultIOChannel {
   private handleToolResult(data: any): void {
     if (!data?.name) return;
     
-    // 如果已经有 preview 字段，直接使用（向后兼容）
+    // 如果已经有 preview 字段，进行截断处理（向后兼容）
     if (data.preview !== undefined) {
-      console.log(styled.toolResult(data.name, data.success, data.preview));
+      const verbose = config.output.verbose;
+      const truncateLimit = verbose ? 300 : 150;
+      const truncatedPreview = styled.truncated(data.preview, truncateLimit);
+      console.log(styled.toolResult(data.name, data.success, truncatedPreview));
       return;
     }
     

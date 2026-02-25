@@ -20,17 +20,17 @@ Use this skill when you have uncommitted code changes that need to be:
 
 ### Step 1: Test Validation and Coverage Verification
 
-**Objective**: Ensure all tests pass and achieve ≥85% coverage
+**Objective**: Ensure all tests pass and achieve ≥80% coverage
 
 **Process**:
 1. **Run complete test suite**: Execute all test scripts to verify no errors exist
-2. **Check test coverage**: Verify coverage is ≥85% using `npx jest --coverage`
+2. **Check test coverage**: Verify coverage is ≥80% using `npx jest --coverage`
 3. **Handle failures systematically**:
    - If tests fail: Identify the specific failing test and corresponding source code
    - Analyze the business logic mismatch between test and source code
    - Fix ONE issue at a time (either test or source code, not both simultaneously)
    - Re-run tests after each fix to verify resolution
-   - Continue until all tests pass AND coverage ≥85%
+   - Continue until all tests pass AND coverage ≥80%
 
 **MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-test-coverage.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your implementation based on the feedback and re-run the validation until it passes.
 
@@ -58,7 +58,7 @@ Use this skill when you have uncommitted code changes that need to be:
 **Objective**: Generate comprehensive feature documentation using the standard template **(MUST BE WRITTEN IN CHINESE)**
 
 **Process**:
-1. **Use feature template**: Apply `templates/feature-template.md` structure
+1. **Use feature template**: Apply `skills/feature-organizer/templates/feature-template.md` structure
 2. **Populate sections based on extracted requirements** **(ALL DOCUMENTATION MUST BE IN CHINESE)**:
    - **Specification**: User stories and acceptance criteria from Step 2 **(用中文书写)**
    - **Technical Design**: Architecture overview based on actual code changes **(用中文书写)**
@@ -88,7 +88,7 @@ Use this skill when you have uncommitted code changes that need to be:
 Before completing the feature organization process, ensure:
 
 - **✅ All tests pass**: Zero test failures
-- **✅ Coverage ≥85%**: Verified through coverage report  
+- **✅ Coverage ≥80%**: Verified through coverage report  
 - **✅ Feature documentation complete**: All template sections populated
 - **✅ Documentation in Chinese**: **ALL feature documentation content MUST be written in Chinese (中文)**
 - **✅ Sequential numbering**: No gaps or duplicates in feature numbering

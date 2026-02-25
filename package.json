@@ -15,6 +15,7 @@
     "dev": "ts-node -r tsconfig-paths/register src/main.ts",
     "dev:console": "AIBO_INTERACTION=console ts-node -r tsconfig-paths/register src/main.ts",
     "dev:lark": "AIBO_INTERACTION=lark ts-node -r tsconfig-paths/register src/main.ts",
+    "dev:lark-inspect": "AIBO_INTERACTION=lark node --inspect -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "prepare": "husky"
   },
   "author": "xiaoshuang",

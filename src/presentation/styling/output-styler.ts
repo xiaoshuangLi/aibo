@@ -41,10 +41,11 @@ export interface OutputStyler {
   
   /**
    * 系统消息样式
-   * @param text - 要显示的系统文本
+   * @param title - 要显示的系统标题
+   * @param text - 要显示的系统文本（可选）
    * @returns 格式化的系统消息字符串
    */
-  system: (text: string) => string;
+  system: (title: string, text?: string) => string;
   
   /**
    * 错误消息样式
@@ -175,10 +176,11 @@ export const styled: OutputStyler = {
   
   /**
    * 系统消息样式
-   * @param text - 要显示的系统文本
+   * @param title - 要显示的系统标题
+   * @param text - 要显示的系统文本（可选）
    * @returns 格式化的系统消息字符串
    */
-  system: (text: string) => `\n⚙️  ${text}`,
+  system: (title: string, text?: string) => `\n⚙️  ${[title, text].filter(Boolean).join('\n')}`,
   
   /**
    * 错误消息样式

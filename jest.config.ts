@@ -8,7 +8,7 @@ export default {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {
-    '^.+\\.(j|t)s$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+    '^.+\\.(j|t)s$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
   },
   // 添加 transformIgnorePatterns 以处理 ESM 模块
   // 转换所有 node_modules 中的文件（除了明确排除的）

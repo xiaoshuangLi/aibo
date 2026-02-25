@@ -15,6 +15,16 @@ jest.mock('@/core/utils/interactive-logic', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('test-thread-id')
 }));
 
+// Mock SessionManager to return the mocked thread ID
+jest.mock('@/infrastructure/session/session-manager', () => {
+  const mockSessionManager = {
+    getInstance: jest.fn().mockReturnValue({
+      getCurrentSessionId: jest.fn().mockReturnValue('test-thread-id')
+    })
+  };
+  return { SessionManager: mockSessionManager };
+});
+
 // Mock config
 jest.mock('@/core/config/config', () => ({
   config: {
@@ -24,16 +34,7 @@ jest.mock('@/core/config/config', () => ({
   }
 }));
 
-// Mock styled
-jest.mock('@/presentation/styling/output-styler', () => ({
-  styled: {
-    toolCall: jest.fn().mockReturnValue('tool call output'),
-    toolResult: jest.fn().mockReturnValue('tool result output'),
-    system: jest.fn().mockReturnValue('system message'),
-    error: jest.fn().mockReturnValue('error message'),
-    assistant: jest.fn().mockReturnValue('assistant message')
-  }
-}));
+
 
 // Helper to reset SessionManager singleton
 const resetSessionManager = () => {
@@ -59,7 +60,7 @@ describe('Session', () => {
 
     test('should use default values when options not provided', () => {
       const defaultSession = new Session(ioChannel);
-      expect(defaultSession.threadId).toMatch(/^session-\d+$/);
+      expect(defaultSession.threadId).toBe('test-thread-id');
     });
   });
 
@@ -166,40 +167,40 @@ describe('Session', () => {
   });
 
   describe('logToolCall', () => {
-    test('should log tool call using styled output', () => {
+    test('should emit toolCall event with structured data', () => {
       session.logToolCall('testTool', { param: 'value' });
-      expect(require('@/presentation/styling/output-styler').styled.toolCall)
-        .toHaveBeenCalledWith('testTool', { param: 'value' });
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'rawText',
-          data: { text: 'tool call output' }
+          type: 'toolCall',
+          data: { name: 'testTool', args: { param: 'value' } }
         })
       );
     });
   });
 
   describe('logToolResult', () => {
-    test('should log tool result using styled output', () => {
+    test('should emit toolResult event with structured data', () => {
       session.logToolResult('testTool', true, 'preview');
-      expect(require('@/presentation/styling/output-styler').styled.toolResult)
-        .toHaveBeenCalledWith('testTool', true, 'preview');
-      expect(ioChannel.emit).toHaveBeenCalledTimes(2); // tool result + newline
+      expect(ioChannel.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'toolResult',
+          data: { name: 'testTool', success: true, preview: 'preview' }
+        })
+      );
     });
   });
 
   describe('logThinkingProcess', () => {
-    test('should log thinking process with proper formatting', () => {
-      session.logThinkingProcess([
+    test('should emit thinkingProcess event with structured data', () => {
+      const steps = [
         { content: 'step 1' },
         { content: 'step 2', status: 'completed' }
-      ]);
+      ];
+      session.logThinkingProcess(steps);
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'rawText',
-          data: { 
-            text: expect.stringContaining('🧠 AI 深度思考过程:') 
-          }
+          type: 'thinkingProcess',
+          data: { steps }
         })
       );
     });
@@ -208,11 +209,10 @@ describe('Session', () => {
   describe('streamAIContent', () => {
     test('should handle initial empty content', async () => {
       await session.streamAIContent('', true, false);
-      expect(require('@/presentation/styling/output-styler').styled.assistant)
-        .toHaveBeenCalledWith("...");
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'rawText'
+          type: 'streamStart',
+          data: { placeholder: "..." }
         })
       );
     });
@@ -247,28 +247,24 @@ describe('Session', () => {
   });
 
   describe('logSystemMessage', () => {
-    test('should log system message using styled output', () => {
+    test('should emit systemMessage event with structured data', () => {
       session.logSystemMessage('System message');
-      expect(require('@/presentation/styling/output-styler').styled.system)
-        .toHaveBeenCalledWith('System message');
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'rawText',
-          data: { text: 'system message' }
+          type: 'systemMessage',
+          data: { message: 'System message' }
         })
       );
     });
   });
 
   describe('logErrorMessage', () => {
-    test('should log error message using styled output', () => {
+    test('should emit errorMessage event with structured data', () => {
       session.logErrorMessage('Error message');
-      expect(require('@/presentation/styling/output-styler').styled.error)
-        .toHaveBeenCalledWith('Error message');
       expect(ioChannel.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'rawText',
-          data: { text: 'error message' }
+          type: 'errorMessage',
+          data: { message: 'Error message' }
         })
       );
     });

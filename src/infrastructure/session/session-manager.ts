@@ -250,9 +250,6 @@ export class SessionManager {
     if (!fs.existsSync(this.sessionsDir)) {
       fs.mkdirSync(this.sessionsDir, { recursive: true });
     }
-    
-    // 初始化时加载当前会话ID
-    this.loadCurrentSession();
   }
 
   /**
@@ -971,12 +968,16 @@ export class SessionManager {
     const content = kwargs.content || '';
     const toolCalls = kwargs.tool_calls || [];
     
-    // 如果有write_subagent_todos工具调用，这通常表示子任务代理
-    const writeTodosTool = toolCalls.find((tc: any) => tc.name === 'write_subagent_todos');
+    // 如果有write-subagent-todos或write_subagent_todos工具调用，这通常表示子任务代理
+    const writeTodosTool = toolCalls.find((tc: any) => 
+      tc.name === 'write-subagent-todos' || tc.name === 'write_subagent_todos'
+    );
     if (writeTodosTool) {
+      // 标准化工具名称为连字符格式
+      const standardizedToolName = writeTodosTool.name.replace(/_/g, '-');
       return {
         agent_type: 'task_manager',
-        agent_name: 'write-subagent-todos',
+        agent_name: standardizedToolName,
         agent_description: 'Advanced task management with specialized subagent type assignments',
         call_id: `subagent-${messageIndex}`,
         sequence_number: messageIndex,

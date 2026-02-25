@@ -1,4 +1,4 @@
-import { FilesystemBackend, GrepMatch } from 'deepagents';
+import { FilesystemBackend, GrepMatch, WriteResult } from 'deepagents';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -335,6 +335,80 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       
       // Re-throw other errors
       throw error;
+    }
+  }
+
+  /**
+   * Enhanced write operation that supports overwriting existing files
+   * 
+   * Unlike the parent class which only allows creating new files, this implementation
+   * allows writing to both new and existing files within the project root.
+   * 
+   * @param filePath - Absolute or relative file path to write to
+   * @param content - Content to write to the file
+   * @returns WriteResult with success or error information
+   */
+  async write(filePath: string, content: string): Promise<WriteResult> {
+    try {
+      // Security checks
+      if (!this.isWithinProjectRoot(filePath)) {
+        return {
+          error: `Access denied: ${filePath} is outside project root`
+        };
+      }
+
+      if (!this.isWithinDepthLimit(filePath)) {
+        return {
+          error: `Access denied: ${filePath} exceeds maximum depth limit of ${this.maxDepth}`
+        };
+      }
+
+      if (!this.isAllowedExtension(filePath)) {
+        return {
+          error: `Access denied: ${filePath} has a blocked file extension`
+        };
+      }
+
+      // Use the parent class's resolvePath method indirectly by calling super.read
+      // which will trigger the path resolution, or use our own path resolution
+      const resolvedPath = path.resolve(this.projectRoot, filePath);
+      
+      // Ensure the resolved path is still within project root (double-check)
+      if (!this.isWithinProjectRoot(resolvedPath)) {
+        return {
+          error: `Access denied: resolved path ${resolvedPath} is outside project root`
+        };
+      }
+
+      // Ensure parent directory exists using fs.promises
+      await fs.promises.mkdir(path.dirname(resolvedPath), { recursive: true });
+
+      // Write the file using fs.promises (this will create new files or overwrite existing ones)
+      await fs.promises.writeFile(resolvedPath, content, 'utf-8');
+
+      return { 
+        path: filePath, 
+        filesUpdate: null 
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        // Handle permission errors gracefully
+        if (error.message.includes('EACCES') || error.message.includes('EPERM')) {
+          return {
+            error: `Permission denied: Cannot write to ${filePath}`
+          };
+        }
+        
+        // Handle other errors
+        return {
+          error: `Error writing file '${filePath}': ${error.message}`
+        };
+      }
+      
+      // Fallback for non-Error exceptions
+      return {
+        error: `Unknown error writing file '${filePath}'`
+      };
     }
   }
 }

@@ -1,6 +1,6 @@
-# 009 - 飞书集成支持
+# 飞书集成支持
 
-## 📋 规格说明
+## 📋 Specification (规格说明)
 
 **一句话描述**: 实现飞书(Lark)平台集成支持，允许用户在飞书环境中与AIBO AI助手进行交互，并支持多种交互模式的灵活切换
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 🏗️ 技术设计
+## 🏗️ Technical Design (技术设计)
 
 ### 📐 架构概览
 采用适配器模式实现多平台支持：
@@ -45,7 +45,7 @@
 
 ---
 
-## 📝 实施计划
+## 📝 Implementation Plan (实施计划)
 
 ### ✅ 已完成任务
 ✅ **核心架构实现**
@@ -75,7 +75,7 @@
 
 ---
 
-## 🚀 使用指南
+## 🚀 Usage Guide (使用指南)
 
 ### 📦 快速开始
 1. **获取飞书应用凭证**:
@@ -115,7 +115,7 @@
 
 ---
 
-## Impact Analysis
+## 📊 Impact Analysis (影响分析)
 
 ### Positive Impacts
 - ✅ **Expanded Use Cases**: Supports enterprise collaboration platform integration

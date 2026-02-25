@@ -11,7 +11,13 @@ jest.mock('@/presentation/styling/output-styler', () => ({
     system: jest.fn().mockReturnValue('system message'),
     error: jest.fn().mockReturnValue('error message'),
     hint: jest.fn().mockReturnValue('hint message'),
-    assistant: jest.fn().mockReturnValue('assistant message')
+    assistant: jest.fn().mockReturnValue('assistant message'),
+    truncated: jest.fn().mockImplementation((text, limit) => {
+      if (text.length <= limit) {
+        return text;
+      }
+      return text.substring(0, limit) + '... [已截断]';
+    })
   }
 }));
 

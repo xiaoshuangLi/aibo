@@ -6,6 +6,14 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
+const merge = (main: string = '') => (...args: string[]): string => {
+  const filter = (item: string) => item && !main.includes(item);
+  const more = args.filter(Boolean).filter(filter);
+  const list = main ? [main, ...more] : more;
+
+  return list.join('\n');
+};
+
 /**
  * ⚠️ 安全警告：此工具可执行任意系统命令，仅限以下场景使用：
  *   - 本地开发/测试环境
@@ -87,6 +95,8 @@ function handleBashExecutionError(error: unknown, command: string, timeout: numb
       success: false,
       error: "Command timeout",
       message: `Command exceeded ${timeout}ms timeout limit`,
+      stdout: err.stdout || "",
+      stderr: err.stderr || "",
       command: command,
     }, null, 2);
   }
@@ -104,25 +114,35 @@ function handleBashExecutionError(error: unknown, command: string, timeout: numb
 
 export const executeBashTool = tool(
   async ({ command, timeout = 30000, cwd }) => {
+    const records: string[] = [];
+
+    const promise = execAsync(command, {
+      timeout: timeout,
+      cwd: cwd || process.cwd(),
+      // 限制环境变量（基础防护）
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+      },
+    });
+
     try {
-      // 执行命令
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: timeout,
-        cwd: cwd || process.cwd(),
-        // 限制环境变量（基础防护）
-        env: {
-          PATH: process.env.PATH,
-          HOME: process.env.HOME,
-        },
+      promise.child.stdout?.on?.('data', (data) => {
+        records.push(data);
       });
+
+      // 执行命令
+      const { stdout, stderr } = await promise;
 
       return JSON.stringify({
         success: true,
-        stdout: stdout || "(empty)",
+        stdout: merge(stdout)(...records) || "(empty)",
         stderr: stderr || "(empty)",
         command: command,
       }, null, 2);
-    } catch (error) {
+    } catch (error: any) {
+      error.stdout = merge(error.stdout)(...records);
+
       return handleBashExecutionError(error, command, timeout);
     }
   },

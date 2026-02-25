@@ -1,0 +1,724 @@
+/**
+ * 工具结果格式化器 - 专门处理不同工具类型的结果格式化
+ * 
+ * 中文名称：工具结果格式化器
+ * 
+ * 为 LARK 飞书适配器提供工具结果的智能格式化功能，
+ * 根据不同的工具类型提供针对性的展示格式。
+ * 
+ * @module tool-result-formatter
+ */
+
+/**
+ * 零宽空格字符 - 用于避免 Lark 将缩进行识别为代码块
+ */
+const ZERO_WIDTH_SPACE = '\u200B';
+
+/**
+ * 在文本行首添加零宽空格以避免 Lark 代码块识别
+ * @param text - 要处理的文本
+ * @returns 处理后的文本
+ */
+export const escapeLarkIndentation = (text: string): string => {
+  if (!text) return text;
+  
+  // 按行分割文本
+  const lines = text.split('\n');
+  
+  // 为每一行添加零宽空格（如果该行以空白字符开头）
+  const processedLines = lines.map(line => {
+    // 如果行以空白字符（空格、制表符等）开头，则在开头添加零宽空格
+    if (line.length > 0 && /^\s/.test(line)) {
+      return ZERO_WIDTH_SPACE + line;
+    }
+    return line;
+  });
+  
+  return processedLines.join('\n');
+};
+
+/**
+ * 转义 Lark 特殊字符
+ * @param text - 要转义的文本
+ * @returns 转义后的文本
+ */
+export const escapeLarkSpecialChars = (text: string): string => {
+  if (!text) return text;
+  
+  // Lark 支持完整的 Markdown，但某些特殊字符可能需要处理
+  // 目前主要处理可能导致解析问题的字符
+  let escapedText = text;
+  
+  // 转义反斜杠（如果后面跟着特殊字符）
+  escapedText = escapedText.replace(/\\/g, '\\\\');
+  
+  // 转义可能导致问题的其他字符（根据实际需要添加）
+  // 这里保持相对保守，因为 Lark 的 Markdown 解析相对宽松
+  
+  return escapedText;
+};
+
+/**
+ * 完整的 Lark 文本处理函数
+ * @param text - 要处理的原始文本
+ * @param options - 处理选项
+ * @returns 处理后的文本
+ */
+export const processLarkText = (
+  text: string, 
+  options: { 
+    escapeIndentation?: boolean; 
+    escapeSpecialChars?: boolean;
+    preserveCodeBlocks?: boolean;
+  } = {}
+): string => {
+  if (!text) return text;
+  
+  const { 
+    escapeIndentation = true, 
+    escapeSpecialChars = true,
+    preserveCodeBlocks = false 
+  } = options;
+  
+  let processedText = text;
+  
+  // 如果需要保留代码块，则先提取代码块内容
+  if (preserveCodeBlocks) {
+    // 提取并临时替换代码块
+    const codeBlockRegex = /(```[\s\S]*?```)/g;
+    const tempCodeBlocks: string[] = [];
+    processedText = processedText.replace(codeBlockRegex, (match) => {
+      tempCodeBlocks.push(match);
+      return `__CODE_BLOCK_${tempCodeBlocks.length - 1}__`;
+    });
+    
+    // 应用零宽空格转义（避免缩进被识别为代码块）
+    if (escapeIndentation) {
+      processedText = escapeLarkIndentation(processedText);
+    }
+    
+    // 应用特殊字符转义
+    if (escapeSpecialChars) {
+      processedText = escapeLarkSpecialChars(processedText);
+    }
+    
+    // 恢复代码块
+    processedText = processedText.replace(/__CODE_BLOCK_(\d+)__/g, (_, index) => {
+      return tempCodeBlocks[parseInt(index)] || '';
+    });
+  } else {
+    // 不保留代码块的情况
+    if (escapeIndentation) {
+      processedText = escapeLarkIndentation(processedText);
+    }
+    
+    if (escapeSpecialChars) {
+      processedText = escapeLarkSpecialChars(processedText);
+    }
+  }
+  
+  return processedText;
+};
+
+/**
+ * 检测内容是否为JSON格式
+ * @param content - 要检测的内容
+ * @returns 是否为JSON格式
+ */
+export const isJsonContent = (content: string): boolean => {
+  const trimmed = content.trim();
+  return (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+         (trimmed.startsWith('[') && trimmed.endsWith(']'));
+};
+
+/**
+ * 检测内容是否包含错误信息
+ * @param content - 要检测的内容
+ * @returns 是否包含错误信息
+ */
+export const isErrorContent = (content: string): boolean => {
+  return content.toLowerCase().includes('error') || 
+         content.toLowerCase().includes('exception') ||
+         content.includes('stderr') ||
+         content.startsWith('Error:') ||
+         content.startsWith('Exception:');
+};
+
+/**
+ * 检测工具类型
+ * @param name - 工具名称
+ * @returns 工具类型分类
+ */
+export const getToolType = (name: string): string => {
+  // 文件系统工具
+  if (['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'].includes(name)) {
+    return 'filesystem';
+  }
+  // 系统/Bash工具
+  if (['execute_bash', 'sleep', 'echo'].includes(name)) {
+    return 'system';
+  }
+  // GitHub工具
+  if (name === 'WebFetchFromGithub') {
+    return 'github';
+  }
+  // 代码分析工具
+  if (name === 'hybrid_code_reader') {
+    return 'code_analysis';
+  }
+  // 知识库工具
+  if (['add_knowledge', 'get_knowledge_summaries', 'search_knowledge'].includes(name)) {
+    return 'knowledge';
+  }
+  // 搜索工具
+  if (name === 'TencentWsaSearch') {
+    return 'search';
+  }
+  // 任务管理工具
+  if (name === 'write-subagent-todos' || name === 'write_todos' || name === 'task') {
+    return 'task_management';
+  }
+  // Composio工具
+  if (name.startsWith('COMPOSIO_')) {
+    return 'composio';
+  }
+  // 其他工具
+  return 'other';
+};
+
+/**
+ * 截断文本辅助函数（内部使用）
+ */
+const truncateText = (text: string, limit: number): string => {
+  if (text.length <= limit) {
+    return text;
+  }
+  return text.substring(0, limit) + '...';
+};
+
+/**
+ * 格式化文件系统工具结果
+ */
+const formatFilesystemResult = (name: string, result: any): string => {
+  // 处理字符串输入（非JSON格式）- 这是关键！
+  if (typeof result === 'string') {
+    const trimmed = result.trim();
+    if (!trimmed) return '无内容';
+    
+    switch (name) {
+      case 'ls':
+        if (trimmed.startsWith('/')) {
+          // ls 工具返回的文本按换行符分割成文件列表
+          const lsLines = trimmed.split('\n').filter(line => line.trim());
+          if (lsLines.length === 0) return '目录为空';
+          return lsLines.map(item => `- \`${item}\``).join('\n');
+        }
+
+        return `\`\`\`\n${trimmed}\n\`\`\``;
+      
+      case 'grep':
+        // grep 工具返回的文本按换行符分割成匹配项
+        const grepLines = trimmed.split('\n').filter(line => line.trim());
+        if (grepLines.length === 0) return '未找到匹配内容';
+        return `找到 ${grepLines.length} 个匹配项:\n\n` + 
+               grepLines.slice(0, 10).map(match => `- ${match}`).join('\n') + 
+               (grepLines.length > 10 ? `\n... 还有 ${grepLines.length - 10} 个匹配项` : '');
+      
+      case 'read_file':
+        // read_file 工具的字符串结果直接显示
+        const lines = trimmed.split('\n').length;
+        const chars = trimmed.length;
+        const preview = trimmed.length > 500 
+          ? truncateText(trimmed, 500) 
+          : trimmed;
+        return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`\n${preview}\n\`\`\``;
+      
+      case 'glob':
+        // glob 工具返回的文本按换行符分割成文件路径
+        const globLines = trimmed.split('\n').filter(line => line.trim());
+        if (globLines.length === 0) return '未找到匹配文件';
+        return `找到 ${globLines.length} 个匹配文件:\n\n` + 
+               globLines.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
+               (globLines.length > 10 ? `\n... 还有 ${globLines.length - 10} 个文件` : '');
+      
+      default:
+        // 其他文件系统工具的字符串结果
+        if (trimmed.includes('\n')) {
+          return `\`\`\`\n${trimmed}\n\`\`\``;
+        } else {
+          return `\`${trimmed}\``;
+        }
+    }
+  }
+  
+  // 处理对象/数组输入（JSON格式）
+  switch (name) {
+    case 'ls':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '目录为空';
+        return result.map(item => `- ${item}`).join('\n');
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'read_file':
+      if (result.content !== undefined) {
+        const lines = result.content.split('\n').length;
+        const chars = result.content.length;
+        const preview = result.content.length > 500 
+          ? truncateText(result.content, 500) 
+          : result.content;
+        return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`\n${preview}\n\`\`\``;
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'write_file':
+    case 'edit_file':
+      if (result.success) {
+        return `✅ 文件操作成功\n**路径:** \`${result.file_path || result.filePath}\``;
+      }
+      return `❌ 文件操作失败\n\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'glob':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '未找到匹配文件';
+        return `找到 ${result.length} 个匹配文件:\n\n` + 
+               result.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
+               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个文件` : '');
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'grep':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '未找到匹配内容';
+        return `找到 ${result.length} 个匹配项:\n\n` + 
+               result.slice(0, 10).map(match => `- ${match}`).join('\n') + 
+               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个匹配项` : '');
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    default:
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  }
+};
+
+/**
+ * 格式化系统/Bash工具结果
+ */
+const formatSystemResult = (name: string, result: any): string => {
+  // 处理字符串输入（非JSON格式）
+  if (typeof result === 'string') {
+    const trimmed = result.trim();
+    if (!trimmed) return '无输出';
+    
+    switch (name) {
+      case 'execute_bash':
+        // execute_bash 的字符串结果直接显示为标准输出
+        return `**标准输出:**\n\`\`\`\n${trimmed}\n\`\`\``;
+      
+      case 'echo':
+        return `💬 回显内容:\n\`\`\`\n${trimmed}\n\`\`\``;
+      
+      case 'sleep':
+        // sleep 工具通常返回数字或简单消息
+        return `⏱️ 延迟执行完成\n**时长:** ${trimmed} 毫秒`;
+      
+      default:
+        if (trimmed.includes('\n')) {
+          return `\`\`\`\n${trimmed}\n\`\`\``;
+        } else {
+          return `\`${trimmed}\``;
+        }
+    }
+  }
+  
+  // 处理对象/数组输入（JSON格式）
+  switch (name) {
+    case 'execute_bash':
+      let output = '';
+      if (result.stdout && result.stdout !== '(empty)') {
+        output += `**标准输出:**\n\`\`\`\n${result.stdout}\n\`\`\`\n\n`;
+      }
+      if (result.stderr && result.stderr !== '(empty)') {
+        output += `**标准错误:**\n\`\`\`\n${result.stderr}\n\`\`\``;
+      }
+      if (result.command) {
+        output = `**命令:** \`${result.command}\`\n\n` + output;
+      }
+      return output || '无输出';
+    
+    case 'sleep':
+      return `⏱️ 延迟执行完成\n**时长:** ${result.duration || result.message?.match(/(\d+)/)?.[1] || '未知'} 毫秒`;
+    
+    case 'echo':
+      return `💬 回显内容:\n\`\`\`\n${result.echoed || result.message}\n\`\`\``;
+    
+    default:
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  }
+};
+
+/**
+ * 格式化GitHub工具结果
+ */
+const formatGithubResult = (result: any): string => {
+  if (result.content) {
+    const lines = result.content.split('\n').length;
+    return `🐙 **GitHub文件内容**\n\n**行数:** ${lines}\n\n\`\`\`\n${truncateText(result.content, 800)}\n\`\`\``;
+  }
+  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化代码分析工具结果
+ */
+const formatCodeAnalysisResult = (result: any): string => {
+  if (result.implementation || result.definition || result.references) {
+    const content = result.implementation || result.definition || result.references;
+    return `🔍 **代码分析结果**\n\n\`\`\`typescript\n${truncateText(content, 1000)}\n\`\`\``;
+  }
+  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化知识库工具结果
+ */
+const formatKnowledgeResult = (name: string, result: any): string => {
+  switch (name) {
+    case 'add_knowledge':
+      if (result.success) {
+        return `📚 **知识添加成功**\n\n**标题:** ${result.title || '未知'}\n**关键词:** ${result.keywords?.join(', ') || '无'}`;
+      }
+      return `❌ 知识添加失败\n\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'get_knowledge_summaries':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '知识库为空';
+        return `📚 **知识库摘要 (${result.length} 项)**\n\n` + 
+               result.map((item: any) => `- **${item.title}** [${item.keywords?.join(', ') || '无关键词'}]`).join('\n');
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'search_knowledge':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '未找到匹配的知识';
+        return `📚 **知识搜索结果 (${result.length} 项)**\n\n` + 
+               result.map((item: any) => 
+                 `- **${item.title}**\n  ${truncateText(item.content || '', 100)}`
+               ).join('\n\n');
+      }
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    default:
+      return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  }
+};
+
+/**
+ * 格式化搜索工具结果
+ */
+const formatSearchResult = (result: any): string => {
+  // 获取搜索结果数组（兼容不同结构）
+  let searchResults: any[] = [];
+  
+  if (result.success !== undefined && result.results && Array.isArray(result.results)) {
+    // TencentWsaSearch 工具的标准响应结构
+    searchResults = result.results;
+  } else if (Array.isArray(result)) {
+    // 直接传入数组的情况
+    searchResults = result;
+  } else if (result.Pages && Array.isArray(result.Pages)) {
+    // 直接的 Pages 结构
+    searchResults = result.Pages;
+  }
+  
+  if (searchResults.length === 0) {
+    return '未找到搜索结果';
+  }
+  
+  // 处理每个搜索结果项
+  const formattedResults = searchResults.slice(0, 5).map((item: any, index: number) => {
+    // 如果 item 是字符串，尝试解析为 JSON 对象
+    let parsedItem: any = item;
+    if (typeof item === 'string') {
+      try {
+        parsedItem = JSON.parse(item);
+      } catch (e) {
+        // 如果解析失败，创建一个包含原始字符串的对象
+        parsedItem = { title: '解析失败', url: '#', description: item };
+      }
+    }
+    
+    // 如果 parsedItem 不是对象，创建默认对象
+    if (!parsedItem || typeof parsedItem !== 'object') {
+      parsedItem = { title: '无标题', url: '#', description: '无描述' };
+    }
+    
+    // 提取标题（兼容多种字段名和大小写）
+    const title = parsedItem.Title || parsedItem.title || parsedItem.Name || parsedItem.name || '无标题';
+    
+    // 提取URL（兼容多种字段名和大小写）
+    const url = parsedItem.Url || parsedItem.url || parsedItem.Link || parsedItem.link || parsedItem.href || '#';
+    
+    // 提取描述/摘要（兼容多种字段名和大小写）
+    const snippet = parsedItem.Description || parsedItem.description || 
+                   parsedItem.Abstract || parsedItem.abstract || 
+                   parsedItem.Snippet || parsedItem.snippet || 
+                   parsedItem.Content || parsedItem.content || 
+                   parsedItem.passage || '无描述';
+    
+    // 创建安全的链接文本
+    const safeUrl = url && url !== '#' ? url : '#';
+    const linkText = safeUrl !== '#' ? `[${title}](${safeUrl})` : title;
+    
+    return `${index + 1}. **${linkText}**\n   ${truncateText(String(snippet), 150)}`;
+  });
+  
+  return `🌐 **网络搜索结果 (${searchResults.length} 项)**\n\n` + formattedResults.join('\n\n');
+};
+
+/**
+ * 格式化任务管理工具结果
+ */
+const formatTaskManagementResult = (name: string, result: any): string => {
+  if (name === 'write-subagent-todos' || name === 'write_todos') {
+    if (result.todos && Array.isArray(result.todos)) {
+      const completed = result.todos.filter((t: any) => t.status === 'completed').length;
+      const total = result.todos.length;
+      return `📋 **待办事项更新 (${completed}/${total} 完成)**\n\n` + 
+             result.todos.map((todo: any) => 
+               `- [${todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '🔄' : ' '}] ${todo.content}`
+             ).join('\n');
+    }
+  }
+  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化Composio工具结果
+ */
+const formatComposioResult = (name: string, result: any): string => {
+  // Composio工具通常返回结构化的数据，尝试提取有用信息
+  if (result.data) {
+    if (Array.isArray(result.data)) {
+      if (result.data.length === 0) return '无数据返回';
+      // 尝试识别常见的Composio响应格式
+      if (result.data[0].subject || result.data[0].title) {
+        return `🔌 **${name.replace('COMPOSIO_', '')} 结果 (${result.data.length} 项)**\n\n` + 
+               result.data.slice(0, 3).map((item: any, index: number) => 
+                 `- **${item.subject || item.title || '无标题'}**\n  ${truncateText(item.body || item.content || item.snippet || '无内容', 150)}`
+               ).join('\n\n');
+      }
+    } else if (typeof result.data === 'object') {
+      return `🔌 **${name.replace('COMPOSIO_', '')} 结果**\n\n\`\`\`json\n${truncateText(JSON.stringify(result.data, null, 2), 800)}\n\`\`\``;
+    }
+  }
+  return `\`\`\`\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化结构化结果对象（用于改进的预览函数）
+ * @param result - 结构化结果对象
+ * @param verbose - 是否详细模式
+ * @returns 格式化的Markdown字符串
+ */
+export const formatStructuredResult = (result: any, verbose: boolean): string => {
+  if (Array.isArray(result)) {
+    if (result.length === 0) {
+      return "**空数组** ⚪";
+    }
+    
+    // 尝试识别数组类型
+    if (result.every(item => typeof item === 'string')) {
+      // 字符串数组
+      if (verbose || result.length <= 5) {
+        return `📋 **结果列表 (${result.length} 项)**:\n\n` + 
+               result.map((item, index) => `${index + 1}. \`${item}\``).join('\n');
+      } else {
+        const preview = result.slice(0, 3);
+        const remaining = result.length - 3;
+        return `📋 **结果列表 (${result.length} 项)**:\n\n` + 
+               preview.map((item, index) => `${index + 1}. \`${item}\``).join('\n') +
+               `\n... 还有 ${remaining} 项`;
+      }
+    } else {
+      // 对象数组
+      if (verbose || result.length <= 2) {
+        return `📊 **数据表格 (${result.length} 行)**:\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+      } else {
+        const preview = result.slice(0, 2);
+        const remaining = result.length - 2;
+        return `📊 **数据表格 (${result.length} 行)**:\n\n\`\`\`json\n${JSON.stringify(preview, null, 2)}\n\`\`\`\n... 还有 ${remaining} 行`;
+      }
+    }
+  }
+  
+  // 处理错误对象
+  if (result.error || result.message) {
+    const errorMsg = result.error || result.message;
+    if (typeof errorMsg === 'string' && errorMsg.includes('\n')) {
+      return `❌ **执行错误**:\n\`\`\`\n${errorMsg}\n\`\`\``;
+    } else {
+      return `❌ **${errorMsg}**`;
+    }
+  }
+  
+  // 处理成功的结果对象
+  if (result.success !== undefined) {
+    if (result.success) {
+      let successMsg = "✅ **操作成功**";
+      if (result.data) {
+        if (typeof result.data === 'string') {
+          successMsg += `\n\n📄 **数据**: \`${result.data}\``;
+        } else {
+          successMsg += `\n\n\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``;
+        }
+      }
+      return successMsg;
+    } else {
+      return `❌ **操作失败**${result.error ? `\n\n${result.error}` : ''}`;
+    }
+  }
+  
+  // 通用对象处理
+  const keys = Object.keys(result);
+  if (keys.length === 0) {
+    return "**空对象** ⚪";
+  }
+  
+  // 如果对象包含 stdout/stderr，按命令输出处理
+  if (result.stdout || result.stderr) {
+    let outputParts: string[] = [];
+    if (result.stdout) {
+      const stdout = String(result.stdout).trim();
+      if (stdout && stdout !== "(empty)") {
+        if (stdout.includes('\n') || stdout.length > 100) {
+          outputParts.push(`📋 **标准输出**:\n\`\`\`\n${stdout}\n\`\`\``);
+        } else {
+          outputParts.push(`📋 **标准输出**: \`${stdout}\``);
+        }
+      }
+    }
+    if (result.stderr) {
+      const stderr = String(result.stderr).trim();
+      if (stderr && stderr !== "(empty)") {
+        if (stderr.includes('\n') || stderr.length > 100) {
+          outputParts.push(`❌ **标准错误**:\n\`\`\`\n${stderr}\n\`\`\``);
+        } else {
+          outputParts.push(`❌ **标准错误**: \`${stderr}\``);
+        }
+      }
+    }
+    return outputParts.join('\n\n') || "**无输出** ⚪";
+  }
+  
+  // 其他对象，使用JSON代码块
+  if (verbose) {
+    return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+  } else {
+    // 简洁模式：只显示主要字段
+    const mainFields = keys.slice(0, 3);
+    const otherFields = keys.length - 3;
+    let content = "**结果对象**:\n";
+    content += mainFields.map(key => `- **${key}**: \`${String(result[key])}\``).join('\n');
+    if (otherFields > 0) {
+      content += `\n- ... 还有 ${otherFields} 个字段`;
+    }
+    return content;
+  }
+};
+
+/**
+ * 格式化默认工具类型的结果（处理未分类的工具）
+ * @param parsedResult - 已解析的结果（可能是字符串、对象或数组）
+ * @returns 格式化后的内容字符串
+ */
+const formatDefaultToolResult = (parsedResult: any): string => {
+  // 其他工具类型，尝试智能格式化
+  if (typeof parsedResult === 'object' && parsedResult !== null) {
+    if (parsedResult.stdout || parsedResult.stderr) {
+      // 类似Bash命令的输出
+      let output = '';
+      if (parsedResult.stdout && parsedResult.stdout !== '(empty)') {
+        output += `**标准输出:**\n\`\`\`\n${parsedResult.stdout}\n\`\`\`\n\n`;
+      }
+      if (parsedResult.stderr && parsedResult.stderr !== '(empty)') {
+        output += `**标准错误:**\n\`\`\`\n${parsedResult.stderr}\n\`\`\``;
+      }
+      return output || '无输出';
+    } else if (parsedResult.message) {
+      return parsedResult.message;
+    } else {
+      return `\`\`\`json\n${JSON.stringify(parsedResult, null, 2)}\n\`\`\``;
+    }
+  } else if (typeof parsedResult === 'string') {
+    const trimmed = parsedResult.trim();
+    if (!trimmed) return '无内容';
+    // 检查是否包含错误信息
+    if (isErrorContent(trimmed)) {
+      if (trimmed.includes('\n')) {
+        return `❌ **执行错误**\n\`\`\`\n${trimmed}\n\`\`\``;
+      } else {
+        return `❌ **${trimmed}**`;
+      }
+    }
+    // 普通文本内容
+    if (trimmed.includes('\n')) {
+      return `\`\`\`\n${trimmed}\n\`\`\``;
+    } else {
+      return `\`${trimmed}\``;
+    }
+  }
+  return String(parsedResult);
+};
+
+/**
+ * 格式化不同工具类型的结果
+ * @param name - 工具名称
+ * @param toolType - 工具类型
+ * @param success - 执行是否成功
+ * @param result - 原始结果（可能是字符串、对象或数组）
+ * @returns 格式化后的内容字符串
+ */
+export const formatToolResultByType = (name: string, toolType: string, success: boolean, result: any): string => {
+  // 首先尝试解析JSON（向后兼容）
+  let parsedResult = result;
+  let isJson = false;
+  if (typeof result === 'string') {
+    try {
+      const trimmed = result.trim();
+      if (trimmed) {
+        // 检查是否看起来像JSON
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+          parsedResult = JSON.parse(trimmed);
+          isJson = true;
+        }
+      }
+    } catch (e) {
+      // 不是有效的JSON，保持为字符串
+      parsedResult = result;
+    }
+  }
+  
+  // 根据工具类型调用相应的格式化函数
+  switch (toolType) {
+    case 'filesystem':
+      return formatFilesystemResult(name, parsedResult);
+    case 'system':
+      return formatSystemResult(name, parsedResult);
+    case 'github':
+      return formatGithubResult(parsedResult);
+    case 'code_analysis':
+      return formatCodeAnalysisResult(parsedResult);
+    case 'knowledge':
+      return formatKnowledgeResult(name, parsedResult);
+    case 'search':
+      return formatSearchResult(parsedResult);
+    case 'task_management':
+      return formatTaskManagementResult(name, parsedResult);
+    case 'composio':
+      return formatComposioResult(name, parsedResult);
+    default:
+      return formatDefaultToolResult(parsedResult);
+  }
+};
