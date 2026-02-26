@@ -390,7 +390,7 @@ export const formatSearchResult = (result: any): string => {
     const safeUrl = url && url !== '#' ? url : '#';
     const linkText = safeUrl !== '#' ? `[${title}](${safeUrl})` : title;
     
-    return `${index + 1}. **${linkText}**\n   \`\`\` \n${String(snippet)}\n \`\`\``;
+    return `${index + 1}. **${linkText}**\n\`\`\` \n${String(snippet)}\n \`\`\``;
   });
   
   return `🌐 **网络搜索结果 (${searchResults.length} 项)**\n\n` + formattedResults.join('\n\n');
