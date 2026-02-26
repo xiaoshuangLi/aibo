@@ -278,14 +278,14 @@ export class LspClient extends EventEmitter {
         }
       } else if (message.method) {
         // 来自服务器的请求或通知
-        if (message.params === undefined && !message.result) {
-          // 通知消息
+        if (message.id === undefined) {
+          // 通知消息（没有 id）
           const handler = this.messageHandlers.get(message.method);
           if (handler) {
             handler(message.params || {});
           }
-        } else if (message.id) {
-          // 需要响应的请求
+        } else {
+          // 需要响应的请求（有 id）
           this.handleServerRequest(message);
         }
       }
