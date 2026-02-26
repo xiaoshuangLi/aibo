@@ -56,7 +56,7 @@ export const getToolType = (name: string): string => {
 /**
  * 格式化文件系统工具结果
  */
-const formatFilesystemResult = (name: string, result: any): string => {
+export const formatFilesystemResult = (name: string, result: any): string => {
   // 处理字符串输入（非JSON格式）- 这是关键！
   if (typeof result === 'string') {
     const trimmed = result.trim();
@@ -210,7 +210,7 @@ const formatFilesystemResult = (name: string, result: any): string => {
 /**
  * 格式化系统/Bash工具结果
  */
-const formatSystemResult = (name: string, result: any): string => {
+export const formatSystemResult = (name: string, result: any): string => {
   // 处理字符串输入（非JSON格式）
   if (typeof result === 'string') {
     const trimmed = result.trim();
@@ -278,7 +278,7 @@ const formatSystemResult = (name: string, result: any): string => {
 /**
  * 格式化GitHub工具结果
  */
-const formatGithubResult = (result: any): string => {
+export const formatGithubResult = (result: any): string => {
   if (result.content) {
     const lines = result.content.split('\n').length;
     const githubLang = inferLanguageType(undefined, result.content);
@@ -291,7 +291,7 @@ const formatGithubResult = (result: any): string => {
 /**
  * 格式化代码分析工具结果
  */
-const formatCodeAnalysisResult = (result: any): string => {
+export const formatCodeAnalysisResult = (result: any): string => {
   if (result.implementation || result.definition || result.references) {
     const content = result.implementation || result.definition || result.references;
     return `🔍 **代码分析结果**\n\n\`\`\`typescript\n${content}\n\`\`\``;
@@ -302,7 +302,7 @@ const formatCodeAnalysisResult = (result: any): string => {
 /**
  * 格式化知识库工具结果
  */
-const formatKnowledgeResult = (name: string, result: any): string => {
+export const formatKnowledgeResult = (name: string, result: any): string => {
   switch (name) {
     case 'add_knowledge':
       if (result.success) {
@@ -336,7 +336,7 @@ const formatKnowledgeResult = (name: string, result: any): string => {
 /**
  * 格式化搜索工具结果
  */
-const formatSearchResult = (result: any): string => {
+export const formatSearchResult = (result: any): string => {
   // 获取搜索结果数组（兼容不同结构）
   let searchResults: any[] = [];
   
@@ -399,7 +399,7 @@ const formatSearchResult = (result: any): string => {
 /**
  * 格式化任务管理工具结果
  */
-const formatTaskManagementResult = (name: string, result: any): string => {
+export const formatTaskManagementResult = (name: string, result: any): string => {
   if (name === 'write-subagent-todos' || name === 'write_todos') {
     if (result.todos && Array.isArray(result.todos)) {
       const completed = result.todos.filter((t: any) => t.status === 'completed').length;
@@ -416,7 +416,7 @@ const formatTaskManagementResult = (name: string, result: any): string => {
 /**
  * 格式化Composio工具结果
  */
-const formatComposioResult = (name: string, result: any): string => {
+export const formatComposioResult = (name: string, result: any): string => {
   // Composio工具通常返回结构化的数据，尝试提取有用信息
   if (result.data) {
     if (Array.isArray(result.data)) {
@@ -558,7 +558,7 @@ export const formatStructuredResult = (result: any, verbose: boolean): string =>
  * @param parsedResult - 已解析的结果（可能是字符串、对象或数组）
  * @returns 格式化后的内容字符串
  */
-const formatDefaultToolResult = (parsedResult: any): string => {
+export const formatDefaultToolResult = (parsedResult: any): string => {
   // 其他工具类型，尝试智能格式化
   if (typeof parsedResult === 'object' && parsedResult !== null) {
     if (parsedResult.stdout || parsedResult.stderr) {
