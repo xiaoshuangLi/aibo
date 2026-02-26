@@ -268,6 +268,7 @@ export const getHoverInfoTool = tool(
       validateFileExists(file_path);
 
       const client = await LspClientManager.getClient(rootDir);
+      await client.openDocument(file_path);
       const hover = await client.getHover(file_path, {
         line: line - 1,
         character: column - 1
@@ -321,6 +322,7 @@ export const getCompletionsTool = tool(
       validateFileExists(file_path);
 
       const client = await LspClientManager.getClient(rootDir);
+      await client.openDocument(file_path);
       const completions = await client.getCompletion(file_path, {
         line: line - 1,
         character: column - 1
