@@ -268,6 +268,7 @@ export const getHoverInfoTool = tool(
       validateFileExists(file_path);
 
       const client = await LspClientManager.getClient(rootDir);
+      await client.openDocument(file_path);
       const hover = await client.getHover(file_path, {
         line: line - 1,
         character: column - 1
@@ -321,6 +322,7 @@ export const getCompletionsTool = tool(
       validateFileExists(file_path);
 
       const client = await LspClientManager.getClient(rootDir);
+      await client.openDocument(file_path);
       const completions = await client.getCompletion(file_path, {
         line: line - 1,
         character: column - 1
@@ -506,7 +508,9 @@ export const getDiagnosticsTool = tool(
         log('debug', `Getting diagnostics for: ${file_path}`);
         validateFileExists(file_path);
 
-        const diagnostics = client.getDiagnostics(file_path);
+        const alreadyOpen = client.isDocumentOpen(file_path);
+        await client.openDocument(file_path);
+        const diagnostics = await client.getDiagnostics(file_path);
 
         if (diagnostics.length === 0) {
           return JSON.stringify(createSuccessResult('No diagnostics found'));
