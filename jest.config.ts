@@ -6,6 +6,8 @@ export default {
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Case-insensitive shim: map Config (uppercase) → config (lowercase)
+    '^(.*[\\/]core[\\/]config[\\/])Config$': '$1config',
   },
   transform: {
     '^.+\\.(j|t)s$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],

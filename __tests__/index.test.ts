@@ -164,12 +164,44 @@ jest.mock('../src/core/config/Config', () => ({
       modelName: 'gpt-4',
       baseURL: 'https://api.openai.com/v1',
     },
+    langgraph: {
+      recursionLimit: 25,
+      checkpointerType: 'memory',
+    },
+    memory: {
+      windowSize: 10,
+    },
+    language: {
+      code: 'en',
+    },
     output: {
       verbose: false,
     },
+    tencentCloud: {
+      appId: '',
+      secretId: '',
+      secretKey: '',
+      region: 'ap-guangzhou',
+    },
+    composio: {
+      apiKey: '',
+      externalUserId: 'test-user',
+    },
+    lark: {
+      appId: '',
+      appSecret: '',
+      receiveId: '',
+      interactiveTemplateId: '',
+    },
+    advanced: {
+      maxConcurrentSubtasks: 3,
+    },
     specialKeyword: {
       keyword: '干活'
-    }
+    },
+    interaction: {
+      mode: 'console',
+    },
   },
 }));
 

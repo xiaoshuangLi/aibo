@@ -278,15 +278,15 @@ export class LspClient extends EventEmitter {
         }
       } else if (message.method) {
         // 来自服务器的请求或通知
-        if (message.params === undefined && !message.result) {
-          // 通知消息
+        if (message.id !== undefined) {
+          // 需要响应的请求
+          this.handleServerRequest(message);
+        } else {
+          // 通知消息（无 id）
           const handler = this.messageHandlers.get(message.method);
           if (handler) {
             handler(message.params || {});
           }
-        } else if (message.id) {
-          // 需要响应的请求
-          this.handleServerRequest(message);
         }
       }
     } catch (error) {
@@ -443,6 +443,34 @@ export class LspClient extends EventEmitter {
     });
 
     console.log(`[LSP] Document opened: ${uri}`);
+  }
+
+  /**
+   * 更新文档内容（发送 didChange 通知）
+   */
+  public async updateDocument(filePath: string, newText: string): Promise<void> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const existing = this.openedDocuments.get(uri);
+    if (!existing) {
+      throw new Error(`Document not open: ${filePath}. Call openDocument first.`);
+    }
+
+    const newVersion = existing.version + 1;
+
+    this.notify('textDocument/didChange', {
+      textDocument: { uri, version: newVersion },
+      contentChanges: [{ text: newText }]
+    });
+
+    this.openedDocuments.set(uri, {
+      uri,
+      version: newVersion,
+      text: newText
+    });
+
+    console.log(`[LSP] Document updated: ${uri}`);
   }
 
   /**

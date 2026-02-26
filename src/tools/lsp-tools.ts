@@ -40,6 +40,23 @@ let currentRootDir: string | null = null;
 let logLevel: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency' = 'info';
 
 /**
+ * 解析 typescript-language-server 的可执行路径
+ * 优先查找项目本地的 node_modules/.bin，其次回退到 PATH 中的命令
+ */
+function resolveServerCommand(rootDir: string): string {
+  const candidates = [
+    path.join(rootDir, 'node_modules/.bin/typescript-language-server'),
+    path.join(process.cwd(), 'node_modules/.bin/typescript-language-server')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return 'typescript-language-server';
+}
+
+/**
  * 日志函数
  */
 function log(level: typeof logLevel, message: string): void {
@@ -111,7 +128,7 @@ export const startLspTool = tool(
 
       // 配置 LSP 客户端
       const config: LspClientConfig = {
-        serverCommand: 'typescript-language-server',
+        serverCommand: resolveServerCommand(root_dir),
         serverArgs: ['--stdio'],
         workingDirectory: root_dir,
         timeout: 60000,
@@ -159,7 +176,7 @@ export const restartLspServerTool = tool(
       log('info', `Restarting LSP server${root_dir ? ` with root: ${root_dir}` : ''}...`);
 
       const config: LspClientConfig = {
-        serverCommand: 'typescript-language-server',
+        serverCommand: resolveServerCommand(restartRootDir),
         serverArgs: ['--stdio'],
         workingDirectory: restartRootDir,
         timeout: 60000,
@@ -680,6 +697,44 @@ export const setLogLevelTool = tool(
 );
 
 /**
+ * update_document - 更新文件内容并通知 LSP 服务器
+ */
+export const updateDocumentTool = tool(
+  async ({ file_path, new_content }: { file_path: string; new_content: string }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log('debug', `Updating document: ${file_path}`);
+
+      const absolutePath = validateFileExists(file_path);
+
+      // 将新内容写入磁盘
+      fs.writeFileSync(absolutePath, new_content, 'utf-8');
+
+      // 通知 LSP 服务器文件已更改
+      const client = await LspClientManager.getClient(rootDir);
+      await client.updateDocument(file_path, new_content);
+
+      log('debug', `Document updated: ${file_path}`);
+
+      return JSON.stringify(createSuccessResult(`File successfully updated: ${file_path}`));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error updating document: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to update document: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'update_document',
+    description:
+      '更新文件内容并通知 LSP 服务器。将新内容写入文件，并发送 textDocument/didChange 通知，确保 LSP 服务器使用最新内容分析文件。文件必须已通过 open_document 打开。',
+    schema: z.object({
+      file_path: z.string().describe('要更新的文件路径'),
+      new_content: z.string().describe('文件的新内容')
+    })
+  }
+);
+
+/**
  * shutdown_lsp - 关闭 LSP 服务器
  */
 export const shutdownLspTool = tool(
@@ -714,6 +769,7 @@ export default async function getLspTools() {
     restartLspServerTool,
     openDocumentTool,
     closeDocumentTool,
+    updateDocumentTool,
     getHoverInfoTool,
     getCompletionsTool,
     getDefinitionTool,

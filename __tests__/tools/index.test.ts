@@ -1,3 +1,5 @@
+jest.mock('@/tools/composio', () => jest.fn().mockResolvedValue([]));
+
 import getTools from '@/tools/index';
 
 describe('tools/index', () => {
