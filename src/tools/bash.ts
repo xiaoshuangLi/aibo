@@ -113,17 +113,13 @@ function handleBashExecutionError(error: unknown, command: string, timeout: numb
 }
 
 export const executeBashTool = tool(
-  async ({ command, timeout = 30000, cwd }) => {
+  async ({ command, timeout = 120000, cwd }) => {
     const records: string[] = [];
 
     const promise = execAsync(command, {
       timeout: timeout,
       cwd: cwd || process.cwd(),
-      // 限制环境变量（基础防护）
-      env: {
-        PATH: process.env.PATH,
-        HOME: process.env.HOME,
-      },
+      env: process.env,
     });
 
     try {
@@ -148,14 +144,12 @@ export const executeBashTool = tool(
   },
   {
     name: "execute_bash",
-    description: `Execute a bash/shell command in the current environment.
-⚠️ DANGEROUS: Can run ANY command with current user permissions.
-Use with extreme caution. Never run untrusted/unknown commands.
-Recommended safe commands: ls, pwd, cat, echo, grep, find (with caution).
-Dangerous commands: rm -rf, dd, mkfs, chmod 777, any command with sudo.`,
+    description: `Execute a bash/shell command. Use for running builds, tests, git operations, package installs, file operations, and any shell task.
+Prefer this over manual file manipulation when a shell command is more direct.
+Default timeout is 2 minutes — increase for long-running commands like npm install or full test suites.`,
     schema: z.object({
-      command: z.string().describe("The bash command to execute (e.g., 'ls -la', 'pwd', 'cat file.txt'). DO NOT include 'bash -c' prefix."),
-      timeout: z.number().optional().default(30000).describe("Timeout in milliseconds (default: 30000 = 30 seconds). Prevents hanging commands."),
+      command: z.string().describe("The bash command to execute (e.g., 'npm test', 'git status', 'ls -la'). DO NOT include 'bash -c' prefix."),
+      timeout: z.number().optional().default(120000).describe("Timeout in milliseconds (default: 120000 = 2 minutes). Increase for slow builds or installs."),
       cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
     }),
   }
