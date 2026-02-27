@@ -11,6 +11,10 @@
  * The integration suite starts a real typescript-language-server, opens the
  * fixture file src/lsp-test-fixture.ts, and exercises every tool.
  *
+ * The fixture file is NOT committed to the repository.  A root-level
+ * beforeAll writes it to disk before any test runs, and a root-level
+ * afterAll deletes it when the suite is complete.
+ *
  * After the fixes in lsp-client.ts the test suite completes without hanging:
  *   - setTimeout in request() is unref()'d → Node.js can exit naturally
  *   - shutdown() caps its grace period at 3 s → no 60 s blockage
@@ -42,6 +46,51 @@ import getLspTools, {
 const ROOT_DIR = path.resolve(__dirname, '../..');
 const FIXTURE_FILE = path.join(ROOT_DIR, 'src', 'lsp-test-fixture.ts');
 
+/**
+ * TypeScript source used as the LSP fixture.
+ *
+ * Key line positions (1-based) referenced by the integration tests:
+ *   Line 1  – `export interface User {`            col 18 = 'U' of User
+ *   Line 7  – `export function greet(user: User)`  col 23 = 'u' of user param
+ *                                                   col 29 = 'U' of User type ref
+ *   Line 11 – `export class UserService {`         col 14 = 'U' of UserService
+ *   Line 15 – `    this.users.push(user);`         col 10 = after "this."
+ *   Line 27 – `export const defaultUser: User`     col 14 = 'd' of defaultUser
+ */
+const FIXTURE_CONTENT = `\
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export function greet(user: User): string {
+  return \`Hello, \${user.name}!\`;
+}
+
+export class UserService {
+  private users: User[] = [];
+
+  addUser(user: User): void {
+    this.users.push(user);
+  }
+
+  getUserById(id: number): User | undefined {
+    return this.users.find(u => u.id === id);
+  }
+
+  getAllUsers(): User[] {
+    return [...this.users];
+  }
+}
+
+export const defaultUser: User = {
+  id: 1,
+  name: 'Test User',
+  email: 'test@example.com',
+};
+`;
+
 /** Wait ms milliseconds without keeping the event loop alive. */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms).unref());
@@ -58,6 +107,20 @@ function parseResult(raw: string) {
 
 // Allow up to 60 s per test (server startup + analysis can be slow in CI).
 jest.setTimeout(60_000);
+
+// ─── Fixture file lifecycle ────────────────────────────────────────────────────
+// Create the fixture before any test runs; delete it after all tests finish.
+// This keeps src/ free of test-only files that are not real production code.
+
+beforeAll(() => {
+  fs.writeFileSync(FIXTURE_FILE, FIXTURE_CONTENT, 'utf-8');
+});
+
+afterAll(() => {
+  if (fs.existsSync(FIXTURE_FILE)) {
+    fs.unlinkSync(FIXTURE_FILE);
+  }
+});
 
 // ─── 1. Tool schema & metadata ────────────────────────────────────────────────
 
@@ -127,22 +190,22 @@ describe('Error paths before any LSP server is started', () => {
   });
 
   it('getHoverInfoTool returns error', async () => {
-    const result = parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 14, column: 18 }));
+    const result = parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18 }));
     expect(result.success).toBe(false);
   });
 
   it('getCompletionsTool returns error', async () => {
-    const result = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 14, column: 1 }));
+    const result = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 1 }));
     expect(result.success).toBe(false);
   });
 
   it('getDefinitionTool returns error', async () => {
-    const result = parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 29 }));
+    const result = parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 29 }));
     expect(result.success).toBe(false);
   });
 
   it('getReferencesTool returns error', async () => {
-    const result = parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 14, column: 18 }));
+    const result = parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18 }));
     expect(result.success).toBe(false);
   });
 
@@ -168,7 +231,7 @@ describe('Error paths before any LSP server is started', () => {
 
   it('getCodeActionsTool returns error', async () => {
     const result = parseResult(await getCodeActionsTool.invoke({
-      file_path: FIXTURE_FILE, start_line: 14, start_column: 1, end_line: 14, end_column: 22,
+      file_path: FIXTURE_FILE, start_line: 1, start_column: 1, end_line: 1, end_column: 22,
     }));
     expect(result.success).toBe(false);
   });
@@ -254,9 +317,11 @@ describe('File-not-found error handling', () => {
 // ─── 5. Integration tests – real typescript-language-server ──────────────────
 
 describe('LSP integration tests', () => {
-  const originalContent = fs.readFileSync(FIXTURE_FILE, 'utf-8');
+  // originalContent is assigned in beforeAll (after the fixture is on disk).
+  let originalContent: string;
 
   beforeAll(async () => {
+    originalContent = fs.readFileSync(FIXTURE_FILE, 'utf-8');
     // Start the server and open the fixture file.
     expect(parseResult(await startLspTool.invoke({ root_dir: ROOT_DIR })).success).toBe(true);
     expect(parseResult(await openDocumentTool.invoke({ file_path: FIXTURE_FILE })).success).toBe(true);
@@ -309,32 +374,32 @@ describe('LSP integration tests', () => {
 
   // ── getHoverInfoTool ────────────────────────────────────────────────────────
   describe('getHoverInfoTool', () => {
-    it('returns info at User interface declaration (line 14, col 18)', async () => {
-      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 14, column: 18 })).success).toBe(true);
+    it('returns info at User interface declaration (line 1, col 18)', async () => {
+      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18 })).success).toBe(true);
     });
 
-    it('returns info at greet parameter "user" (line 20, col 23)', async () => {
-      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 23 })).success).toBe(true);
+    it('returns info at greet parameter "user" (line 7, col 23)', async () => {
+      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 23 })).success).toBe(true);
     });
 
-    it('returns info at User type annotation (line 20, col 29)', async () => {
-      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 29 })).success).toBe(true);
+    it('returns info at User type annotation (line 7, col 29)', async () => {
+      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 29 })).success).toBe(true);
     });
 
-    it('returns info at UserService class (line 24, col 14)', async () => {
-      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 24, column: 14 })).success).toBe(true);
+    it('returns info at UserService class (line 11, col 14)', async () => {
+      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 11, column: 14 })).success).toBe(true);
     });
 
     it('succeeds (possibly no info) on a blank line', async () => {
-      // Line 13 is the blank line before `export interface User`
-      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 13, column: 1 })).success).toBe(true);
+      // Line 6 is the blank line between the interface and function declarations
+      expect(parseResult(await getHoverInfoTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
     });
   });
 
   // ── getDefinitionTool ───────────────────────────────────────────────────────
   describe('getDefinitionTool', () => {
-    it('finds definition of User type (line 20, col 29)', async () => {
-      const r = parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 29 }));
+    it('finds definition of User type (line 7, col 29)', async () => {
+      const r = parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 29 }));
       expect(r.success).toBe(true);
       if (r.content[0].text !== 'No definition found') {
         const defs = JSON.parse(r.content[0].text);
@@ -344,19 +409,19 @@ describe('LSP integration tests', () => {
       }
     });
 
-    it('finds definition of UserService (line 24, col 14)', async () => {
-      expect(parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 24, column: 14 })).success).toBe(true);
+    it('finds definition of UserService (line 11, col 14)', async () => {
+      expect(parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 11, column: 14 })).success).toBe(true);
     });
 
-    it('succeeds with no definition on a comment', async () => {
-      expect(parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 1 })).success).toBe(true);
+    it('succeeds with no definition on a blank line', async () => {
+      expect(parseResult(await getDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
     });
   });
 
   // ── getReferencesTool ───────────────────────────────────────────────────────
   describe('getReferencesTool', () => {
-    it('finds references to User interface (line 14, col 18)', async () => {
-      const r = parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 14, column: 18 }));
+    it('finds references to User interface (line 1, col 18)', async () => {
+      const r = parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18 }));
       expect(r.success).toBe(true);
       if (r.content[0].text !== 'No references found') {
         const refs = JSON.parse(r.content[0].text);
@@ -365,26 +430,26 @@ describe('LSP integration tests', () => {
       }
     });
 
-    it('finds references to greet function (line 20, col 17)', async () => {
-      expect(parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 17 })).success).toBe(true);
+    it('finds references to greet function (line 7, col 17)', async () => {
+      expect(parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 17 })).success).toBe(true);
     });
 
-    it('succeeds (possibly empty) on comment position', async () => {
-      expect(parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 1 })).success).toBe(true);
+    it('succeeds (possibly empty) on a blank line', async () => {
+      expect(parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
     });
   });
 
   // ── getCompletionsTool ──────────────────────────────────────────────────────
   describe('getCompletionsTool', () => {
-    it('returns completions after "this." (line 27, col 10)', async () => {
-      // Line 27: `    this.users.push(user);`
-      const r = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 27, column: 10 }));
+    it('returns completions after "this." (line 15, col 10)', async () => {
+      // Line 15: `    this.users.push(user);`
+      const r = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 15, column: 10 }));
       expect(r.success).toBe(true);
       expect(Array.isArray(JSON.parse(r.content[0].text))).toBe(true);
     });
 
     it('returns completions at start of expression line', async () => {
-      const r = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 20, column: 1 }));
+      const r = parseResult(await getCompletionsTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 1 }));
       expect(r.success).toBe(true);
       expect(Array.isArray(JSON.parse(r.content[0].text))).toBe(true);
     });
@@ -394,13 +459,13 @@ describe('LSP integration tests', () => {
   describe('getCodeActionsTool', () => {
     it('succeeds on the interface declaration range', async () => {
       expect(parseResult(await getCodeActionsTool.invoke({
-        file_path: FIXTURE_FILE, start_line: 14, start_column: 1, end_line: 14, end_column: 25,
+        file_path: FIXTURE_FILE, start_line: 1, start_column: 1, end_line: 1, end_column: 25,
       })).success).toBe(true);
     });
 
     it('succeeds on a single-character range', async () => {
       expect(parseResult(await getCodeActionsTool.invoke({
-        file_path: FIXTURE_FILE, start_line: 20, start_column: 23, end_line: 20, end_column: 24,
+        file_path: FIXTURE_FILE, start_line: 7, start_column: 23, end_line: 7, end_column: 24,
       })).success).toBe(true);
     });
   });
@@ -509,3 +574,4 @@ describe('LSP integration tests', () => {
     });
   });
 });
+
