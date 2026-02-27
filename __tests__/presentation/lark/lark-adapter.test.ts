@@ -146,6 +146,26 @@ describe('LarkAdapter', () => {
       // Access private property for testing (not ideal but necessary)
       expect((adapter as any).userMessageCallback).toBe(callback);
     });
+
+    it('should replay queued messages that arrived before the callback was registered', async () => {
+      const adapter = new LarkAdapter();
+      // Ensure no callback is set yet
+      (adapter as any).userMessageCallback = null;
+
+      // Simulate messages arriving before the callback is registered
+      (adapter as any).messageQueue.push({ content: '说个笑话', chatId: 'chat-1' });
+      (adapter as any).messageQueue.push({ content: '你好', chatId: 'chat-1' });
+
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      // Both queued messages should have been forwarded to the callback
+      expect(callback).toHaveBeenCalledTimes(2);
+      expect(callback).toHaveBeenNthCalledWith(1, '说个笑话');
+      expect(callback).toHaveBeenNthCalledWith(2, '你好');
+      // Queue should be empty after draining
+      expect((adapter as any).messageQueue).toHaveLength(0);
+    });
   });
 
   describe('setAbortSignal', () => {
