@@ -36,7 +36,7 @@ describe('FileDiffVisualizer', () => {
       expect(result.files).toHaveLength(1);
       expect(result.files[0]).toEqual({
         path: 'src/test-file.ts',
-        status: '修改 (M)',
+        status: '修改',
         emoji: '✏️',
         rawStatus: 'M'
       });
@@ -88,7 +88,7 @@ describe('FileDiffVisualizer', () => {
       const result = await visualizer.getFileDiff('non-existent.ts');
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('文件不存在且无Git记录');
+      expect(result.error).toContain('文件不存在或已彻底删除');
     });
   });
 

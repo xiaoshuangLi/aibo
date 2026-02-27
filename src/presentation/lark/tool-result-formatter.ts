@@ -18,7 +18,7 @@ import { inferLanguageType, isErrorContent } from './shared';
  */
 export const getToolType = (name: string): string => {
   // 文件系统工具
-  if (['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'].includes(name)) {
+  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'glob_files', 'grep', 'grep_files'].includes(name)) {
     return 'filesystem';
   }
   // 系统/Bash工具
@@ -28,6 +28,14 @@ export const getToolType = (name: string): string => {
   // GitHub工具
   if (name === 'WebFetchFromGithub') {
     return 'github';
+  }
+  // 网页获取工具
+  if (name === 'web_fetch') {
+    return 'web';
+  }
+  // 思考工具
+  if (name === 'think') {
+    return 'thinking';
   }
   // 代码分析工具
   if (name === 'hybrid_code_reader') {
@@ -42,7 +50,7 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (name === 'write-subagent-todos' || name === 'write_todos' || name === 'task') {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
     return 'task_management';
   }
   // Composio工具
@@ -76,6 +84,7 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
       
       case 'grep':
+      case 'grep_files':
         // 智能解析 grep 工具的输出格式
         const grepLines = trimmed.split('\n').filter(line => line.trim());
         if (grepLines.length === 0) return '未找到匹配内容';
@@ -127,7 +136,8 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return resultText;
       
       case 'read_file':
-        // read_file 工具的字符串结果直接显示
+      case 'view_file':
+        // read_file/view_file 工具的字符串结果直接显示
         const lines = trimmed.split('\n').length;
         const chars = trimmed.length;
         const preview = trimmed;
@@ -136,6 +146,7 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
       
       case 'glob':
+      case 'glob_files':
         // glob 工具返回的文本按换行符分割成文件路径
         const globLines = trimmed.split('\n').filter(line => line.trim());
         if (globLines.length === 0) return '未找到匹配文件';
@@ -176,11 +187,42 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+
+    case 'view_file':
+      // view_file 返回 {success, file_path, total_lines, start_line, end_line, content}
+      if (result.success === false) {
+        return `❌ **读取失败**: ${result.message || result.error || '未知错误'}`;
+      }
+      if (result.content !== undefined) {
+        const filePath = result.file_path || undefined;
+        const fileLang = inferLanguageType(filePath, result.content);
+        const fileLangTag = fileLang ? fileLang : '';
+        const totalLines = result.total_lines || result.content.split('\n').length;
+        const startLine = result.start_line || 1;
+        const endLine = result.end_line || totalLines;
+        const rangeInfo = (startLine === 1 && endLine === totalLines)
+          ? `共 ${totalLines} 行`
+          : `第 ${startLine}–${endLine} 行 / 共 ${totalLines} 行`;
+        return `**文件:** \`${filePath || '未知'}\` (${rangeInfo})\n\n\`\`\`${fileLangTag}\n${result.content}\n\`\`\``;
+      }
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'write_file':
     case 'edit_file':
       if (result.success) {
-        return `✅ 文件操作成功\n**路径:** \`${result.file_path || result.filePath}\``;
+        const filePath = result.file_path || result.filePath;
+        let detail = `**路径:** \`${filePath}\``;
+        if (result.action) {
+          const actionLabel: Record<string, string> = { created: '新建', overwritten: '覆写', edited: '编辑' };
+          detail = `**操作:** ${actionLabel[result.action] || result.action}  ${detail}`;
+        }
+        if (result.lines_written !== undefined) {
+          detail += `\n**写入行数:** ${result.lines_written}`;
+        }
+        if (result.lines_removed !== undefined || result.lines_added !== undefined) {
+          detail += `\n**变更:** <font color="red">-${result.lines_removed ?? 0}</font> / <font color="green">+${result.lines_added ?? 0}</font>`;
+        }
+        return `✅ 文件操作成功\n${detail}`;
       }
       return `❌ 文件操作失败\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
@@ -192,6 +234,22 @@ export const formatFilesystemResult = (name: string, result: any): string => {
                (result.length > 10 ? `\n... 还有 ${result.length - 10} 个文件` : '');
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+
+    case 'glob_files':
+      // glob_files 返回 {success, pattern, cwd, count, files}
+      if (result.success === false) {
+        return `❌ **搜索失败**: ${result.error || '未知错误'}`;
+      }
+      if (result.files !== undefined) {
+        const files: string[] = result.files || [];
+        if (files.length === 0) return `未找到匹配模式 \`${result.pattern}\` 的文件`;
+        const shown = files.slice(0, 10);
+        const remaining = files.length - shown.length;
+        return `找到 ${files.length} 个匹配文件 (\`${result.pattern}\`):\n\n` +
+               shown.map(f => `- \`${f}\``).join('\n') +
+               (remaining > 0 ? `\n... 还有 ${remaining} 个文件` : '');
+      }
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'grep':
       if (Array.isArray(result)) {
@@ -199,6 +257,25 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `找到 ${result.length} 个匹配项:\n\n` + 
                result.slice(0, 10).map(match => `- ${match}`).join('\n') + 
                (result.length > 10 ? `\n... 还有 ${result.length - 10} 个匹配项` : '');
+      }
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+
+    case 'grep_files':
+      // grep_files 返回 {success, pattern, include, cwd, count, truncated, results}
+      // results 是 [{file, line, content}] 数组
+      if (result.success === false) {
+        return `❌ **搜索失败**: ${result.message || result.error || '未知错误'}`;
+      }
+      if (result.results !== undefined) {
+        const matches: Array<{file: string; line: number; content: string}> = result.results || [];
+        if (matches.length === 0) return `未找到匹配模式 \`${result.pattern}\` 的内容`;
+        const shown = matches.slice(0, 10);
+        const remaining = matches.length - shown.length;
+        const lines = shown.map(m => `📄 \`${m.file}\` 第 ${m.line} 行\n   🔹 ${m.content.trim()}`);
+        let text = `找到 ${result.count || matches.length} 个匹配项 (\`${result.pattern}\`):\n\n` + lines.join('\n\n');
+        if (remaining > 0) text += `\n\n... 还有 ${remaining} 个匹配项`;
+        if (result.truncated) text += `\n\n⚠️ 结果已截断（超过最大数量限制）`;
+        return text;
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
@@ -263,7 +340,18 @@ export const formatSystemResult = (name: string, result: any): string => {
       return output || '无输出';
     
     case 'sleep':
-      return `⏱️ 延迟执行完成\n**时长:** ${result.duration || result.message?.match(/(\d+)/)?.[1] || '未知'} 毫秒`;
+      // sleep 返回 {success: true, message: "Slept for X milliseconds"}
+      // 向后兼容：也处理 {duration: X} 格式
+      {
+        const matched = result.message ? result.message.match(/(\d+)/) : null;
+        const sleepDuration = result.duration !== undefined
+          ? result.duration
+          : (matched ? parseInt(matched[1]) : undefined);
+        if (sleepDuration !== undefined) {
+          return `⏱️ 延迟执行完成\n**时长:** ${sleepDuration} 毫秒`;
+        }
+        return `⏱️ 延迟执行完成\n**结果:** ${result.message || '完成'}`;
+      }
     
     case 'echo':
       const echoContentLang = inferLanguageType(undefined, result.echoed || result.message);
@@ -279,11 +367,19 @@ export const formatSystemResult = (name: string, result: any): string => {
  * 格式化GitHub工具结果
  */
 export const formatGithubResult = (result: any): string => {
+  if (result.success === false) {
+    return `❌ **GitHub 获取失败**: ${result.message || result.error || '未知错误'}`;
+  }
   if (result.content) {
     const lines = result.content.split('\n').length;
-    const githubLang = inferLanguageType(undefined, result.content);
+    const githubLang = inferLanguageType(result.path, result.content);
     const githubLangTag = githubLang ? githubLang : '';
-    return `🐙 **GitHub文件内容**\n\n**行数:** ${lines}\n\n\`\`\`${githubLangTag}\n${result.content}\n\`\`\``;
+    const meta = [
+      result.owner && result.repo ? `**仓库:** \`${result.owner}/${result.repo}\`` : null,
+      result.path ? `**文件:** \`${result.path}\`` : null,
+      result.branch ? `**分支:** \`${result.branch}\`` : null,
+    ].filter(Boolean).join('  ');
+    return `🐙 **GitHub 文件内容** (${lines} 行)${meta ? `\n${meta}` : ''}\n\n\`\`\`${githubLangTag}\n${result.content}\n\`\`\``;
   }
   return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
@@ -306,23 +402,28 @@ export const formatKnowledgeResult = (name: string, result: any): string => {
   switch (name) {
     case 'add_knowledge':
       if (result.success) {
-        return `📚 **知识添加成功**\n\n**标题:** ${result.title || '未知'}\n**关键词:** ${result.keywords?.join(', ') || '无'}`;
+        const keywordCount = result.keywordCount ?? result.keywords?.length ?? 0;
+        return `📚 **知识添加成功**\n\n**标题:** ${result.title || '未知'}\n**关键词数量:** ${keywordCount}`;
       }
       return `❌ 知识添加失败\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'get_knowledge_summaries':
-      if (Array.isArray(result)) {
-        if (result.length === 0) return '知识库为空';
-        return `📚 **知识库摘要 (${result.length} 项)**\n\n` + 
-               result.map((item: any) => `- **${item.title}** [${item.keywords?.join(', ') || '无关键词'}]`).join('\n');
+      // 实际输出: {success, knowledgeSummaries, total}
+      const summaries = result.knowledgeSummaries || (Array.isArray(result) ? result : null);
+      if (summaries) {
+        if (summaries.length === 0) return '知识库为空';
+        return `📚 **知识库摘要 (${summaries.length} 项)**\n\n` + 
+               summaries.map((item: any) => `- **${item.title}** [${item.keywords?.join(', ') || '无关键词'}]`).join('\n');
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
     case 'search_knowledge':
-      if (Array.isArray(result)) {
-        if (result.length === 0) return '未找到匹配的知识';
-        return `📚 **知识搜索结果 (${result.length} 项)**\n\n` + 
-               result.map((item: any) => 
+      // 实际输出: {success, message, knowledgeItems, total}
+      const items = result.knowledgeItems || (Array.isArray(result) ? result : null);
+      if (items) {
+        if (items.length === 0) return '未找到匹配的知识';
+        return `📚 **知识搜索结果 (${items.length} 项)**\n\n` + 
+               items.map((item: any) => 
                  `- **${item.title}**\n  ${item.content || ''}`
                ).join('\n\n');
       }
@@ -409,6 +510,51 @@ export const formatTaskManagementResult = (name: string, result: any): string =>
                `- [${todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '🔄' : ' '}] ${todo.content}`
              ).join('\n');
     }
+  }
+  if (name === 'read-subagent-todos') {
+    if (result.todos && Array.isArray(result.todos)) {
+      if (result.todos.length === 0) return '📋 **待办事项列表为空**';
+      const completed = result.todos.filter((t: any) => t.status === 'completed').length;
+      const total = result.todos.length;
+      return `📋 **待办事项 (${completed}/${total} 完成)**\n\n` + 
+             result.todos.map((todo: any) => 
+               `- [${todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '🔄' : ' '}] \`${todo.subagent_type || '?'}\` ${todo.content}`
+             ).join('\n');
+    }
+  }
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化网页获取工具结果
+ */
+export const formatWebFetchResult = (result: any): string => {
+  if (result.success === false) {
+    return `❌ **网页获取失败** (HTTP ${result.status || '?'}): ${result.message || result.error || '未知错误'}`;
+  }
+  if (result.content !== undefined) {
+    const lines = result.content.split('\n').length;
+    const contentType = result.content_type || '';
+    const isHtml = contentType.includes('html');
+    const lang = isHtml ? 'html' : inferLanguageType(result.url, result.content);
+    const langTag = lang || '';
+    const truncatedNote = result.truncated ? '\n\n⚠️ 内容已截断（超过最大长度限制）' : '';
+    const meta = [
+      result.url ? `**URL:** ${result.url}` : null,
+      result.status ? `**状态:** ${result.status}` : null,
+      contentType ? `**类型:** ${contentType}` : null,
+    ].filter(Boolean).join('  ');
+    return `🌐 **网页内容** (${lines} 行)\n${meta}\n\n\`\`\`${langTag}\n${result.content}\n\`\`\`${truncatedNote}`;
+  }
+  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+};
+
+/**
+ * 格式化思考工具结果
+ */
+export const formatThinkResult = (result: any): string => {
+  if (result.reasoning) {
+    return `💭 **思考过程**\n\n${result.reasoning}`;
   }
   return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
@@ -642,6 +788,10 @@ export const formatToolResultByType = (name: string, toolType: string, success: 
       return formatSystemResult(name, parsedResult);
     case 'github':
       return formatGithubResult(parsedResult);
+    case 'web':
+      return formatWebFetchResult(parsedResult);
+    case 'thinking':
+      return formatThinkResult(parsedResult);
     case 'code_analysis':
       return formatCodeAnalysisResult(parsedResult);
     case 'knowledge':

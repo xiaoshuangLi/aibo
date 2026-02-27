@@ -70,7 +70,22 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
       }
       break;
     
+    case 'view_file':
     case 'read_file':
+      if (typeof args === 'string') {
+        return `**文件路径**: \`${args}\``;
+      } else if (typeof args === 'object') {
+        const filePath = args.file_path || args.filePath || '未知路径';
+        let content = `**文件路径**: \`${filePath}\``;
+        if (args.start_line !== undefined || args.end_line !== undefined) {
+          const start = args.start_line ?? 1;
+          const end = args.end_line ?? '末尾';
+          content += `\n**行范围**: 第 ${start} – ${end} 行`;
+        }
+        return content;
+      }
+      break;
+
     case 'write_file':
     case 'edit_file':
       if (typeof args === 'string') {
@@ -79,7 +94,7 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
         const filePath = args.file_path || args.filePath || '未知路径';
         let content = `**文件路径**: \`${filePath}\``;
         
-        if (name === 'write_file' || name === 'edit_file') {
+        if (name === 'write_file') {
           if (args.content != null) {
             const lang = inferLanguageType(filePath, args.content);
             const langTag = lang ? lang : '';
@@ -103,22 +118,28 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
       }
       break;
     
+    case 'glob_files':
     case 'glob':
       if (typeof args === 'string') {
         return `**模式**: \`${args}\``;
       } else if (typeof args === 'object') {
         const pattern = args.pattern || '未知模式';
-        const path = args.path || '/';
+        const path = args.path || args.cwd || '/';
         return `**模式**: \`${pattern}\`\n**路径**: \`${path}\``;
       }
       break;
     
+    case 'grep_files':
     case 'grep':
       if (typeof args === 'object') {
         const pattern = args.pattern || '未知模式';
-        const path = args.path || '/';
-        const glob = args.glob || '所有文件';
-        return `**搜索模式**: \`${pattern}\`\n**路径**: \`${path}\`\n**文件过滤**: \`${glob}\``;
+        const path = args.path || args.cwd || '/';
+        const fileFilter = args.include || args.glob || '所有文件';
+        let content = `**搜索模式**: \`${pattern}\`\n**路径**: \`${path}\`\n**文件过滤**: \`${fileFilter}\``;
+        if (args.case_insensitive) {
+          content += '\n**大小写**: 不敏感';
+        }
+        return content;
       }
       break;
   }
@@ -247,11 +268,48 @@ export const formatDefaultToolCall = (args: any): string => {
 };
 
 /**
- * 格式化工具调用参数
- * @param name - 工具名称
+ * 格式化网页获取工具调用参数
  * @param args - 工具参数
  * @returns 格式化后的内容字符串
  */
+export const formatWebFetchToolCall = (args: any): string => {
+  if (args == null) return '无参数';
+  if (typeof args === 'string') {
+    return `**URL**: \`${args}\``;
+  }
+  if (typeof args === 'object') {
+    const url = args.url || '未知 URL';
+    let content = `**URL**: \`${url}\``;
+    if (args.timeout) content += `\n**超时**: ${args.timeout}ms`;
+    if (args.max_length) content += `\n**最大长度**: ${args.max_length} 字符`;
+    return content;
+  }
+  return `\`${String(args)}\``;
+};
+
+/**
+ * 格式化思考工具调用参数
+ * @param args - 工具参数
+ * @returns 格式化后的内容字符串
+ */
+export const formatThinkToolCall = (args: any): string => {
+  if (args == null) return '无参数';
+  if (typeof args === 'object' && args.reasoning) {
+    const lines = String(args.reasoning).split('\n');
+    const preview = lines.slice(0, 5).join('\n');
+    const more = lines.length > 5 ? `\n... (共 ${lines.length} 行)` : '';
+    return `💭 **推理过程**\n\`\`\`\n${preview}${more}\n\`\`\``;
+  }
+  if (typeof args === 'string') {
+    const lines = args.split('\n');
+    const preview = lines.slice(0, 5).join('\n');
+    const more = lines.length > 5 ? `\n... (共 ${lines.length} 行)` : '';
+    return `💭 **推理过程**\n\`\`\`\n${preview}${more}\n\`\`\``;
+  }
+  return `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``;
+};
+
+
 export const formatToolCallArgs = (name: string, args: any): string => {
   const toolType = getToolType(name);
 
@@ -271,6 +329,12 @@ export const formatToolCallArgs = (name: string, args: any): string => {
     
     case 'system':
       return formatSystemToolCall(name, args);
+    
+    case 'web':
+      return formatWebFetchToolCall(args);
+    
+    case 'thinking':
+      return formatThinkToolCall(args);
     
     default:
       return formatDefaultToolCall(args);
@@ -295,6 +359,8 @@ export const getToolCallTitle = (name: string, args: any): string => {
     filesystem: '📁',
     system: '💻',
     github: '🐧',
+    web: '🔗',
+    thinking: '💭',
     code_analysis: '🔍',
     knowledge: '📚',
     search: '🌐',

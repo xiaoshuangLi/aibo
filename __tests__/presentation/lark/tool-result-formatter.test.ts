@@ -175,7 +175,7 @@ describe('Tool Result Formatter', () => {
 
     it('should handle github result', () => {
       const result = formatToolResultByType('WebFetchFromGithub', 'github', true, {content: 'github content'});
-      expect(result).toContain('GitHub文件内容');
+      expect(result).toContain('GitHub 文件内容');
     });
 
     it('should handle code analysis result', () => {

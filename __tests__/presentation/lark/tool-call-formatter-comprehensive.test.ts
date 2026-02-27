@@ -425,5 +425,100 @@ describe('Tool Call Formatter Comprehensive Tests', () => {
     it('should return default emoji for unknown tools', () => {
       expect(getToolCallTitle('unknown_tool', {})).toBe('🔧 工具调用: unknown_tool');
     });
+
+    it('should return correct emoji for web_fetch tool', () => {
+      expect(getToolCallTitle('web_fetch', {})).toBe('🔗 工具调用: web_fetch');
+    });
+
+    it('should return correct emoji for think tool', () => {
+      expect(getToolCallTitle('think', {})).toBe('💭 工具调用: think');
+    });
+
+    it('should return correct emoji for view_file tool', () => {
+      expect(getToolCallTitle('view_file', {})).toBe('📁 工具调用: view_file');
+    });
+
+    it('should return correct emoji for glob_files tool', () => {
+      expect(getToolCallTitle('glob_files', {})).toBe('📁 工具调用: glob_files');
+    });
+
+    it('should return correct emoji for grep_files tool', () => {
+      expect(getToolCallTitle('grep_files', {})).toBe('📁 工具调用: grep_files');
+    });
+  });
+
+  // ─── Tests for new tool names ────────────────────────────────────────────────
+
+  describe('view_file tool call formatting', () => {
+    it('should format view_file with just file_path', () => {
+      const result = formatToolCallArgs('view_file', { file_path: '/src/index.ts' });
+      expect(result).toContain('**文件路径**: `/src/index.ts`');
+    });
+
+    it('should format view_file with line range', () => {
+      const result = formatToolCallArgs('view_file', { file_path: '/src/index.ts', start_line: 10, end_line: 50 });
+      expect(result).toContain('**文件路径**: `/src/index.ts`');
+      expect(result).toContain('第 10 – 50 行');
+    });
+  });
+
+  describe('glob_files tool call formatting', () => {
+    it('should format glob_files with pattern and cwd', () => {
+      const result = formatToolCallArgs('glob_files', { pattern: '**/*.ts', cwd: '/src' });
+      expect(result).toContain('**模式**: `**/*.ts`');
+      expect(result).toContain('**路径**: `/src`');
+    });
+
+    it('should format glob_files with pattern only', () => {
+      const result = formatToolCallArgs('glob_files', { pattern: '*.json' });
+      expect(result).toContain('**模式**: `*.json`');
+    });
+  });
+
+  describe('grep_files tool call formatting', () => {
+    it('should format grep_files with all parameters', () => {
+      const result = formatToolCallArgs('grep_files', { 
+        pattern: 'export const', 
+        include: '**/*.ts',
+        cwd: '/src',
+        case_insensitive: true
+      });
+      expect(result).toContain('**搜索模式**: `export const`');
+      expect(result).toContain('**文件过滤**: `**/*.ts`');
+      expect(result).toContain('**大小写**: 不敏感');
+    });
+
+    it('should format grep_files with pattern only', () => {
+      const result = formatToolCallArgs('grep_files', { pattern: 'TODO' });
+      expect(result).toContain('**搜索模式**: `TODO`');
+    });
+  });
+
+  describe('web_fetch tool call formatting', () => {
+    it('should format web_fetch with url only', () => {
+      const result = formatToolCallArgs('web_fetch', { url: 'https://example.com' });
+      expect(result).toContain('**URL**: `https://example.com`');
+    });
+
+    it('should format web_fetch with url and timeout', () => {
+      const result = formatToolCallArgs('web_fetch', { url: 'https://example.com', timeout: 5000 });
+      expect(result).toContain('**URL**: `https://example.com`');
+      expect(result).toContain('**超时**: 5000ms');
+    });
+  });
+
+  describe('think tool call formatting', () => {
+    it('should format think with short reasoning', () => {
+      const result = formatToolCallArgs('think', { reasoning: 'I need to analyze this.' });
+      expect(result).toContain('💭 **推理过程**');
+      expect(result).toContain('I need to analyze this.');
+    });
+
+    it('should truncate think reasoning longer than 5 lines', () => {
+      const reasoning = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`).join('\n');
+      const result = formatToolCallArgs('think', { reasoning });
+      expect(result).toContain('💭 **推理过程**');
+      expect(result).toContain('共 10 行');
+    });
   });
 });

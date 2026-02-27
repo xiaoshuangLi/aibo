@@ -93,19 +93,19 @@ export class FileDiffVisualizer {
         // 解析 2 字符状态码：第1字符表示暂存区状态，第2字符表示工作区状态
         // 参考：https://git-scm.com/docs/git-status#_short_format
         if (status === '??') {
-          fileStatus = '新增 (A)';
+          fileStatus = '新增';
           emoji = '🆕';
         } else if (status.startsWith('D') || status.endsWith('D')) {
           // D? 或 ?D 或 DD - 删除文件
-          fileStatus = '删除 (D)';
+          fileStatus = '删除';
           emoji = '🗑️';
         } else if (status.startsWith('A') || status.endsWith('A')) {
           // A? 或 ?A 或 AA - 新增文件
-          fileStatus = '新增 (A)';
+          fileStatus = '新增';
           emoji = '🆕';
         } else if (status.includes('M') || status.includes('T') || status.includes('R') || status.includes('C') || status.includes('U')) {
           // 包含 M(修改)、T(类型更改)、R(重命名)、C(复制)、U(未合并) 的任何组合
-          fileStatus = '修改 (M)';
+          fileStatus = '修改';
           emoji = '✏️';
         } else {
           fileStatus = '其他';
@@ -121,8 +121,19 @@ export class FileDiffVisualizer {
       }
       
       // 使用Markdown列表格式化文件列表，对文件路径进行完全转义
-      const fileList = files.map(file => `- ${file.emoji} **${this.escapeMarkdown(file.path)}** (${file.status})`).join('\n');
-      const message = `✨ **检测到 ${files.length} 个文件有改动！**\n\n${fileList}`;
+      const fileList = files.map(file => `- ${file.emoji} \`${file.path}\` ${file.status}`).join('\n');
+      
+      // 统计各状态数量生成摘要
+      const addedCount = files.filter(f => f.status === '新增').length;
+      const modifiedCount = files.filter(f => f.status === '修改').length;
+      const deletedCount = files.filter(f => f.status === '删除').length;
+      const summaryParts: string[] = [];
+      if (addedCount > 0) summaryParts.push(`新增 ${addedCount}`);
+      if (modifiedCount > 0) summaryParts.push(`修改 ${modifiedCount}`);
+      if (deletedCount > 0) summaryParts.push(`删除 ${deletedCount}`);
+      const categorySummary = summaryParts.length > 0 ? `（${summaryParts.join(' · ')}）` : '';
+      
+      const message = `✨ **${files.length} 个文件有改动**${categorySummary}\n\n${fileList}`;
       
       return {
         success: true,
@@ -133,7 +144,7 @@ export class FileDiffVisualizer {
       return { 
         success: false,
         files: [], 
-        message: '❌ **无法获取Git状态，请确保在Git仓库中运行**',
+        message: '❌ **无法获取 Git 状态，请确保在 Git 仓库中运行**',
         error: (error as Error).message
       };
     }
@@ -164,7 +175,7 @@ export class FileDiffVisualizer {
           deletions: 0,
           diff: '',
           summary: '',
-          error: '❌ 文件不存在且无Git记录'
+          error: '❌ 文件不存在或已彻底删除'
         };
       }
 
@@ -203,7 +214,7 @@ export class FileDiffVisualizer {
           deletions: 0,
           diff: '',
           summary: '',
-          error: '❌ 文件没有改动或无法获取diff'
+          error: '❌ 文件没有改动（已是最新状态）'
         };
       }
       
@@ -217,7 +228,7 @@ export class FileDiffVisualizer {
         deletions: 0,
         diff: '',
         summary: '',
-        error: `❌ 获取文件diff失败: ${(error as Error).message}`
+        error: `❌ 获取文件 diff 失败: ${(error as Error).message}`
       };
     }
   }
@@ -294,7 +305,7 @@ export class FileDiffVisualizer {
       additions,
       deletions,
       diff: formattedDiff,
-      summary: `<font color="green">+${additions}</font> <font color="red">-${deletions}</font>`
+      summary: `<font color="green">+${additions} 行新增</font> <font color="red">-${deletions} 行删除</font>`
     };
   }
 
@@ -319,7 +330,7 @@ export class FileDiffVisualizer {
       additions: lines.length,
       deletions: 0,
       diff: formattedDiff,
-      summary: `<font color="green">+${lines.length}</font>`
+      summary: `<font color="green">+${lines.length} 行新增（新文件）</font>`
     };
   }
 
@@ -332,7 +343,7 @@ export class FileDiffVisualizer {
       return { 
         success: false,
         diffs: [],
-        error: '✨ 当前工作区很干净，没有文件改动！'
+        error: '✨ 当前工作区很干净，没有文件改动'
       };
     }
     
@@ -356,13 +367,13 @@ export class FileDiffVisualizer {
       execSync(`git checkout -- ${filePath}`, { cwd: this.workingDir });
       return {
         success: true,
-        message: `✅ 成功撤销文件改动: ${filePath}`
+        message: `✅ 已撤销文件改动: \`${filePath}\``
       };
     } catch (error) {
       return {
         success: false,
         message: '',
-        error: `❌ 撤销文件失败: ${(error as Error).message}`
+        error: `❌ 撤销文件改动失败: ${(error as Error).message}`
       };
     }
   }
@@ -375,7 +386,7 @@ export class FileDiffVisualizer {
       execSync(`git add ${filePath}`, { cwd: this.workingDir });
       return {
         success: true,
-        message: `✅ 成功暂存文件: ${filePath}`
+        message: `✅ 已暂存文件: \`${filePath}\``
       };
     } catch (error) {
       return {
@@ -394,7 +405,7 @@ export class FileDiffVisualizer {
       execSync(`git commit -m "${message}"`, { cwd: this.workingDir });
       return {
         success: true,
-        message: `✅ 成功提交: ${message}`
+        message: `✅ 提交成功: **${message}**`
       };
     } catch (error) {
       return {
