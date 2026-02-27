@@ -8,19 +8,10 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import {
-  LspClient,
   LspClientManager,
-  LspClientConfig,
-  Position,
-  Range,
-  Diagnostic,
-  Hover,
-  CompletionItem,
-  CodeAction,
-  Definition,
-  References,
-  SymbolInformation
+  LspClientConfig
 } from '../infrastructure/code-analysis/lsp-client';
+import { log, setLogLevel, LoggingLevel } from '../infrastructure/code-analysis/lsp-logging';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -37,7 +28,6 @@ interface ToolResult {
  * 全局状态管理
  */
 let currentRootDir: string | null = null;
-let logLevel: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency' = 'info';
 
 /**
  * 解析 typescript-language-server 的可执行路径
@@ -54,19 +44,6 @@ function resolveServerCommand(rootDir: string): string {
     }
   }
   return 'typescript-language-server';
-}
-
-/**
- * 日志函数
- */
-function log(level: typeof logLevel, message: string): void {
-  const levelOrder = ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'];
-  const currentLevelIndex = levelOrder.indexOf(logLevel);
-  const messageLevelIndex = levelOrder.indexOf(level);
-
-  if (messageLevelIndex <= currentLevelIndex) {
-    console.log(`[LSP-TOOL ${level.toUpperCase()}] ${message}`);
-  }
 }
 
 /**
@@ -678,9 +655,9 @@ export const setLogLevelTool = tool(
   async ({
     level
   }: {
-    level: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
+    level: LoggingLevel;
   }) => {
-    logLevel = level;
+    setLogLevel(level);
     log('info', `Log level set to: ${level}`);
     return JSON.stringify(createSuccessResult(`Log level set to: ${level}`));
   },

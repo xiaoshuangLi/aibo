@@ -207,6 +207,7 @@ export class LspClient extends EventEmitter {
         // 处理进程错误
         this.childProcess.on('error', (err: Error) => {
           console.error(`[LSP ERROR] Failed to start process: ${err.message}`);
+          this.rejectAllPending(err);
           reject(err);
         });
 
@@ -214,6 +215,9 @@ export class LspClient extends EventEmitter {
         this.childProcess.on('exit', (code: number | null) => {
           console.log(`[LSP] Server process exited with code ${code}`);
           this.initialized = false;
+          this.openedDocuments.clear();
+          this.documentDiagnostics.clear();
+          this.rejectAllPending(new Error(`LSP server process exited with code ${code}`));
           this.emit('exit', { code });
         });
 
@@ -230,6 +234,13 @@ export class LspClient extends EventEmitter {
   private handleStdoutData(data: Buffer): void {
     this.buffer += data.toString('utf-8');
 
+    // Prevent unbounded buffer growth
+    if (this.buffer.length > this.config.maxBufferSize!) {
+      console.error(`[LSP] Buffer overflow (${this.buffer.length} bytes), resetting buffer`);
+      this.buffer = '';
+      return;
+    }
+
     while (true) {
       const headerMatch = this.buffer.match(/^Content-Length: (\d+)\r\n\r\n/);
       if (!headerMatch) {
@@ -244,13 +255,16 @@ export class LspClient extends EventEmitter {
         break;
       }
 
+      const message = this.buffer.substring(headerLength, totalLength);
+      // Advance the buffer before parsing so that a JSON.parse failure
+      // does not leave the framing cursor stuck — the next message will
+      // still be processed correctly.
+      this.buffer = this.buffer.substring(totalLength);
+
       try {
-        const message = this.buffer.substring(headerLength, totalLength);
-        this.buffer = this.buffer.substring(totalLength);
         this.processMessage(JSON.parse(message));
       } catch (error) {
         console.error(`[LSP] Failed to process message: ${error}`);
-        this.buffer = this.buffer.substring(1);
       }
     }
   }
@@ -260,15 +274,15 @@ export class LspClient extends EventEmitter {
    */
   private processMessage(message: LSPMessage): void {
     try {
-      if (message.id !== undefined && message.result !== undefined) {
-        // 响应消息
+      if (message.id !== undefined && 'result' in message && !('error' in message)) {
+        // 成功响应（result 可以是 null）
         const pending = this.responsePromises.get(message.id);
         if (pending) {
           clearTimeout(pending.timeout);
           this.responsePromises.delete(message.id);
           pending.resolve(message.result);
         }
-      } else if (message.id !== undefined && message.error !== undefined) {
+      } else if (message.id !== undefined && 'error' in message) {
         // 错误响应
         const pending = this.responsePromises.get(message.id);
         if (pending) {
@@ -358,6 +372,17 @@ export class LspClient extends EventEmitter {
         reject(error);
       }
     });
+  }
+
+  /**
+   * 拒绝所有待处理的请求（进程崩溃或退出时使用）
+   */
+  private rejectAllPending(reason: Error): void {
+    for (const [id, pending] of this.responsePromises) {
+      clearTimeout(pending.timeout);
+      pending.reject(reason);
+      this.responsePromises.delete(id);
+    }
   }
 
   /**
@@ -729,6 +754,7 @@ export class LspClient extends EventEmitter {
  */
 export class LspClientManager {
   private static clients: Map<string, LspClient> = new Map();
+  private static pending: Map<string, Promise<LspClient>> = new Map();
 
   /**
    * 获取或创建客户端
@@ -739,7 +765,18 @@ export class LspClientManager {
   ): Promise<LspClient> {
     const key = path.resolve(workingDirectory);
 
-    if (!this.clients.has(key)) {
+    const existing = this.clients.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    // Avoid duplicate initialization when called concurrently
+    const inFlight = this.pending.get(key);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const initPromise = (async () => {
       const fullConfig: LspClientConfig = {
         serverCommand: 'typescript-language-server',
         serverArgs: ['--stdio'],
@@ -754,9 +791,18 @@ export class LspClientManager {
       await client.initialize();
 
       this.clients.set(key, client);
-    }
+      this.pending.delete(key);
+      return client;
+    })();
 
-    return this.clients.get(key)!;
+    this.pending.set(key, initPromise);
+
+    try {
+      return await initPromise;
+    } catch (error) {
+      this.pending.delete(key);
+      throw error;
+    }
   }
 
   /**
@@ -778,6 +824,7 @@ export class LspClientManager {
     }
 
     this.clients.delete(key);
+    this.pending.delete(key);
     return this.getClient(workingDirectory, config);
   }
 
@@ -800,6 +847,7 @@ export class LspClientManager {
       }
     }
     this.clients.clear();
+    this.pending.clear();
   }
 
   /**
@@ -817,5 +865,6 @@ export class LspClientManager {
       }
       this.clients.delete(key);
     }
+    this.pending.delete(key);
   }
 }
