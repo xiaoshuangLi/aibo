@@ -31,12 +31,17 @@ import getLspTools, {
   getHoverInfoTool,
   getCompletionsTool,
   getDefinitionTool,
+  getTypeDefinitionTool,
+  getImplementationTool,
   getReferencesTool,
   getCodeActionsTool,
   getDiagnosticsTool,
   getDocumentSymbolsTool,
   getWorkspaceSymbolsTool,
   formatDocumentTool,
+  formatRangeTool,
+  getSignatureHelpTool,
+  renameSymbolTool,
   setLogLevelTool,
   shutdownLspTool,
 } from '@/tools/lsp-tools';
@@ -125,28 +130,33 @@ afterAll(() => {
 // ─── 1. Tool schema & metadata ────────────────────────────────────────────────
 
 describe('LSP tool schema and metadata', () => {
-  it('getLspTools() returns 16 tools', async () => {
+  it('getLspTools() returns 21 tools', async () => {
     const tools = await getLspTools();
-    expect(tools).toHaveLength(16);
+    expect(tools).toHaveLength(21);
   });
 
   const cases: [string, any, string[]][] = [
-    ['start_lsp',           startLspTool,          ['root_dir']],
-    ['restart_lsp_server',  restartLspServerTool,  ['root_dir']],
-    ['open_document',       openDocumentTool,      ['file_path']],
-    ['close_document',      closeDocumentTool,     ['file_path']],
-    ['update_document',     updateDocumentTool,    ['file_path', 'new_content']],
-    ['get_hover_info',      getHoverInfoTool,      ['file_path', 'line', 'column']],
-    ['get_completions',     getCompletionsTool,    ['file_path', 'line', 'column']],
-    ['get_definition',      getDefinitionTool,     ['file_path', 'line', 'column']],
-    ['get_references',      getReferencesTool,     ['file_path', 'line', 'column']],
-    ['get_code_actions',    getCodeActionsTool,    ['file_path', 'start_line', 'start_column', 'end_line', 'end_column']],
-    ['get_diagnostics',     getDiagnosticsTool,    ['file_path']],
-    ['get_document_symbols',getDocumentSymbolsTool,['file_path']],
-    ['get_workspace_symbols',getWorkspaceSymbolsTool,['query']],
-    ['format_document',     formatDocumentTool,    ['file_path']],
-    ['set_log_level',       setLogLevelTool,       ['level']],
-    ['shutdown_lsp',        shutdownLspTool,       []],
+    ['start_lsp',             startLspTool,            ['root_dir']],
+    ['restart_lsp_server',    restartLspServerTool,    ['root_dir']],
+    ['open_document',         openDocumentTool,        ['file_path']],
+    ['close_document',        closeDocumentTool,       ['file_path']],
+    ['update_document',       updateDocumentTool,      ['file_path', 'new_content']],
+    ['get_hover_info',        getHoverInfoTool,        ['file_path', 'line', 'column']],
+    ['get_completions',       getCompletionsTool,      ['file_path', 'line', 'column']],
+    ['get_definition',        getDefinitionTool,       ['file_path', 'line', 'column']],
+    ['get_type_definition',   getTypeDefinitionTool,   ['file_path', 'line', 'column']],
+    ['get_implementation',    getImplementationTool,   ['file_path', 'line', 'column']],
+    ['get_references',        getReferencesTool,       ['file_path', 'line', 'column']],
+    ['get_code_actions',      getCodeActionsTool,      ['file_path', 'start_line', 'start_column', 'end_line', 'end_column']],
+    ['get_diagnostics',       getDiagnosticsTool,      ['file_path']],
+    ['get_document_symbols',  getDocumentSymbolsTool,  ['file_path']],
+    ['get_workspace_symbols', getWorkspaceSymbolsTool, ['query']],
+    ['format_document',       formatDocumentTool,      ['file_path']],
+    ['format_range',          formatRangeTool,         ['file_path', 'start_line', 'start_column', 'end_line', 'end_column']],
+    ['get_signature_help',    getSignatureHelpTool,    ['file_path', 'line', 'column']],
+    ['rename_symbol',         renameSymbolTool,        ['file_path', 'line', 'column', 'new_name']],
+    ['set_log_level',         setLogLevelTool,         ['level']],
+    ['shutdown_lsp',          shutdownLspTool,         []],
   ];
 
   for (const [name, toolObj, schemaKeys] of cases) {
@@ -204,8 +214,28 @@ describe('Error paths before any LSP server is started', () => {
     expect(result.success).toBe(false);
   });
 
+  it('getTypeDefinitionTool returns error', async () => {
+    const result = parseResult(await getTypeDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 29 }));
+    expect(result.success).toBe(false);
+  });
+
+  it('getImplementationTool returns error', async () => {
+    const result = parseResult(await getImplementationTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 17 }));
+    expect(result.success).toBe(false);
+  });
+
   it('getReferencesTool returns error', async () => {
     const result = parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18 }));
+    expect(result.success).toBe(false);
+  });
+
+  it('getSignatureHelpTool returns error', async () => {
+    const result = parseResult(await getSignatureHelpTool.invoke({ file_path: FIXTURE_FILE, line: 15, column: 22 }));
+    expect(result.success).toBe(false);
+  });
+
+  it('renameSymbolTool returns error', async () => {
+    const result = parseResult(await renameSymbolTool.invoke({ file_path: FIXTURE_FILE, line: 1, column: 18, new_name: 'Account' }));
     expect(result.success).toBe(false);
   });
 
@@ -226,6 +256,13 @@ describe('Error paths before any LSP server is started', () => {
 
   it('formatDocumentTool returns error', async () => {
     const result = parseResult(await formatDocumentTool.invoke({ file_path: FIXTURE_FILE }));
+    expect(result.success).toBe(false);
+  });
+
+  it('formatRangeTool returns error', async () => {
+    const result = parseResult(await formatRangeTool.invoke({
+      file_path: FIXTURE_FILE, start_line: 1, start_column: 1, end_line: 5, end_column: 1,
+    }));
     expect(result.success).toBe(false);
   });
 
@@ -287,8 +324,24 @@ describe('File-not-found error handling', () => {
     expect(parseResult(await getDefinitionTool.invoke({ file_path: MISSING, line: 1, column: 1 })).success).toBe(false);
   });
 
+  it('getTypeDefinitionTool returns error for missing file', async () => {
+    expect(parseResult(await getTypeDefinitionTool.invoke({ file_path: MISSING, line: 1, column: 1 })).success).toBe(false);
+  });
+
+  it('getImplementationTool returns error for missing file', async () => {
+    expect(parseResult(await getImplementationTool.invoke({ file_path: MISSING, line: 1, column: 1 })).success).toBe(false);
+  });
+
   it('getReferencesTool returns error for missing file', async () => {
     expect(parseResult(await getReferencesTool.invoke({ file_path: MISSING, line: 1, column: 1 })).success).toBe(false);
+  });
+
+  it('getSignatureHelpTool returns error for missing file', async () => {
+    expect(parseResult(await getSignatureHelpTool.invoke({ file_path: MISSING, line: 1, column: 1 })).success).toBe(false);
+  });
+
+  it('renameSymbolTool returns error for missing file', async () => {
+    expect(parseResult(await renameSymbolTool.invoke({ file_path: MISSING, line: 1, column: 1, new_name: 'NewName' })).success).toBe(false);
   });
 
   it('getCompletionsTool returns error for missing file', async () => {
@@ -305,6 +358,12 @@ describe('File-not-found error handling', () => {
 
   it('formatDocumentTool returns error for missing file', async () => {
     expect(parseResult(await formatDocumentTool.invoke({ file_path: MISSING })).success).toBe(false);
+  });
+
+  it('formatRangeTool returns error for missing file', async () => {
+    expect(parseResult(await formatRangeTool.invoke({
+      file_path: MISSING, start_line: 1, start_column: 1, end_line: 5, end_column: 1,
+    })).success).toBe(false);
   });
 
   it('getCodeActionsTool returns error for missing file', async () => {
@@ -436,6 +495,81 @@ describe('LSP integration tests', () => {
 
     it('succeeds (possibly empty) on a blank line', async () => {
       expect(parseResult(await getReferencesTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
+    });
+  });
+
+  // ── getTypeDefinitionTool ───────────────────────────────────────────────────
+  describe('getTypeDefinitionTool', () => {
+    it('returns type definition of User param (line 7, col 23)', async () => {
+      const r = parseResult(await getTypeDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 23 }));
+      expect(r.success).toBe(true);
+    });
+
+    it('succeeds (possibly no result) on a blank line', async () => {
+      expect(parseResult(await getTypeDefinitionTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
+    });
+  });
+
+  // ── getImplementationTool ───────────────────────────────────────────────────
+  describe('getImplementationTool', () => {
+    it('returns implementations (possibly empty) for greet function (line 7, col 17)', async () => {
+      const r = parseResult(await getImplementationTool.invoke({ file_path: FIXTURE_FILE, line: 7, column: 17 }));
+      expect(r.success).toBe(true);
+    });
+
+    it('succeeds (possibly empty) on a blank line', async () => {
+      expect(parseResult(await getImplementationTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
+    });
+  });
+
+  // ── getSignatureHelpTool ────────────────────────────────────────────────────
+  describe('getSignatureHelpTool', () => {
+    it('returns signature help (possibly none) inside push() call (line 15, col 22)', async () => {
+      // Line 15: `    this.users.push(user);`  col 22 is inside push(...)
+      const r = parseResult(await getSignatureHelpTool.invoke({ file_path: FIXTURE_FILE, line: 15, column: 22 }));
+      expect(r.success).toBe(true);
+    });
+
+    it('succeeds (possibly no info) on a blank line', async () => {
+      expect(parseResult(await getSignatureHelpTool.invoke({ file_path: FIXTURE_FILE, line: 6, column: 1 })).success).toBe(true);
+    });
+  });
+
+  // ── renameSymbolTool ────────────────────────────────────────────────────────
+  describe('renameSymbolTool', () => {
+    it('returns workspace edit for renaming greet function (line 7, col 17)', async () => {
+      const r = parseResult(await renameSymbolTool.invoke({
+        file_path: FIXTURE_FILE, line: 7, column: 17, new_name: 'sayHello',
+      }));
+      expect(r.success).toBe(true);
+    });
+
+    it('succeeds (possibly no edit) on a blank line', async () => {
+      const r = parseResult(await renameSymbolTool.invoke({
+        file_path: FIXTURE_FILE, line: 6, column: 1, new_name: 'anything',
+      }));
+      expect(r.success).toBe(true);
+    });
+  });
+
+  // ── formatRangeTool ─────────────────────────────────────────────────────────
+  describe('formatRangeTool', () => {
+    it('returns success (already formatted or with edits) for lines 1-5', async () => {
+      const r = parseResult(await formatRangeTool.invoke({
+        file_path: FIXTURE_FILE, start_line: 1, start_column: 1, end_line: 5, end_column: 1,
+      }));
+      expect(r.success).toBe(true);
+      const text = r.content[0].text;
+      const valid = text === 'Range is already formatted' || (() => {
+        try { return Array.isArray(JSON.parse(text)); } catch { return false; }
+      })();
+      expect(valid).toBe(true);
+    });
+
+    it('succeeds on a single-line range', async () => {
+      expect(parseResult(await formatRangeTool.invoke({
+        file_path: FIXTURE_FILE, start_line: 7, start_column: 1, end_line: 7, end_column: 40,
+      })).success).toBe(true);
     });
   });
 

@@ -428,6 +428,244 @@ export const getReferencesTool = tool(
 );
 
 /**
+ * get_type_definition - 获取类型定义位置
+ */
+export const getTypeDefinitionTool = tool(
+  async ({ file_path, line, column }: { file_path: string; line: number; column: number }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log('debug', `Getting type definition: ${file_path} (${line}:${column})`);
+
+      validateFileExists(file_path);
+
+      const client = await LspClientManager.getClient(rootDir);
+      const definitions = await client.getTypeDefinition(file_path, {
+        line: line - 1,
+        character: column - 1
+      });
+
+      if (definitions.length === 0) {
+        return JSON.stringify(createSuccessResult('No type definition found'));
+      }
+
+      log('debug', `Found ${definitions.length} type definition(s)`);
+
+      return JSON.stringify(createSuccessResult(JSON.stringify(definitions, null, 2)));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error getting type definition: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to get type definition: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'get_type_definition',
+    description:
+      '获取指定位置符号的类型定义位置。与 get_definition 不同，此工具返回类型本身的定义位置，而非值的声明位置。适用于查找类型别名、接口、泛型参数的定义。',
+    schema: z.object({
+      file_path: z.string().describe('文件路径'),
+      line: z.number().describe('行号（1-based）'),
+      column: z.number().describe('列位置（1-based）')
+    })
+  }
+);
+
+/**
+ * get_implementation - 获取接口或抽象方法的实现
+ */
+export const getImplementationTool = tool(
+  async ({ file_path, line, column }: { file_path: string; line: number; column: number }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log('debug', `Getting implementation: ${file_path} (${line}:${column})`);
+
+      validateFileExists(file_path);
+
+      const client = await LspClientManager.getClient(rootDir);
+      const implementations = await client.getImplementation(file_path, {
+        line: line - 1,
+        character: column - 1
+      });
+
+      if (implementations.length === 0) {
+        return JSON.stringify(createSuccessResult('No implementations found'));
+      }
+
+      log('debug', `Found ${implementations.length} implementation(s)`);
+
+      return JSON.stringify(createSuccessResult(JSON.stringify(implementations, null, 2)));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error getting implementation: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to get implementation: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'get_implementation',
+    description:
+      '获取接口方法或抽象方法的所有具体实现位置。帮助了解某个接口或抽象类在代码库中的所有实现。',
+    schema: z.object({
+      file_path: z.string().describe('文件路径'),
+      line: z.number().describe('行号（1-based）'),
+      column: z.number().describe('列位置（1-based）')
+    })
+  }
+);
+
+/**
+ * rename_symbol - 重命名符号
+ */
+export const renameSymbolTool = tool(
+  async ({
+    file_path,
+    line,
+    column,
+    new_name
+  }: {
+    file_path: string;
+    line: number;
+    column: number;
+    new_name: string;
+  }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log('debug', `Renaming symbol at: ${file_path} (${line}:${column}) to "${new_name}"`);
+
+      validateFileExists(file_path);
+
+      const client = await LspClientManager.getClient(rootDir);
+      const workspaceEdit = await client.rename(file_path, {
+        line: line - 1,
+        character: column - 1
+      }, new_name);
+
+      if (!workspaceEdit) {
+        return JSON.stringify(createSuccessResult('No rename edits produced'));
+      }
+
+      log('debug', 'Rename workspace edit generated');
+
+      return JSON.stringify(createSuccessResult(JSON.stringify(workspaceEdit, null, 2)));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error renaming symbol: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to rename symbol: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'rename_symbol',
+    description:
+      '重命名指定位置的符号，返回需要应用到整个工作区的编辑操作（WorkspaceEdit）。返回的编辑描述了所有需要修改的文件和位置，需配合 update_document 工具应用这些变更。',
+    schema: z.object({
+      file_path: z.string().describe('文件路径'),
+      line: z.number().describe('行号（1-based）'),
+      column: z.number().describe('列位置（1-based）'),
+      new_name: z.string().describe('新的符号名称')
+    })
+  }
+);
+
+/**
+ * get_signature_help - 获取函数签名帮助
+ */
+export const getSignatureHelpTool = tool(
+  async ({ file_path, line, column }: { file_path: string; line: number; column: number }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log('debug', `Getting signature help: ${file_path} (${line}:${column})`);
+
+      validateFileExists(file_path);
+
+      const client = await LspClientManager.getClient(rootDir);
+      const signatureHelp = await client.getSignatureHelp(file_path, {
+        line: line - 1,
+        character: column - 1
+      });
+
+      if (!signatureHelp || signatureHelp.signatures.length === 0) {
+        return JSON.stringify(createSuccessResult('No signature help available'));
+      }
+
+      log('debug', `Got ${signatureHelp.signatures.length} signature(s)`);
+
+      return JSON.stringify(createSuccessResult(JSON.stringify(signatureHelp, null, 2)));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error getting signature help: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to get signature help: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'get_signature_help',
+    description:
+      '获取函数调用位置的签名帮助信息。返回函数的参数列表、类型和文档说明，帮助了解如何正确调用某个函数。',
+    schema: z.object({
+      file_path: z.string().describe('文件路径'),
+      line: z.number().describe('行号（1-based）'),
+      column: z.number().describe('列位置（1-based）')
+    })
+  }
+);
+
+/**
+ * format_range - 格式化指定范围的代码
+ */
+export const formatRangeTool = tool(
+  async ({
+    file_path,
+    start_line,
+    start_column,
+    end_line,
+    end_column
+  }: {
+    file_path: string;
+    start_line: number;
+    start_column: number;
+    end_line: number;
+    end_column: number;
+  }) => {
+    try {
+      const rootDir = getCurrentRootDir();
+      log(
+        'debug',
+        `Formatting range: ${file_path} (${start_line}:${start_column} to ${end_line}:${end_column})`
+      );
+
+      validateFileExists(file_path);
+
+      const client = await LspClientManager.getClient(rootDir);
+      const edits = await client.formatRange(file_path, {
+        start: { line: start_line - 1, character: start_column - 1 },
+        end: { line: end_line - 1, character: end_column - 1 }
+      });
+
+      if (edits.length === 0) {
+        return JSON.stringify(createSuccessResult('Range is already formatted'));
+      }
+
+      log('debug', `Generated ${edits.length} formatting edit(s)`);
+
+      return JSON.stringify(createSuccessResult(JSON.stringify(edits, null, 2)));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Error formatting range: ${errorMessage}`);
+      return JSON.stringify(createErrorResult(`Failed to format range: ${errorMessage}`));
+    }
+  },
+  {
+    name: 'format_range',
+    description:
+      '格式化文件中指定范围的代码。与 format_document 不同，此工具只格式化选中区域，适合对局部代码进行格式化而不影响整个文件。',
+    schema: z.object({
+      file_path: z.string().describe('文件路径'),
+      start_line: z.number().describe('起始行号（1-based）'),
+      start_column: z.number().describe('起始列位置（1-based）'),
+      end_line: z.number().describe('结束行号（1-based）'),
+      end_column: z.number().describe('结束列位置（1-based）')
+    })
+  }
+);
+
+/**
  * get_code_actions - 获取代码操作（快速修复、重构等）
  */
 export const getCodeActionsTool = tool(
@@ -750,12 +988,17 @@ export default async function getLspTools() {
     getHoverInfoTool,
     getCompletionsTool,
     getDefinitionTool,
+    getTypeDefinitionTool,
+    getImplementationTool,
     getReferencesTool,
     getCodeActionsTool,
     getDiagnosticsTool,
     getDocumentSymbolsTool,
     getWorkspaceSymbolsTool,
     formatDocumentTool,
+    formatRangeTool,
+    getSignatureHelpTool,
+    renameSymbolTool,
     setLogLevelTool,
     shutdownLspTool
   ];
