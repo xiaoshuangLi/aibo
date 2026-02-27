@@ -342,7 +342,7 @@ export async function handleAbortCommand(session: any): Promise<boolean> {
   let success = false;
   let message = "";
   
-  if (session.abortController && !session.abortController.signal.aborted) {
+  if (session.isRunning && session.abortController && !session.abortController.signal.aborted) {
     session.abortController.abort();
     success = true;
     message = "⏹️ **操作已中断**\n\n当前任务已被成功取消，您可以开始新的操作。";

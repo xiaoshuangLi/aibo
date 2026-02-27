@@ -143,5 +143,21 @@ describe('UserInputHandler - Comprehensive Tests', () => {
       // New abort controller should be created
       expect(mockSession.abortController).not.toBeUndefined();
     });
+
+    it('should not overwrite abortController set by a concurrent new message', async () => {
+      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+
+      const concurrentAbortController = new AbortController();
+      // Simulate the race condition: a concurrent new message replaces the controller mid-processing
+      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+        mockSession.abortController = concurrentAbortController;
+      });
+
+      await handleUserInput('test', mockSession, mockAgent);
+
+      // The finally block must NOT overwrite the controller set by the concurrent message
+      expect(mockSession.abortController).toBe(concurrentAbortController);
+    });
   });
 });

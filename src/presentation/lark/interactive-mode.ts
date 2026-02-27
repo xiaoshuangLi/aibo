@@ -100,11 +100,11 @@ export async function handleUserMessage(
   // 设置会话为运行状态
   session.isRunning = true;
   
+  // 创建新的中断控制器（在 try 外部，以便 finally 能访问并比较）
+  const abortController = new AbortController();
+  session.abortController = abortController;
+
   try {
-    // 创建新的中断控制器
-    const abortController = new AbortController();
-    session.abortController = abortController;
-    
     // 创建流状态
     const state: any = {
       fullResponse: '',
@@ -133,8 +133,10 @@ export async function handleUserMessage(
     // processStreamChunks会自动处理错误事件
   } finally {
     session.isRunning = false;
-    // 重置中断控制器
-    session.abortController = new AbortController();
+    // 只有当前控制器未被新消息替换时才重置，避免覆盖并发新会话的控制器
+    if (session.abortController === abortController) {
+      session.abortController = new AbortController();
+    }
   }
 }
 
