@@ -4,6 +4,7 @@ import {
   handleHelpCommand,
   handleVerboseCommand,
   handleNewCommand,
+  handleCompactCommand,
   handleAbortCommand,
   handleExitCommand,
   handleUnknownCommand,
@@ -83,6 +84,11 @@ jest.mock('@/shared/utils/restart-helper', () => ({
   getRestartCommand: jest.fn()
 }));
 
+jest.mock('@/shared/utils/library', () => ({
+  getAllKnowledge: jest.fn().mockReturnValue([]),
+  addKnowledge: jest.fn(),
+}));
+
 // Mock child_process.spawn
 jest.mock('child_process', () => ({
   spawn: jest.fn(() => ({
@@ -128,6 +134,7 @@ describe('Lark Command Handlers', () => {
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/exit'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/verbose'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/new'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/compact'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('/abort'));
       
       // Verify that the message was emitted through ioChannel
@@ -863,11 +870,121 @@ describe('Lark Command Handlers', () => {
     });
   });
 
+  describe('handleCompactCommand', () => {
+    let mockSession: any;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      const library = require('@/shared/utils/library');
+      (library.getAllKnowledge as jest.Mock).mockReturnValue([]);
+      mockSession = {
+        threadId: 'old-session-id',
+        adapter: { emit: jest.fn() }
+      };
+    });
+
+    it('should return true', async () => {
+      const result = await handleCompactCommand(mockSession);
+      expect(result).toBe(true);
+    });
+
+    it('should update session threadId', async () => {
+      await handleCompactCommand(mockSession);
+      expect(mockSession.threadId).toBe('new-session-id');
+    });
+
+    it('should emit commandExecuted with success when knowledge base is empty', async () => {
+      await handleCompactCommand(mockSession);
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/compact',
+            result: expect.objectContaining({ success: true })
+          })
+        })
+      );
+    });
+
+    it('should emit guidance message when knowledge base is empty', async () => {
+      await handleCompactCommand(mockSession);
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            result: expect.objectContaining({
+              message: expect.stringContaining('知识库为空')
+            })
+          })
+        })
+      );
+    });
+
+    it('should migrate knowledge items to new session', async () => {
+      const library = require('@/shared/utils/library');
+      (library.getAllKnowledge as jest.Mock).mockReturnValue([
+        { content: 'Content A', title: 'Goal A', keywords: ['k1'] },
+        { content: 'Content B', title: 'Goal B', keywords: ['k2'] },
+      ]);
+
+      await handleCompactCommand(mockSession);
+
+      expect(library.addKnowledge).toHaveBeenCalledTimes(2);
+      expect(library.addKnowledge).toHaveBeenCalledWith('Content A', 'Goal A', ['k1']);
+      expect(library.addKnowledge).toHaveBeenCalledWith('Content B', 'Goal B', ['k2']);
+    });
+
+    it('should emit knowledge item titles when migration occurs', async () => {
+      const library = require('@/shared/utils/library');
+      (library.getAllKnowledge as jest.Mock).mockReturnValue([
+        { content: 'Content A', title: 'My Project Goal', keywords: [] },
+      ]);
+
+      await handleCompactCommand(mockSession);
+
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            result: expect.objectContaining({
+              message: expect.stringContaining('My Project Goal')
+            })
+          })
+        })
+      );
+    });
+
+    it('should return true even when getAllKnowledge throws', async () => {
+      const library = require('@/shared/utils/library');
+      (library.getAllKnowledge as jest.Mock).mockImplementation(() => {
+        throw new Error('storage error');
+      });
+
+      const result = await handleCompactCommand(mockSession);
+      expect(result).toBe(true);
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            result: expect.objectContaining({ success: false })
+          })
+        })
+      );
+    });
+  });
+
   describe('createHandleInternalCommand', () => {
     let mockSession: any;
     let handleCommand: (command: string) => Promise<boolean>;
 
     beforeEach(() => {
+      jest.clearAllMocks();
+      // Ensure library mocks have clean default state
+      const library = require('@/shared/utils/library');
+      (library.getAllKnowledge as jest.Mock).mockReturnValue([]);
+      // Ensure SessionManager mock returns predictable value
+      const { SessionManager: SM } = require('@/infrastructure/session/session-manager');
+      SM.getInstance.mockReturnValue({
+        clearCurrentSession: jest.fn().mockReturnValue('new-session-id'),
+        getCurrentSessionMetadata: jest.fn().mockReturnValue(null),
+      });
       mockSession = {
         threadId: 'test-session-id',
         adapter: {
@@ -896,6 +1013,12 @@ describe('Lark Command Handlers', () => {
 
     it('should handle /new command', async () => {
       const result = await handleCommand('/new');
+      expect(result).toBe(true);
+      expect(mockSession.threadId).toBe('new-session-id');
+    });
+
+    it('should handle /compact command', async () => {
+      const result = await handleCommand('/compact');
       expect(result).toBe(true);
       expect(mockSession.threadId).toBe('new-session-id');
     });
