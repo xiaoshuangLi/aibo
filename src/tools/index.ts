@@ -9,6 +9,8 @@ import getLspTools from '@/tools/lsp-tools';
 import getGlobTools from '@/tools/glob';
 import getGrepTools from '@/tools/grep';
 import getWebFetchTools from '@/tools/web-fetch';
+import getViewFileTools from '@/tools/view-file';
+import getEditFileTools from '@/tools/edit-file';
 
 /**
  * 异步获取所有工具的方法
@@ -28,6 +30,8 @@ export default async function getTools() {
     globTools,
     grepTools,
     webFetchTools,
+    viewFileTools,
+    editFileTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -40,6 +44,8 @@ export default async function getTools() {
     getGlobTools(),
     getGrepTools(),
     getWebFetchTools(),
+    getViewFileTools(),
+    getEditFileTools(),
   ]);
   
   return [
@@ -54,5 +60,7 @@ export default async function getTools() {
     ...globTools,
     ...grepTools,
     ...webFetchTools,
+    ...viewFileTools,
+    ...editFileTools,
   ];
 }
