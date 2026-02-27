@@ -4,14 +4,20 @@
   "description": "AI bot with DeepAgents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "aibo": "dist/main.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && tsc-alias",
     "test": "jest --verbose=false",
     "test:watch": "jest --verbose=false --watch",
     "test:coverage": "jest --verbose=false --coverage",
-    "start": "node dist/index.js",
-    "start:console": "AIBO_INTERACTION=console node dist/index.js",
-    "start:lark": "AIBO_INTERACTION=lark node dist/index.js",
+    "start": "node dist/main.js",
+    "start:console": "AIBO_INTERACTION=console node dist/main.js",
+    "start:lark": "AIBO_INTERACTION=lark node dist/main.js",
     "dev": "ts-node -r tsconfig-paths/register src/main.ts",
     "dev:console": "AIBO_INTERACTION=console ts-node -r tsconfig-paths/register src/main.ts",
     "dev:lark": "AIBO_INTERACTION=lark ts-node -r tsconfig-paths/register src/main.ts",
