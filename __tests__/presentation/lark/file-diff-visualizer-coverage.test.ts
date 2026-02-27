@@ -96,9 +96,9 @@ index 000..111 100644
     expect(result.success).toBe(true);
     expect(result.deletions).toBeGreaterThan(0);
     expect(result.additions).toBeGreaterThan(0);
-    expect(result.diff).toContain('<font color="red">');
-    expect(result.diff).toContain('<font color="green">');
-    expect(result.diff).toContain('<font color="blue">');
+    expect(result.diff).toContain('```');
+    expect(result.diff).toContain('-deleted line');
+    expect(result.diff).toContain('+added line');
   });
 
   // Lines 305-313: revertFile, stageFile, commit success paths

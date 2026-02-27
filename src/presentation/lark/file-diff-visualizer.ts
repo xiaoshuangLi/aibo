@@ -7,9 +7,8 @@
  * 
  * Lark (飞书) Markdown 兼容性说明：
  * - Lark 使用标准 CommonMark Markdown 语法
- * - 所有 Markdown 特殊字符都需要转义：\ ` * _ { } [ ] ( ) # + - . ! |
- * - 即使在 <font> 标签内的内容也会被解析为 Markdown，必须完全转义
  * - 代码块（```）内的内容不会被解析为 Markdown，无需转义
+ * - 飞书不支持 diff 语法高亮，代码块使用无语言标识符保证内容原样显示
  */
 
 import { execSync } from 'child_process';
@@ -233,70 +232,30 @@ export class FileDiffVisualizer {
     }
   }
 
-  /**
-   * 🛡️ Lark Markdown 完全转义函数
-   * 用于转义所有 Markdown 特殊字符，确保在 Lark 消息中正确显示
-   * 需要转义的字符：\ ` * _ { } [ ] ( ) # + - . ! |
-   * 
-   * 注意：Lark 会解析整个消息的 Markdown，包括 <font> 标签内的内容，
-   * 所以所有非代码块内容都必须完全转义。
-   * 
-   * @param str 要转义的字符串
-   * @returns 转义后的安全字符串
-   */
-  private escapeMarkdown(str: string): string {
-    // 所有需要转义的 Markdown 特殊字符
-    // 使用捕获组确保每个字符都被正确转义
-    // 注意：将 - 放在字符类末尾以避免被解释为范围操作符，并移除重复的 !
-    return str.replace(/([\\`*_{}[\]()#+.!|-])/g, '\\$1');
-  }
-
-
 
   /**
-   * 🎨 格式化diff输出（带颜色字体）
-   * 所有内容都需要进行 Markdown 转义，包括 <font> 标签内的内容，
-   * 因为 Lark 会解析整个消息的 Markdown 语法。
-   * 
-   * 特别处理：上下文行（普通行）可能包含缩进，在Lark中会被识别为代码块。
-   * 通过在上下文行开头添加零宽空格(\u200B)来避免被识别为代码块。
+   * 使用普通代码块包裹原始 diff 内容，贴近原生 git 输出效果。
+   * 飞书不支持 diff 语法高亮，使用无语言标识符的代码块保证内容原样显示，
+   * 无需对内容进行 Markdown 转义。
    */
   private formatDiffOutput(diff: string, filePath: string, type: string): FileDiffResult {
     const lines = diff.split('\n');
     let additions = 0;
     let deletions = 0;
     
-    // 统计增删行数并格式化每一行
-    const formattedLines = lines.map(line => {
-      // 清理行尾的回车符，确保单行显示
+    // 统计增删行数
+    for (const line of lines) {
       const cleanLine = line.replace(/\r/g, '');
-      
       if (cleanLine.startsWith('+') && !cleanLine.startsWith('+++')) {
         additions++;
-        // 新增行用绿色高亮 - 内容需要完全转义
-        const content = cleanLine.substring(1); // 移除开头的 '+'
-        const escapedContent = this.escapeMarkdown(content);
-        return `<font color="green">+${escapedContent}</font>`;
       } else if (cleanLine.startsWith('-') && !cleanLine.startsWith('---')) {
         deletions++;
-        // 删除行用红色高亮 - 内容需要完全转义
-        const content = cleanLine.substring(1); // 移除开头的 '-'
-        const escapedContent = this.escapeMarkdown(content);
-        return `<font color="red">-${escapedContent}</font>`;
-      } else if (cleanLine.startsWith('@@')) {
-        // diff 块标识用蓝色高亮 - 内容需要完全转义
-        const escapedContent = this.escapeMarkdown(cleanLine);
-        return `<font color="blue">${escapedContent}</font>`;
-      } else {
-        // 其他行（上下文行）保持正常 - 需要完全转义
-        // 为避免Lark将缩进行识别为代码块，在行首添加零宽空格
-        const escapedContent = this.escapeMarkdown(cleanLine);
-        return `\u200B${escapedContent}`;
       }
-    });
+    }
     
-    // 格式化diff内容为Markdown兼容格式
-    const formattedDiff = formattedLines.join('\n');
+    // 使用普通代码块包裹，贴近原生 git 输出，飞书中无需转义
+    const cleanDiff = diff.replace(/\r/g, '');
+    const formattedDiff = `\`\`\`\n${cleanDiff}\`\`\``;
     
     return {
       success: true,
