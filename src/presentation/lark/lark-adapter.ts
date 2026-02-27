@@ -80,6 +80,8 @@ export class LarkAdapter extends DefaultAdapter {
    */
   setUserMessageCallback(callback: UserMessageCallback): void {
     this.userMessageCallback = callback;
+    // 处理在回调注册之前已入队的消息
+    this.processMessageQueue();
   }
 
   /**
@@ -167,17 +169,17 @@ export class LarkAdapter extends DefaultAdapter {
    * 处理消息队列
    */
   private async processMessageQueue(): Promise<void> {
-    if (this.isProcessingQueue || this.messageQueue.length === 0) {
+    if (this.isProcessingQueue || this.messageQueue.length === 0 || !this.userMessageCallback) {
       return;
     }
 
     this.isProcessingQueue = true;
     
     try {
-      while (this.messageQueue.length > 0) {
+      while (this.messageQueue.length > 0 && this.userMessageCallback) {
         const message = this.messageQueue.shift()!;
-        // 这里可以添加消息处理逻辑
         console.log(`📨 收到队列消息: ${message.content}`);
+        this.userMessageCallback(message.content);
       }
     } finally {
       this.isProcessingQueue = false;
