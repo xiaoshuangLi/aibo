@@ -204,6 +204,19 @@ describe('Lark Command Handlers', () => {
         })
       );
     });
+
+    it('should replace the old threadId so the next message has no prior context', async () => {
+      const mockSession = {
+        threadId: 'old-session-id',
+        adapter: { emit: jest.fn() }
+      };
+
+      await handleNewCommand(mockSession as any);
+
+      // The threadId must change so LangGraph starts a fresh checkpoint
+      expect(mockSession.threadId).not.toBe('old-session-id');
+      expect(mockSession.threadId).toBe('new-session-id');
+    });
   });
 
   describe('handleAbortCommand', () => {

@@ -137,6 +137,36 @@ describe('SessionManager', () => {
       expect(result).toBe('session-1234567890');
       expect((sessionManager as any).currentSessionId).toBe('session-1234567890');
     });
+
+    it('should produce a different session ID than the previous one', () => {
+      // Set up two different IDs returned by createConsoleThreadId
+      const { createConsoleThreadId } = require('@/core/utils/interactive-logic');
+      (createConsoleThreadId as jest.Mock)
+        .mockReturnValueOnce('session-old')
+        .mockReturnValueOnce('session-new');
+
+      // Establish an initial session
+      sessionManager.createSession(); // session-old
+      expect((sessionManager as any).currentSessionId).toBe('session-old');
+
+      // Clearing must produce a different ID
+      const newId = sessionManager.clearCurrentSession(); // session-new
+      expect(newId).toBe('session-new');
+      expect(newId).not.toBe('session-old');
+    });
+
+    it('should update currentSessionId so subsequent calls use the new session', () => {
+      const { createConsoleThreadId } = require('@/core/utils/interactive-logic');
+      (createConsoleThreadId as jest.Mock)
+        .mockReturnValueOnce('session-before')
+        .mockReturnValueOnce('session-after');
+
+      sessionManager.createSession();
+      sessionManager.clearCurrentSession();
+
+      // getCurrentSessionId should now return the post-clear session ID
+      expect(sessionManager.getCurrentSessionId()).toBe('session-after');
+    });
   });
 
   describe('getAllSessionIds', () => {

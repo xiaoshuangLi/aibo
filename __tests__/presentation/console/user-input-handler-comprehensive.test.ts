@@ -143,5 +143,53 @@ describe('UserInputHandler - Comprehensive Tests', () => {
       // New abort controller should be created
       expect(mockSession.abortController).not.toBeUndefined();
     });
+
+    it('should use the updated threadId after /new resets the session', async () => {
+      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+
+      mockAgent.stream.mockResolvedValue({});
+      require('@/core/utils/stream-handler').processStreamChunks.mockResolvedValue('response');
+
+      // Simulate /new: session.threadId is updated to a fresh ID
+      mockSession.threadId = 'new-session-after-new-command';
+
+      await handleUserInput('hello in new session', mockSession, mockAgent);
+
+      // The agent must receive the NEW thread_id, not the original 'test-thread'
+      expect(mockAgent.stream).toHaveBeenCalledWith(
+        { messages: [{ role: 'user', content: 'hello in new session' }] },
+        expect.objectContaining({
+          configurable: { thread_id: 'new-session-after-new-command' },
+        })
+      );
+    });
+
+    it('should not use previous thread_id after session is reset', async () => {
+      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+
+      mockAgent.stream.mockResolvedValue({});
+      require('@/core/utils/stream-handler').processStreamChunks.mockResolvedValue('response');
+
+      const originalThreadId = mockSession.threadId; // 'test-thread'
+
+      // First message uses the original thread_id
+      await handleUserInput('first message', mockSession, mockAgent);
+      expect(mockAgent.stream).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ configurable: { thread_id: originalThreadId } })
+      );
+
+      // Simulate /new clearing the session
+      mockSession.threadId = 'fresh-thread-id-after-reset';
+
+      // Second message must use the NEW thread_id, confirming no prior context
+      await handleUserInput('second message', mockSession, mockAgent);
+      expect(mockAgent.stream).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ configurable: { thread_id: 'fresh-thread-id-after-reset' } })
+      );
+    });
   });
 });

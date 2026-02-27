@@ -181,6 +181,47 @@ describe('Lark Interactive Mode', () => {
       expect(mockSession.abortController).not.toBe(originalAbortController);
       expect(mockSession.abortController).toBeDefined();
     });
+
+    it('should use updated threadId after /new resets session', async () => {
+      // Simulate the effect of /new: session.threadId is updated to a new value
+      mockSession.threadId = 'brand-new-session-id';
+
+      const testMessage = 'first message in new session';
+      mockAgent.stream.mockResolvedValue('test-stream');
+
+      await handleUserMessage(testMessage, mockSession, mockAgent);
+
+      // The agent must be called with the NEW thread_id, not the original 'test-session'
+      expect(mockAgent.stream).toHaveBeenCalledWith(
+        { messages: [{ role: 'user', content: testMessage }] },
+        expect.objectContaining({
+          configurable: { thread_id: 'brand-new-session-id' },
+        })
+      );
+    });
+
+    it('should not carry previous thread_id after session is reset via /new', async () => {
+      const originalThreadId = mockSession.threadId; // 'test-session'
+      const testMessage = 'hello';
+      mockAgent.stream.mockResolvedValue('test-stream');
+
+      // First message uses the original thread_id
+      await handleUserMessage(testMessage, mockSession, mockAgent);
+      expect(mockAgent.stream).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ configurable: { thread_id: originalThreadId } })
+      );
+
+      // Simulate /new clearing the session
+      mockSession.threadId = 'fresh-session-after-new';
+
+      // Second message must use the new thread_id, not the old one
+      await handleUserMessage(testMessage, mockSession, mockAgent);
+      expect(mockAgent.stream).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ configurable: { thread_id: 'fresh-session-after-new' } })
+      );
+    });
   });
 
   describe('startLarkInteractiveMode', () => {
