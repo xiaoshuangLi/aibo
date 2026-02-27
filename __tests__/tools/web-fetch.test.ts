@@ -21,8 +21,8 @@ describe('webFetchTool', () => {
   test('should return content from successful fetch', async () => {
     mockedAxios.get = jest.fn().mockResolvedValue({
       status: 200,
-      headers: { 'content-type': 'text/html' },
-      data: '<html><body>Hello World</body></html>',
+      headers: { 'content-type': 'text/plain' },
+      data: 'Hello World',
     });
 
     const result = await webFetchTool.invoke({ url: 'https://example.com' });
@@ -33,6 +33,40 @@ describe('webFetchTool', () => {
     expect(parsed.status).toBe(200);
     expect(parsed.content).toContain('Hello World');
     expect(parsed.truncated).toBe(false);
+  });
+
+  test('should convert HTML content to Markdown', async () => {
+    mockedAxios.get = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      data: '<html><body><h1>Title</h1><p>Hello <strong>World</strong></p><script>alert("noise")</script></body></html>',
+    });
+
+    const result = await webFetchTool.invoke({ url: 'https://example.com' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    // Should contain Markdown, not HTML tags
+    expect(parsed.content).not.toContain('<h1>');
+    expect(parsed.content).not.toContain('<script>');
+    expect(parsed.content).toContain('Title');
+    expect(parsed.content).toContain('Hello');
+    expect(parsed.content).toContain('World');
+  });
+
+  test('should not convert non-HTML content to Markdown', async () => {
+    const jsonBody = '{"key":"value"}';
+    mockedAxios.get = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: jsonBody,
+    });
+
+    const result = await webFetchTool.invoke({ url: 'https://api.example.com/data' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.content).toBe(jsonBody);
   });
 
   test('should truncate content exceeding max_length', async () => {
