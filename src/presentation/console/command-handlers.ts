@@ -2,6 +2,7 @@ import { config } from '@/core/config/config';
 import { styled } from '@/presentation/styling/output-styler';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
 import { SessionManager } from '@/infrastructure/session/session-manager';
+import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
 import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { handleUserInput } from '@/presentation/console/user-input-handler';
 
@@ -47,6 +48,7 @@ export async function handleHelpCommand(): Promise<boolean> {
    /ls          - 列出当前目录
    /verbose     - 切换详细/简略输出模式
    /new         - 开始新会话（清除对话历史）
+   /compact     - 压缩对话历史（保留知识库，开始新会话，适合长对话变慢时使用）
    /voice       - 启动语音输入（5秒录音）
    双击空格键   - 开始/结束语音输入（推荐使用）
    Ctrl+C       - 强制中断当前操作（任何时刻可用）
@@ -168,6 +170,65 @@ export async function handleLsCommand(): Promise<boolean> {
 export async function handleVerboseCommand(): Promise<boolean> {
   config.output.verbose = !config.output.verbose;
   console.log(styled.system(`输出模式已切换为: ${config.output.verbose ? '详细模式' : '简略模式（自动截断长内容）'}`));
+  return true;
+}
+
+/**
+ * 处理压缩对话命令（对标 Claude Code /compact）
+ *
+ * 中文名称：处理压缩对话命令
+ *
+ * 预期行为：
+ * - 将当前会话的知识库内容迁移到新会话中
+ * - 开始一个全新的会话（清除大量消息历史以提升速度）
+ * - 显示迁移后的知识库摘要，方便用户了解哪些上下文被保留
+ *
+ * 行为分支：
+ * 1. 有知识库内容：迁移所有知识项到新会话，并显示摘要
+ * 2. 无知识库内容：直接创建新会话，提示用户可以用 add_knowledge 保存重要上下文
+ * 3. 无异常情况：该函数不抛出异常，始终返回true
+ *
+ * @param session - 会话对象，其threadId将被更新为新的会话ID
+ * @returns Promise<boolean> - 始终返回true，表示命令处理成功
+ *
+ * @example
+ * ```typescript
+ * await handleCompactCommand(session); // 压缩对话，保留知识库
+ * ```
+ */
+export async function handleCompactCommand(session: any): Promise<boolean> {
+  try {
+    // 1. Capture all knowledge from the current session before resetting
+    const savedKnowledge = getAllKnowledge();
+
+    // 2. Create a fresh session (clears message history → speeds up responses)
+    const sessionManager = SessionManager.getInstance();
+    session.threadId = sessionManager.clearCurrentSession();
+
+    // 3. Re-populate the knowledge base in the new session
+    for (const item of savedKnowledge) {
+      addKnowledge(item.content, item.title, item.keywords);
+    }
+
+    // 4. Show a summary so the user knows what was preserved
+    if (savedKnowledge.length > 0) {
+      const titles = savedKnowledge.map((k: any) => `     • ${k.title}`).join('\n');
+      console.log(styled.system(
+        `✅ 对话已压缩 — 新会话 ID: ${session.threadId}\n` +
+        `📚 已将 ${savedKnowledge.length} 条知识项迁移到新会话:\n${titles}\n` +
+        `💡 提示：在新会话中直接描述你的当前目标，AI 会从知识库中获取上下文继续工作。`
+      ));
+    } else {
+      console.log(styled.system(
+        `✅ 对话已压缩 — 新会话 ID: ${session.threadId}\n` +
+        `📭 知识库为空，未迁移任何内容。\n` +
+        `💡 提示：使用 add_knowledge 工具保存重要的项目背景或目标，下次压缩时可自动保留。`
+      ));
+    }
+  } catch (error) {
+    console.log(styled.error(`❌ 压缩失败: ${(error as Error).message}`));
+  }
+
   return true;
 }
 
@@ -371,6 +432,9 @@ export function createHandleInternalCommand(session: any, agent: any): (command:
         
       case "/new":
         return await handleNewCommand(session);
+        
+      case "/compact":
+        return await handleCompactCommand(session);
         
       case "/voice":
       case "/speech":

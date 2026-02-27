@@ -318,3 +318,27 @@ Before declaring done:
 | Report "done" with test failures | Task is not done | Fix failures; task is done when tests pass |
 | Edit without reading the file first | Wrong indentation, duplicate code, context blindness | Always view_file before edit_file |
 | `grep_files` once, assume complete | May miss dynamic code, aliases, re-exports | Check multiple times with different queries |
+
+## 🧹 Context Management During Long Tasks
+
+Long coding sessions accumulate token history and cause two problems: **slowdown** and **goal drift**.
+
+### Save Key Decisions to the Knowledge Base
+After every major decision or milestone, save it:
+```typescript
+add_knowledge({
+  content: "Decided to use JWT auth (not sessions) because the app is API-first",
+  title: "Auth Architecture Decision",
+  keywords: ["auth", "JWT", "architecture"]
+})
+```
+
+### Use /compact Between Major Sub-Tasks
+When you finish a phase and the session has grown large:
+```
+/compact
+```
+This clears the heavy message history (speeds up responses) while keeping the knowledge base intact.
+After compacting, restate your goal so the AI stays on track.
+
+> 📖 See the **context-management** skill for the full workflow.
