@@ -15,11 +15,13 @@ The fundamental difference from "just writing code" is **verification at every s
 ```
 Task received
      ↓
+PLAN TODOS: Break into subtasks with todo_write (status: not_started)
+     ↓
 EXPLORE: What does existing similar code look like?
      ↓  
 PLAN: Which files change? What are the cross-file impacts?
      ↓
-IMPLEMENT: Write/edit the code
+IMPLEMENT: Write/edit the code  ← update todo status to in_progress first
      ↓
 BUILD: Does it compile? → NO → Fix errors → repeat BUILD
      ↓ YES
@@ -27,10 +29,40 @@ TEST: Do tests pass? → NO → Fix failures → repeat TEST
      ↓ YES
 VERIFY: Does it actually solve the problem?
      ↓ YES
-CLEANUP: Remove debug code, temp files
+CLEANUP: Remove debug code, temp files  ← mark todo completed
      ↓
 DONE ✅
 ```
+
+## 📝 Phase 0: PLAN TODOS
+
+**For any task that requires 3+ steps, create a personal todo list BEFORE doing anything else.**
+
+```typescript
+// At the start of a complex task:
+todo_write({
+  todos: [
+    { content: "Explore existing code and understand context", status: "not_started", priority: "high" },
+    { content: "Implement feature X in src/services/user-service.ts", status: "not_started", priority: "high" },
+    { content: "Add/update tests for feature X", status: "not_started", priority: "medium" },
+    { content: "Run build and fix any TypeScript errors", status: "not_started", priority: "high" },
+    { content: "Run tests and fix any failures", status: "not_started", priority: "high" },
+    { content: "Verify feature X works end-to-end", status: "not_started", priority: "medium" },
+  ]
+})
+
+// Before starting each task:
+todo_write({ todos: [{ id: "1", content: "...", status: "in_progress" }] })
+
+// After completing each task:
+todo_write({ todos: [{ id: "1", content: "...", status: "completed" }] })
+```
+
+**Why this matters**: A todo list prevents "I forgot to update the barrel export" bugs,
+shows users what you're doing, and ensures nothing is skipped during a long session.
+
+> ⚠️ This is the `todo_write`/`todo_read` tool — for YOUR personal task tracking.
+> For delegating to specialized subagents, use `write-subagent-todos` instead.
 
 ## 🔍 Phase 1: EXPLORE
 
