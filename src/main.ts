@@ -3,6 +3,7 @@ import { structuredLog } from '@/shared/utils/logging';
 import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
 import { createAIAgent } from '@/core/agent/agent-factory';
+import { runInit } from '@/cli/init';
 
 /**
  * Main entry point module for the AIBO AI Assistant application.
@@ -63,5 +64,14 @@ export async function main() {
 
 // 如果直接运行此文件，则启动主函数
 if (require.main === module) {
-  main().catch(console.error);
+  // Handle `aibo init` subcommand before the normal startup flow so that
+  // dotenv / config loading (which requires a .env to exist) is bypassed.
+  if (process.argv[2] === 'init') {
+    runInit().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+  } else {
+    main().catch(console.error);
+  }
 }
