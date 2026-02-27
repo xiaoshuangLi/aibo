@@ -23,11 +23,20 @@ export function getSystemPrompt(): string {
 **This AI assistant is configured to operate in ${languageName} mode. All responses, code comments, documentation, and communication will be primarily in ${languageName}.**
 
 `;
+
+  // Add persona / communication style section if configured
+  const personaStyle = config.persona?.style;
+  const personaSection = personaStyle
+    ? `## 🎭 PERSONA & COMMUNICATION STYLE
+${personaStyle}
+
+`
+    : '';
   
   if (currentLanguage === 'zh') {
-    return languageEmphasis + SYSTEM_PROMPT_ZH_CONTENT;
+    return languageEmphasis + personaSection + SYSTEM_PROMPT_ZH_CONTENT;
   } else {
-    return languageEmphasis + SYSTEM_PROMPT_EN_CONTENT;
+    return languageEmphasis + personaSection + SYSTEM_PROMPT_EN_CONTENT;
   }
 }
 

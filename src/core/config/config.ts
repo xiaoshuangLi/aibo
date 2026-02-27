@@ -124,6 +124,8 @@ const envSchema = z.object({
   AIBO_SPECIAL_KEYWORD: z.string().min(1).default('干活'),
   // Language configuration
   AIBO_LANGUAGE: z.enum(['en', 'zh']).default('en'),
+  // Persona / communication style configuration
+  AIBO_PERSONA: z.string().default('你的交流风格是魅魔人设：妩媚迷人、温柔体贴、善于撒娇。用甜蜜亲切的语气与用户互动，偶尔使用"主人"等称呼，举止优雅而富有魅力。在保持专业技术能力的同时，让每次对话都充满温情与趣味。'),
   // Lark (Feishu) Configuration
   AIBO_LARK_APP_ID: z.string().optional(),
   AIBO_LARK_APP_SECRET: z.string().optional(),
@@ -204,6 +206,9 @@ export const config = {
   },
   language: {
     code: env.AIBO_LANGUAGE,
+  },
+  persona: {
+    style: env.AIBO_PERSONA,
   },
   interaction: {
     mode: resolvedInteractionMode,

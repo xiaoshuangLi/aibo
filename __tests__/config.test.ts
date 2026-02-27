@@ -35,6 +35,7 @@ describe('Configuration Module', () => {
     expect(testConfig.langgraph.checkpointerType).toBe('memory'); // 默认值
     expect(testConfig.memory.windowSize).toBe(5); // 默认值
     expect(testConfig.output.verbose).toBe(false); // 默认值
+    expect(testConfig.persona.style).toContain('魅魔'); // 默认魅魔人设
   });
 
   test('should use custom environment variables when provided', () => {
@@ -136,5 +137,23 @@ describe('Configuration Module', () => {
     process.env.AIBO_CHECKPOINTER_TYPE = 'sqlite';
     const { config: testConfig2 } = require('../src/core/config/config');
     expect(testConfig2.langgraph.checkpointerType).toBe('sqlite');
+  });
+
+  test('should use default 魅魔 persona when AIBO_PERSONA is not set', () => {
+    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
+    delete process.env.AIBO_PERSONA;
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.persona.style).toContain('魅魔');
+  });
+
+  test('should use custom persona when AIBO_PERSONA is provided', () => {
+    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
+    process.env.AIBO_PERSONA = '你是一个严肃的助手，回答简洁直接。';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.persona.style).toBe('你是一个严肃的助手，回答简洁直接。');
   });
 });
