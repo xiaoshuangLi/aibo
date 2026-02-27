@@ -19,27 +19,32 @@ dotenv.config({ quiet: true });
  * Determines the final interaction mode based on CLI args and environment variables.
  * 
  * Priority order:
- * 1. Command line arguments (--interaction, --interactive, -i)
- * 2. AIBO_LARK_MODE environment variable (for backward compatibility)
- * 3. AIBO_INTERACTION environment variable
- * 4. Default value 'console'
+ * 1. Command line arguments (--interaction=console|lark, --interactive/-i)
+ * 2. All four Lark config vars present (AIBO_LARK_APP_ID, AIBO_LARK_APP_SECRET,
+ *    AIBO_LARK_RECEIVE_ID, AIBO_LARK_INTERACTIVE_TEMPLATE_ID) → lark mode
+ * 3. Default: console mode
  * 
  * @returns {'console' | 'lark'} The resolved interaction mode
  */
 function resolveInteractionMode(): 'console' | 'lark' {
-  // First, check command line arguments (highest priority)
+  // 1. CLI args take highest priority
   const cliMode = parseInteractionModeFromArgs();
   if (cliMode !== null) {
     return cliMode;
   }
-  
-  // Second, check AIBO_LARK_MODE for backward compatibility
-  if (process.env.AIBO_LARK_MODE === 'true') {
+
+  // 2. Auto-detect lark mode when all four Lark integration vars are configured
+  if (
+    process.env.AIBO_LARK_APP_ID &&
+    process.env.AIBO_LARK_APP_SECRET &&
+    process.env.AIBO_LARK_RECEIVE_ID &&
+    process.env.AIBO_LARK_INTERACTIVE_TEMPLATE_ID
+  ) {
     return 'lark';
   }
-  
-  // Third, fall back to AIBO_INTERACTION environment variable or default
-  return process.env.AIBO_INTERACTION === 'lark' ? 'lark' : 'console';
+
+  // 3. Default: console mode
+  return 'console';
 }
 
 /**

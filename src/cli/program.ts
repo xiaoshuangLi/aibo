@@ -34,7 +34,7 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
   const program = new Command();
 
   program
-    .option('--interaction <mode>', 'Set interaction mode', 'console')
+    .option('--interaction <mode>', 'Set interaction mode (console|lark)', 'console')
     .option('-i, --interactive', 'Enable interactive console mode')
     .allowUnknownOption(); // let unknown options (and subcommands) pass through
 
@@ -79,7 +79,7 @@ export function createProgram(): Command {
 
   program
     .command('init')
-    .description('Configure environment variables and create the .aibo symlink')
+    .description('Create the .aibo symlink and display setup instructions')
     .action(async () => {
       await runInit();
     });

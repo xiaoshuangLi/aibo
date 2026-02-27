@@ -4,13 +4,15 @@ import path from 'path';
 /**
  * CLI init command module for aibo.
  *
- * `aibo init` copies the bundled `.env.example` to `.env` in the current
- * working directory and prints configuration instructions to the console.
- * It also creates a `.aibo` symbolic link pointing to the globally-installed
- * aibo package directory.
+ * `aibo init` creates a `.aibo` symbolic link in the current working directory
+ * pointing to the globally-installed aibo package, then prints the GitHub
+ * README URL so the user can follow the setup guide to configure their `.env`.
  *
  * @module cli/init
  */
+
+/** GitHub README URL shown to the user after init. */
+export const README_URL = 'https://github.com/xiaoshuangLi/aibo#readme';
 
 /**
  * Resolves the root directory of the aibo npm package.
@@ -23,17 +25,6 @@ import path from 'path';
  */
 export function resolvePackageDir(): string {
   return path.resolve(__dirname, '..', '..');
-}
-
-/**
- * Copies the `.env.example` file from `srcPath` to `destPath`.
- * Any existing file at `destPath` is overwritten.
- *
- * @param srcPath - Absolute path to the source `.env.example` file
- * @param destPath - Absolute path where the `.env` file should be written
- */
-export function copyEnvExample(srcPath: string, destPath: string): void {
-  fs.copyFileSync(srcPath, destPath);
 }
 
 /**
@@ -64,47 +55,26 @@ export function createAiboSymlink(targetDir: string, packageDir: string): void {
 /**
  * Entry point for `aibo init`.
  *
- * Copies `.env.example` from the package to `.env` in the current working
- * directory, prints instructions on how to configure it, and creates the
- * `.aibo` symbolic link.
+ * Creates the `.aibo` symlink in the current working directory and prints
+ * the README URL so the user can follow the configuration guide.
  */
 export async function runInit(): Promise<void> {
   const cwd = process.cwd();
   const packageDir = resolvePackageDir();
-  const examplePath = path.join(packageDir, '.env.example');
-  const envPath = path.join(cwd, '.env');
 
   console.log('\nWelcome to aibo init! 🎉\n');
-
-  // Copy .env.example → .env
-  try {
-    copyEnvExample(examplePath, envPath);
-    console.log(`✅  Created ${envPath}`);
-  } catch (error: any) {
-    console.error(`⚠️   Failed to create .env: ${error.message}`);
-  }
 
   // Create .aibo symlink
   try {
     createAiboSymlink(cwd, packageDir);
-    console.log(`✅  Created .aibo → ${packageDir}`);
+    console.log(`✅  Created .aibo → ${packageDir}\n`);
   } catch (error: any) {
-    console.error(`⚠️   Failed to create .aibo symlink: ${error.message}`);
+    console.error(`⚠️   Failed to create .aibo symlink: ${error.message}\n`);
   }
 
-  console.log(`
-📝  Next step: edit the .env file to configure your environment:
-    ${envPath}
-
-    Key variables to set:
-      AIBO_API_KEY      — your model provider API key
-      AIBO_MODEL_NAME   — model to use (e.g. gpt-4o, claude-3-5-sonnet-20241022, llama3)
-      AIBO_MODEL_PROVIDER — provider: openai | anthropic | google | mistral | groq | ollama | azure
-                           (leave blank to auto-detect from model name)
-
-    See the comments inside .env for the full list of options and examples.
-
-🎉  Done! Edit .env then run "aibo" to start.
-`);
+  console.log(`📖  To configure aibo, create a .env file in this directory.`);
+  console.log(`    See the README for all available options and examples:\n`);
+  console.log(`    ${README_URL}\n`);
+  console.log(`🎉  Done! Create .env then run "aibo" to start.\n`);
 }
 
