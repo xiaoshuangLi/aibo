@@ -42,47 +42,35 @@ describe('Config - CLI Args and Interaction Mode Coverage', () => {
     expect(config.interaction.mode).toBe('console');
   });
 
-  it('should return lark mode when AIBO_LARK_MODE=true is set', () => {
-    process.argv = ['node', 'script.js'];
-    process.env.AIBO_LARK_MODE = 'true';
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('lark');
-  });
-
-  it('should return lark mode when AIBO_INTERACTION=lark is set', () => {
-    process.argv = ['node', 'script.js'];
-    process.env.AIBO_INTERACTION = 'lark';
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('lark');
-  });
-
   it('should return console mode as default when no interaction env/cli is set', () => {
-    process.argv = ['node', 'script.js'];
-    delete process.env.AIBO_INTERACTION;
-    delete process.env.AIBO_LARK_MODE;
     const { config } = require('../src/core/config/config');
     expect(config.interaction.mode).toBe('console');
   });
 
-  it('should fall through to env when invalid --interaction value is provided', () => {
-    process.argv = ['node', 'script.js', '--interaction=invalid'];
-    process.env.AIBO_INTERACTION = 'lark';
+  it('should return lark mode when all 4 Lark vars are configured', () => {
+    process.env.AIBO_LARK_APP_ID = 'app-id';
+    process.env.AIBO_LARK_APP_SECRET = 'app-secret';
+    process.env.AIBO_LARK_RECEIVE_ID = 'receive-id';
+    process.env.AIBO_LARK_INTERACTIVE_TEMPLATE_ID = 'template-id';
     const { config } = require('../src/core/config/config');
-    // With invalid CLI mode, falls back to AIBO_INTERACTION env
     expect(config.interaction.mode).toBe('lark');
   });
 
-  it('CLI --interactive takes precedence over AIBO_INTERACTION env', () => {
-    process.argv = ['node', 'script.js', '--interactive'];
-    process.env.AIBO_INTERACTION = 'lark';
+  it('should return console mode when only some Lark vars are configured', () => {
+    process.env.AIBO_LARK_APP_ID = 'app-id';
+    process.env.AIBO_LARK_APP_SECRET = 'app-secret';
+    // AIBO_LARK_RECEIVE_ID and AIBO_LARK_INTERACTIVE_TEMPLATE_ID intentionally missing
     const { config } = require('../src/core/config/config');
     expect(config.interaction.mode).toBe('console');
   });
 
-  it('CLI --interaction=lark takes precedence over AIBO_LARK_MODE', () => {
-    process.argv = ['node', 'script.js', '--interaction=lark'];
-    process.env.AIBO_LARK_MODE = 'false';
+  it('CLI --interaction=console takes precedence over all 4 Lark vars', () => {
+    process.argv = ['node', 'script.js', '--interaction=console'];
+    process.env.AIBO_LARK_APP_ID = 'app-id';
+    process.env.AIBO_LARK_APP_SECRET = 'app-secret';
+    process.env.AIBO_LARK_RECEIVE_ID = 'receive-id';
+    process.env.AIBO_LARK_INTERACTIVE_TEMPLATE_ID = 'template-id';
     const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('lark');
+    expect(config.interaction.mode).toBe('console');
   });
 });

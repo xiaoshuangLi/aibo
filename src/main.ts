@@ -3,6 +3,7 @@ import { structuredLog } from '@/shared/utils/logging';
 import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
 import { createAIAgent } from '@/core/agent/agent-factory';
+import { createProgram } from '@/cli/program';
 
 /**
  * Main entry point module for the AIBO AI Assistant application.
@@ -63,5 +64,18 @@ export async function main() {
 
 // 如果直接运行此文件，则启动主函数
 if (require.main === module) {
-  main().catch(console.error);
+  // Use the central Commander program to dispatch subcommands.
+  // `aibo init` is handled by the 'init' subcommand action defined in program.ts.
+  // Any other invocation (no subcommand, or with --interaction / -i flags) falls
+  // through to the default action which starts the normal agent loop.
+  const program = createProgram();
+
+  program.action(() => {
+    main().catch(console.error);
+  });
+
+  program.parseAsync(process.argv).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
