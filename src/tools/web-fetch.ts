@@ -1,12 +1,18 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import axios from "axios";
+import TurndownService from "turndown";
 
 const MAX_CONTENT_LENGTH = 100_000; // 100 KB
+const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+
+// Remove script and style elements before converting to markdown
+turndown.remove(["script", "style", "noscript", "iframe"]);
 
 /**
  * Generic HTTP fetch tool - fetches content from any public URL.
  * Equivalent to Claude Code's WebFetch tool.
+ * HTML responses are automatically converted to Markdown to reduce noise and token usage.
  */
 export const webFetchTool = tool(
   async ({ url, timeout, max_length }) => {
@@ -22,13 +28,20 @@ export const webFetchTool = tool(
         transformResponse: [(data) => data], // keep raw string
       });
 
+      const contentType: string = response.headers["content-type"] || "unknown";
       const limit = max_length || MAX_CONTENT_LENGTH;
-      const rawContent: string =
+      const rawString: string =
         typeof response.data === "string"
           ? response.data
           : JSON.stringify(response.data);
-      const content = rawContent.substring(0, limit);
-      const truncated = rawContent.length > limit;
+
+      // Convert HTML to Markdown to reduce noise and token usage
+      const processedContent = contentType.includes("text/html")
+        ? turndown.turndown(rawString)
+        : rawString;
+
+      const content = processedContent.substring(0, limit);
+      const truncated = processedContent.length > limit;
 
       return JSON.stringify({
         success: true,
@@ -54,6 +67,7 @@ export const webFetchTool = tool(
     name: "web_fetch",
     description: `Fetch content from any public URL via HTTP GET.
 Supports HTML pages, JSON APIs, plain text, and other text-based content.
+HTML pages are automatically converted to Markdown to reduce noise and token usage.
 Returns up to 100KB of content (configurable via max_length).
 Use this to fetch documentation, APIs, web pages, or any public resource.`,
     schema: z.object({
