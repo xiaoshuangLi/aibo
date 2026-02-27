@@ -466,6 +466,9 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
       // 优雅关闭当前会话
       session.end();
       
+      // 创建新会话，确保重启后使用全新的会话上下文
+      sessionManager.clearCurrentSession();
+      
       // 重新启动 Lark 交互模式
       // 使用工具函数获取正确的重启命令和参数
       const { spawn } = require('child_process');

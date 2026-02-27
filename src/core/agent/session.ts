@@ -19,7 +19,7 @@ export interface SessionOptions {
 }
 
 export class Session {
-  public readonly threadId: string;
+  public threadId: string;
   public isRunning: boolean = false;
   public abortController: AbortController | null = null;
   private adapter: Adapter;

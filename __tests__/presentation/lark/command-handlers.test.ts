@@ -37,18 +37,19 @@ jest.mock('@/presentation/styling/output-styler', () => ({
 
 // Mock SessionManager
 jest.mock('@/infrastructure/session/session-manager', () => {
+  const instance = {
+    clearCurrentSession: jest.fn(() => 'new-session-id'),
+    getCurrentSessionMetadata: jest.fn(() => ({
+      sessionId: 'test-session-id',
+      startTime: new Date(),
+      commandCount: 0,
+      toolCalls: [],
+      messages: []
+    }))
+  };
   return {
     SessionManager: {
-      getInstance: jest.fn(() => ({
-        clearCurrentSession: jest.fn(() => 'new-session-id'),
-        getCurrentSessionMetadata: jest.fn(() => ({
-          sessionId: 'test-session-id',
-          startTime: new Date(),
-          commandCount: 0,
-          toolCalls: [],
-          messages: []
-        }))
-      }))
+      getInstance: jest.fn(() => instance)
     }
   };
 });
@@ -431,6 +432,8 @@ describe('Lark Command Handlers', () => {
         })
       );
       expect(mockSession.end).toHaveBeenCalled();
+      // 验证重启前已创建新会话，确保新进程以全新上下文启动
+      expect(SessionManager.getInstance().clearCurrentSession).toHaveBeenCalled();
       // 在测试环境中，spawn 会被调用但不会实际执行
       expect(require('child_process').spawn).toHaveBeenCalled();
     });
