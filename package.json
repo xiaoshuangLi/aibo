@@ -8,7 +8,9 @@
     "aibo": "dist/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills",
+    "agents"
   ],
   "scripts": {
     "build": "tsc && tsc-alias",
