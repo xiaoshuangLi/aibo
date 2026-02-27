@@ -41,6 +41,7 @@
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@types/turndown": "^5.0.6",
     "axios": "^1.13.5",
+    "commander": "^9.5.0",
     "deepagents": "^1.7.2",
     "dotenv": "^17.2.4",
     "js-yaml": "^4.1.1",
