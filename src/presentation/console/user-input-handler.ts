@@ -60,12 +60,16 @@ export async function handleUserInput(
 
   session.isRunning = true;
   
+  // 创建新的中断控制器（在 try 外部，以便 finally 能访问并比较）
+  const abortController = new AbortController();
+  session.abortController = abortController;
+
   try {
     const state: StreamState = {
       fullResponse: '',
       lastToolCall: null,
       hasDisplayedThinking: false,
-      abortSignal: session.abortController?.signal || new AbortController().signal,
+      abortSignal: abortController.signal,
     };
 
     const stream = (agent as any).stream(
@@ -73,7 +77,7 @@ export async function handleUserInput(
       { 
         configurable: { thread_id: session.threadId },
         modelKwargs: { enable_thinking: true },
-        signal: session.abortController?.signal,
+        signal: abortController.signal,
         recursionLimit: Infinity,
       }
     );
@@ -81,7 +85,10 @@ export async function handleUserInput(
     await processStreamChunks(stream, state, session, input);
   } finally {
     session.isRunning = false;
-    session.abortController = new AbortController();
+    // 只有当前控制器未被新消息替换时才重置，避免覆盖并发新会话的控制器
+    if (session.abortController === abortController) {
+      session.abortController = new AbortController();
+    }
   }
 
   session.requestUserInput();

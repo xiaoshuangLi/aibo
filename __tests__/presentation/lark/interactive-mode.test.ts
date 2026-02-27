@@ -181,6 +181,21 @@ describe('Lark Interactive Mode', () => {
       expect(mockSession.abortController).not.toBe(originalAbortController);
       expect(mockSession.abortController).toBeDefined();
     });
+
+    it('should not overwrite abortController set by a concurrent new message', async () => {
+      // Simulate the race condition: while processing, a concurrent new message
+      // replaces session.abortController with its own controller
+      const concurrentAbortController = new AbortController();
+      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+        // Simulate concurrent new message replacing the abort controller
+        mockSession.abortController = concurrentAbortController;
+      });
+
+      await handleUserMessage('test', mockSession, mockAgent);
+
+      // The finally block must NOT overwrite the controller set by the concurrent message
+      expect(mockSession.abortController).toBe(concurrentAbortController);
+    });
   });
 
   describe('startLarkInteractiveMode', () => {
