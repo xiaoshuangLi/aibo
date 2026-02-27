@@ -177,6 +177,9 @@ jest.mock('../src/core/config/config', () => ({
     language: {
       code: 'en',
     },
+    persona: {
+      style: '',
+    },
     interaction: {
       mode: 'console',
     },
