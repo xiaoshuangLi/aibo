@@ -98,6 +98,12 @@ export async function handleUserMessage(
     }
   }
 
+  // 如果大模型正在运行，取消当前任务
+  if (session.isRunning && session.abortController) {
+    console.log('🔄 检测到新用户消息，取消当前大模型任务...');
+    session.abortController.abort();
+  }
+
   // 设置会话为运行状态
   session.isRunning = true;
   
@@ -133,9 +139,9 @@ export async function handleUserMessage(
     // 错误处理应该由LarkAdapter的emit方法处理，这里不需要手动调用
     // processStreamChunks会自动处理错误事件
   } finally {
-    session.isRunning = false;
     // 只有当前控制器未被新消息替换时才重置，避免覆盖并发新会话的控制器
     if (session.abortController === abortController) {
+      session.isRunning = false;
       session.abortController = new AbortController();
     }
   }
