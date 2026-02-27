@@ -196,6 +196,42 @@ describe('Lark Interactive Mode', () => {
       // The finally block must NOT overwrite the controller set by the concurrent message
       expect(mockSession.abortController).toBe(concurrentAbortController);
     });
+
+    it('should not reset isRunning when controller was replaced by a concurrent new message', async () => {
+      const concurrentAbortController = new AbortController();
+      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+        // Simulate concurrent new message taking over the session
+        mockSession.abortController = concurrentAbortController;
+        mockSession.isRunning = true;
+      });
+
+      await handleUserMessage('test', mockSession, mockAgent);
+
+      // isRunning must remain true because the concurrent task is still running
+      expect(mockSession.isRunning).toBe(true);
+    });
+
+    it('should abort previous running task when new message arrives while AI is running', async () => {
+      const previousAbortController = new AbortController();
+      mockSession.isRunning = true;
+      mockSession.abortController = previousAbortController;
+
+      await handleUserMessage('new message', mockSession, mockAgent);
+
+      expect(previousAbortController.signal.aborted).toBe(true);
+      expect(mockConsoleLog).toHaveBeenCalledWith('🔄 检测到新用户消息，取消当前大模型任务...');
+    });
+
+    it('should not abort when no task is running', async () => {
+      const controller = new AbortController();
+      mockSession.isRunning = false;
+      mockSession.abortController = controller;
+
+      await handleUserMessage('hello', mockSession, mockAgent);
+
+      expect(controller.signal.aborted).toBe(false);
+      expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('取消当前大模型任务'));
+    });
   });
 
   describe('startLarkInteractiveMode', () => {
