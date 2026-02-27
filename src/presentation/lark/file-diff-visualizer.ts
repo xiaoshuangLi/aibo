@@ -7,8 +7,8 @@
  * 
  * Lark (飞书) Markdown 兼容性说明：
  * - Lark 使用标准 CommonMark Markdown 语法
- * - 代码块（```）内的内容不会被解析为 Markdown，无需转义
- * - 飞书不支持 diff 语法高亮，代码块使用无语言标识符保证内容原样显示
+ * - 代码行内（inline code span）内的内容不会被解析为 Markdown，无需转义
+ * - 飞书不支持 diff 语法高亮，每行使用 <font> 标签着色 + 行内代码块保证内容原样显示
  */
 
 import { execSync } from 'child_process';
@@ -234,29 +234,37 @@ export class FileDiffVisualizer {
 
 
   /**
-   * 使用普通代码块包裹原始 diff 内容，贴近原生 git 输出效果。
-   * 飞书不支持 diff 语法高亮，使用无语言标识符的代码块保证内容原样显示，
-   * 无需对内容进行 Markdown 转义。
+   * 🎨 格式化diff输出（颜色对比 + 行内代码块）
+   * 使用 <font> 标签为新增行（绿色）和删除行（红色）提供醒目的颜色对比，
+   * 每行内容使用行内代码块（inline code span）包裹，避免 Markdown 解析，
+   * 无需反斜杠转义，同时保持贴近原生 git diff 的视觉效果。
    */
   private formatDiffOutput(diff: string, filePath: string, type: string): FileDiffResult {
     const lines = diff.split('\n');
     let additions = 0;
     let deletions = 0;
-    
-    // 统计增删行数
-    for (const line of lines) {
+
+    const formattedLines = lines.map(line => {
       const cleanLine = line.replace(/\r/g, '');
+
       if (cleanLine.startsWith('+') && !cleanLine.startsWith('+++')) {
         additions++;
+        const content = this.wrapInCodeSpan(cleanLine.substring(1));
+        return `<font color="green">+${content}</font>`;
       } else if (cleanLine.startsWith('-') && !cleanLine.startsWith('---')) {
         deletions++;
+        const content = this.wrapInCodeSpan(cleanLine.substring(1));
+        return `<font color="red">-${content}</font>`;
+      } else if (cleanLine.startsWith('@@')) {
+        const content = this.wrapInCodeSpan(cleanLine);
+        return `<font color="blue">${content}</font>`;
+      } else {
+        return this.wrapInCodeSpan(cleanLine);
       }
-    }
-    
-    // 使用普通代码块包裹，贴近原生 git 输出，飞书中无需转义
-    const cleanDiff = diff.replace(/\r/g, '');
-    const formattedDiff = `\`\`\`\n${cleanDiff}\`\`\``;
-    
+    });
+
+    const formattedDiff = formattedLines.join('\n');
+
     return {
       success: true,
       filePath,
@@ -266,6 +274,23 @@ export class FileDiffVisualizer {
       diff: formattedDiff,
       summary: `<font color="green">+${additions} 行新增</font> <font color="red">-${deletions} 行删除</font>`
     };
+  }
+
+  /**
+   * 📦 将内容包裹在行内代码块（inline code span）中
+   * 行内代码块内的内容不会被 Markdown 解析，无需反斜杠转义。
+   * 自动根据内容中已有的反引号数量选择合适的分隔符。
+   */
+  private wrapInCodeSpan(content: string): string {
+    if (!content) return content;
+    // Find longest backtick run in content to choose a safe delimiter
+    const runs = content.match(/`+/g);
+    const maxRun = runs ? runs.reduce((max, r) => Math.max(max, r.length), 0) : 0;
+    const delimiter = '`'.repeat(maxRun + 1);
+    // Add padding spaces when content starts or ends with a backtick
+    const needsSpace = content.startsWith('`') || content.endsWith('`');
+    const wrapped = needsSpace ? ` ${content} ` : content;
+    return `${delimiter}${wrapped}${delimiter}`;
   }
 
   /**
