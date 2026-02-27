@@ -107,6 +107,38 @@ export interface References {
   range: Range;
 }
 
+export interface WorkspaceEdit {
+  changes?: Record<string, TextEdit[]>;
+  documentChanges?: TextDocumentEdit[];
+}
+
+export interface TextEdit {
+  range: Range;
+  newText: string;
+}
+
+export interface TextDocumentEdit {
+  textDocument: VersionedTextDocumentIdentifier;
+  edits: TextEdit[];
+}
+
+export interface SignatureHelp {
+  signatures: SignatureInformation[];
+  activeSignature?: number;
+  activeParameter?: number;
+}
+
+export interface SignatureInformation {
+  label: string;
+  documentation?: string;
+  parameters?: ParameterInformation[];
+}
+
+export interface ParameterInformation {
+  label: string | [number, number];
+  documentation?: string;
+}
+
 /**
  * LSP 客户端配置
  */
@@ -466,6 +498,8 @@ export class LspClient extends EventEmitter {
           completion: {},
           hover: {},
           definition: {},
+          typeDefinition: {},
+          implementation: {},
           references: {},
           documentSymbol: {},
           codeAction: {},
@@ -474,6 +508,7 @@ export class LspClient extends EventEmitter {
           rangeFormatting: {},
           onTypeFormatting: {},
           rename: {},
+          signatureHelp: {},
           publishDiagnostics: { relatedInformation: true }
         },
         workspace: {
@@ -662,6 +697,100 @@ export class LspClient extends EventEmitter {
   }
 
   /**
+   * 获取类型定义
+   */
+  public async getTypeDefinition(filePath: string, position: Position): Promise<Definition[]> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const result = await this.request('textDocument/typeDefinition', {
+      textDocument: { uri },
+      position
+    });
+
+    if (Array.isArray(result)) {
+      return result;
+    } else if (result) {
+      return [result];
+    }
+
+    return [];
+  }
+
+  /**
+   * 获取接口/抽象方法的实现
+   */
+  public async getImplementation(filePath: string, position: Position): Promise<Definition[]> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const result = await this.request('textDocument/implementation', {
+      textDocument: { uri },
+      position
+    });
+
+    if (Array.isArray(result)) {
+      return result;
+    } else if (result) {
+      return [result];
+    }
+
+    return [];
+  }
+
+  /**
+   * 重命名符号
+   */
+  public async rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const result = await this.request('textDocument/rename', {
+      textDocument: { uri },
+      position,
+      newName
+    });
+
+    return result || null;
+  }
+
+  /**
+   * 获取函数签名帮助
+   */
+  public async getSignatureHelp(filePath: string, position: Position): Promise<SignatureHelp | null> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const result = await this.request('textDocument/signatureHelp', {
+      textDocument: { uri },
+      position
+    });
+
+    return result || null;
+  }
+
+  /**
+   * 格式化指定范围
+   */
+  public async formatRange(filePath: string, range: Range): Promise<TextEdit[]> {
+    const absolutePath = this.resolveFilePath(filePath);
+    const uri = this.filePathToUri(absolutePath);
+
+    const result = await this.request('textDocument/rangeFormatting', {
+      textDocument: { uri },
+      range,
+      options: {
+        tabSize: 2,
+        insertSpaces: true,
+        trimTrailingWhitespace: true,
+        insertFinalNewline: true
+      }
+    });
+
+    return result || [];
+  }
+
+  /**
    * 获取诊断信息
    */
   public getDiagnostics(filePath: string): Diagnostic[] {
@@ -694,7 +823,7 @@ export class LspClient extends EventEmitter {
   /**
    * 格式化文档
    */
-  public async formatDocument(filePath: string): Promise<any[]> {
+  public async formatDocument(filePath: string): Promise<TextEdit[]> {
     const absolutePath = this.resolveFilePath(filePath);
     const uri = this.filePathToUri(absolutePath);
 
