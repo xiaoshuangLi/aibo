@@ -12,7 +12,7 @@ import * as library from '@/shared/utils/library';
 jest.mock('@/core/config/config', () => ({
   config: {
     output: { verbose: false },
-    openai: { modelName: 'gpt-4o' },
+    model: { name: 'gpt-4o' },
   },
 }));
 

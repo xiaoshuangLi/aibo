@@ -92,9 +92,13 @@ function resolveInteractionMode(): 'console' | 'lark' {
  * Schema definition for required and optional environment variables.
  * 
  * Validates the following environment variables (all prefixed with AIBO_):
- * - AIBO_OPENAI_API_KEY: Required OpenAI API key
- * - AIBO_OPENAI_BASE_URL: Optional custom base URL for OpenAI API (useful for proxies or local deployments)
+ * - AIBO_API_KEY: Unified API key for any model provider (required for cloud providers;
+ *   not required for local deployments like Ollama)
+ * - AIBO_BASE_URL: Unified base URL for any provider (required for Azure; defaults to http://localhost:11434 for Ollama)
  * - AIBO_MODEL_NAME: AI model name to use (defaults to 'gpt-4o')
+ * - AIBO_MODEL_PROVIDER: Explicit provider override (openai|anthropic|google|mistral|groq|ollama|azure).
+ *   Auto-detected from model name prefix when omitted.
+ * - AIBO_AZURE_API_VERSION: Azure OpenAI API version (only required when using Azure)
  * - AIBO_RECURSION_LIMIT: Maximum recursion depth for LangGraph (defaults to 1000)
  * - AIBO_CHECKPOINTER_TYPE: Type of checkpointing mechanism ('memory' or 'sqlite', defaults to 'memory')
  * - AIBO_MEMORY_WINDOW_SIZE: Size of the conversation memory window (defaults to 5)
@@ -103,9 +107,14 @@ function resolveInteractionMode(): 'console' | 'lark' {
  * @private
  */
 const envSchema = z.object({
-  AIBO_OPENAI_API_KEY: z.string().min(1),
+  AIBO_API_KEY: z.string().optional(),
+  AIBO_BASE_URL: z.string().url().optional(),
+  // Backward-compatible aliases (AIBO_API_KEY / AIBO_BASE_URL take precedence when both are set)
+  AIBO_OPENAI_API_KEY: z.string().optional(),
   AIBO_OPENAI_BASE_URL: z.string().url().optional(),
   AIBO_MODEL_NAME: z.string().min(1).default('gpt-4o'),
+  AIBO_MODEL_PROVIDER: z.enum(['openai', 'anthropic', 'google', 'mistral', 'groq', 'ollama', 'azure']).optional(),
+  AIBO_AZURE_API_VERSION: z.string().optional(),
   AIBO_RECURSION_LIMIT: z.coerce.number().int().positive().default(1000),
   AIBO_CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite', 'filesystem']).default('memory'),
   AIBO_MEMORY_WINDOW_SIZE: z.coerce.number().int().positive().default(5),
@@ -149,28 +158,25 @@ const resolvedInteractionMode = resolveInteractionMode();
  * at startup and will throw descriptive errors if invalid.
  * 
  * @type {Object}
- * @property {Object} openai - OpenAI-specific configuration
- * @property {string} openai.apiKey - The OpenAI API key (required)
- * @property {string|undefined} openai.baseURL - Optional custom base URL for the OpenAI API
- * @property {string} openai.modelName - The AI model name to use
+ * @property {Object} model - Unified model configuration
+ * @property {string|undefined} model.apiKey - API key for the model provider (not required for Ollama)
+ * @property {string|undefined} model.baseURL - Base URL for the model provider
+ * @property {string} model.name - The AI model name to use
+ * @property {string|undefined} model.provider - Explicit provider override; auto-detected when omitted
+ * @property {string|undefined} model.azureApiVersion - Azure OpenAI API version (Azure only)
  * @property {Object} langgraph - LangGraph-specific configuration
  * @property {number} langgraph.recursionLimit - Maximum recursion depth allowed
  * @property {'memory'|'sqlite'} langgraph.checkpointerType - Type of checkpointing mechanism
  * @property {Object} memory - Memory-related configuration
  * @property {number} memory.windowSize - Size of the conversation memory window
- * 
- * @example
- * // Access OpenAI API key
- * const apiKey = config.openai.apiKey;
- * 
- * // Access optional baseURL with fallback
- * const baseUrl = config.openai.baseURL || 'https://api.openai.com/v1';
  */
 export const config = {
-  openai: {
-    apiKey: env.AIBO_OPENAI_API_KEY,
-    baseURL: env.AIBO_OPENAI_BASE_URL,
-    modelName: env.AIBO_MODEL_NAME,
+  model: {
+    apiKey: env.AIBO_API_KEY ?? env.AIBO_OPENAI_API_KEY,
+    baseURL: env.AIBO_BASE_URL ?? env.AIBO_OPENAI_BASE_URL,
+    name: env.AIBO_MODEL_NAME,
+    provider: env.AIBO_MODEL_PROVIDER,
+    azureApiVersion: env.AIBO_AZURE_API_VERSION,
   },
   langgraph: {
     recursionLimit: env.AIBO_RECURSION_LIMIT,

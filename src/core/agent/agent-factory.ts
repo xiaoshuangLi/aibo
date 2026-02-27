@@ -1,6 +1,6 @@
 import { config } from '@/core/config/config';
-import { ChatOpenAI } from '@langchain/openai';
 import { MemorySaver } from "@langchain/langgraph";
+import { createModel } from '@/core/agent/model-factory';
 import { createDeepAgent } from 'deepagents';
 import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/filesystem-checkpointer';
 import getTools from '@/tools/index';
@@ -23,14 +23,7 @@ import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-prompt-
  */
 
 // ==================== 初始化模型 ====================
-const model = new ChatOpenAI({
-  apiKey: config.openai.apiKey,
-  modelName: config.openai.modelName,
-  temperature: 0,
-  ...(config.openai.baseURL && { 
-    configuration: { baseURL: config.openai.baseURL } 
-  }),
-});
+const model = createModel();
 
 const backend = new SafeFilesystemBackend({
   rootDir: process.cwd(),
