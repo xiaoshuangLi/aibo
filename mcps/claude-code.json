@@ -1,0 +1,44 @@
+{
+  "name": "claude-code",
+  "description": "Claude Code MCP Server for autonomous coding and analysis",
+  "endpoint": "http://localhost:8081/mcp",
+  "authentication": {
+    "type": "none"
+  },
+  "tools": [
+    {
+      "name": "claude_code_analyze",
+      "description": "Analyze code structure and provide insights",
+      "parameters": {
+        "required": ["file_path", "analysis_type"],
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "description": "Path to the file to analyze"
+          },
+          "analysis_type": {
+            "type": "string",
+            "description": "Type of analysis: security, performance, architecture, etc."
+          }
+        }
+      }
+    },
+    {
+      "name": "claude_code_refactor",
+      "description": "Refactor code based on best practices",
+      "parameters": {
+        "required": ["file_path", "refactor_goals"],
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "description": "Path to the file to refactor"
+          },
+          "refactor_goals": {
+            "type": "string",
+            "description": "Goals for refactoring: readability, performance, etc."
+          }
+        }
+      }
+    }
+  ]
+}

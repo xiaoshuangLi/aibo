@@ -1,0 +1,18 @@
+{
+  "name": "test-server",
+  "description": "Test server for unit testing",
+  "endpoint": "http://test.example.com",
+  "authentication": {
+    "type": "none"
+  },
+  "tools": [
+    {
+      "name": "test-tool",
+      "description": "Test tool",
+      "parameters": {
+        "required": [],
+        "properties": {}
+      }
+    }
+  ]
+}

@@ -157,19 +157,29 @@ jest.mock('deepagents', () => ({
   FilesystemBackend: jest.fn().mockImplementation(() => ({})),
 }));
 
-jest.mock('../src/core/config/Config', () => ({
+jest.mock('../src/core/config/config', () => ({
   config: {
     openai: {
       apiKey: 'test-api-key',
       modelName: 'gpt-4',
       baseURL: 'https://api.openai.com/v1',
     },
+    langgraph: {
+      checkpointerType: 'memory',
+      recursionLimit: 1000,
+    },
     output: {
       verbose: false,
     },
     specialKeyword: {
       keyword: '干活'
-    }
+    },
+    language: {
+      code: 'en',
+    },
+    interaction: {
+      mode: 'console',
+    },
   },
 }));
 

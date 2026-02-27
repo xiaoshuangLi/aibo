@@ -19,7 +19,7 @@ import {
  * @param args - task 工具的参数对象
  * @returns 格式化后的内容字符串
  */
-const formatTaskToolCall = (args: any): string => {
+export const formatTaskToolCall = (args: any): string => {
   if (!args || typeof args !== 'object') {
     return '无效的 task 参数';
   }
@@ -55,7 +55,7 @@ const formatTaskToolCall = (args: any): string => {
  * @param args - 工具参数
  * @returns 格式化后的内容字符串
  */
-const formatFilesystemToolCall = (name: string, args: any): string => {
+export const formatFilesystemToolCall = (name: string, args: any): string => {
   if (args == null) {
     return '无参数';
   }
@@ -149,7 +149,7 @@ const formatFilesystemToolCall = (name: string, args: any): string => {
  * @param args - 工具参数
  * @returns 格式化后的内容字符串
  */
-const formatSystemToolCall = (name: string, args: any): string => {
+export const formatSystemToolCall = (name: string, args: any): string => {
   if (args == null) {
     return '无参数';
   }
@@ -210,7 +210,7 @@ const formatSystemToolCall = (name: string, args: any): string => {
  * @param args - 工具参数
  * @returns 格式化后的内容字符串
  */
-const formatDefaultToolCall = (args: any): string => {
+export const formatDefaultToolCall = (args: any): string => {
   if (args == null) {
     return '无参数';
   }

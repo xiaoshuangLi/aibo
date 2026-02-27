@@ -2,6 +2,12 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 /**
+ * In-memory storage for the current subagent todo list.
+ * Persists across multiple calls within the same session.
+ */
+let currentTodos: Array<{ content: string; status: string; subagent_type: string }> = [];
+
+/**
  * 🚨 子代理任务清单工具 - 任务管理框架
  * 
  * 中文名称：子代理任务清单工具
@@ -19,6 +25,7 @@ import { z } from "zod";
  * 预期行为：
  * - 接收包含 subagent_type 属性的任务清单数组
  * - 为每个任务分配专门的子代理类型（支持内置类型和用户动态配置类型）
+ * - 持久化任务清单到内存，供 read-subagent-todos 工具读取
  * - 返回结构化的任务清单用于跟踪和执行
  * 
  * 行为分支：
@@ -28,38 +35,6 @@ import { z } from "zod";
  * 
  * @param todos - 任务清单数组，每个任务包含 content, status, subagent_type 属性
  * @returns Promise<string> - 包含任务清单的JSON字符串
- * 
- * @example
- * ```typescript
- * // 基本用法
- * const result1 = await writeSubagentTodos({
- *   todos: [
- *     {
- *       content: "任务1",
- *       status: "in_progress",
- *       subagent_type: "coder"
- *     },
- *     {
- *       content: "任务2", 
- *       status: "in_progress",
- *       subagent_type: "researcher"
- *     },
- *     {
- *       content: "任务3",
- *       status: "pending", 
- *       subagent_type: "testing"
- *     }
- *   ]
- * });
- * ```
- * 
- * @note
- * - 此工具扩展了标准的 write_todos 功能，添加了子代理类型分配
- * - 支持两种子代理类型：
- *   - **内置专业类型**：coder, researcher, validator, coordinator, documentation, innovator, testing
- *   - **用户动态类型**：通过项目目录中的配置文件定义的任意自定义类型
- * - 系统会自动发现并优先使用用户配置的子代理类型
- * - 主流程应使用此工具来规划复杂任务并分配给专门的子代理
  */
 export const writeSubagentTodosTool = tool(
   async ({ todos }) => {
@@ -75,6 +50,9 @@ export const writeSubagentTodosTool = tool(
           subagent_type: todo.subagent_type
         };
       });
+
+      // Persist the todo list in memory for retrieval by readSubagentTodosTool
+      currentTodos = validatedTodos;
       
       return JSON.stringify({
         success: true,
@@ -105,10 +83,34 @@ export const writeSubagentTodosTool = tool(
 );
 
 /**
+ * 读取当前子代理任务清单工具
+ * 
+ * 预期行为：
+ * - 读取并返回当前会话中的子代理任务清单
+ * - 如果清单为空，返回空数组
+ * 
+ * @returns Promise<string> - 包含当前任务清单的JSON字符串
+ */
+export const readSubagentTodosTool = tool(
+  async () => {
+    return JSON.stringify({
+      success: true,
+      todos: currentTodos,
+      total: currentTodos.length
+    }, null, 2);
+  },
+  {
+    name: "read-subagent-todos",
+    description: "Read the current subagent todo list for this work session. Use this to check the current state of tasks, their statuses, and assigned subagent types before updating the list.",
+    schema: z.object({})
+  }
+);
+
+/**
  * 异步获取子代理任务清单工具的方法
  * 
  * @returns Promise<Array<any>> - 包含子代理任务清单工具的数组
  */
 export default async function getWriteSubagentTodosTools() {
-  return [writeSubagentTodosTool];
+  return [writeSubagentTodosTool, readSubagentTodosTool];
 }

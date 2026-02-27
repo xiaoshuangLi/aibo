@@ -77,12 +77,13 @@ export class FileDiffVisualizer {
         };
       }
 
-      const lines = result.trim().split('\n');
+      // 正确处理 git status --porcelain 输出：不要对整个结果 trim()，而是按行分割后过滤空行
+      // git porcelain 格式保证每行前3个字符为 "XY "（X=index状态, Y=worktree状态, 空格分隔符）
+      const lines = result.split('\n').filter(line => line.trim().length > 0);
       const files: FileStatus[] = [];
       
       for (const line of lines) {
-        if (!line.trim()) continue;
-        
+        // 保持原始行格式，直接提取前2字符作为状态，从第4字符开始作为文件路径
         const status = line.substring(0, 2).trim();
         const filePath = line.substring(3).trim();
         
@@ -184,9 +185,10 @@ export class FileDiffVisualizer {
       if (!diffResult.trim()) {
         // 可能是新文件
         const statusResult = execSync('git status --porcelain', { cwd: this.workingDir, encoding: 'utf8' });
-        const lines = statusResult.trim().split('\n');
+        // 正确处理 git status --porcelain 输出：不要对整个结果 trim()，而是按行分割后过滤空行
+        const lines = statusResult.split('\n').filter(line => line.trim().length > 0);
         const isNewFile = lines.some(line => 
-          line.trim().startsWith('??') && line.substring(3).trim() === filePath
+          line.startsWith('?? ') && line.substring(3).trim() === filePath
         );
         
         if (isNewFile) {
@@ -234,7 +236,8 @@ export class FileDiffVisualizer {
   private escapeMarkdown(str: string): string {
     // 所有需要转义的 Markdown 特殊字符
     // 使用捕获组确保每个字符都被正确转义
-    return str.replace(/([\\`*_{}[\]()#+\-!.!|])/g, '\\$1');
+    // 注意：将 - 放在字符类末尾以避免被解释为范围操作符，并移除重复的 !
+    return str.replace(/([\\`*_{}[\]()#+.!|-])/g, '\\$1');
   }
 
 

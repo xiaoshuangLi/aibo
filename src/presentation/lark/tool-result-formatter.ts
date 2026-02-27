@@ -56,7 +56,7 @@ export const getToolType = (name: string): string => {
 /**
  * 格式化文件系统工具结果
  */
-const formatFilesystemResult = (name: string, result: any): string => {
+export const formatFilesystemResult = (name: string, result: any): string => {
   // 处理字符串输入（非JSON格式）- 这是关键！
   if (typeof result === 'string') {
     const trimmed = result.trim();
@@ -76,12 +76,55 @@ const formatFilesystemResult = (name: string, result: any): string => {
         return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
       
       case 'grep':
-        // grep 工具返回的文本按换行符分割成匹配项
+        // 智能解析 grep 工具的输出格式
         const grepLines = trimmed.split('\n').filter(line => line.trim());
         if (grepLines.length === 0) return '未找到匹配内容';
-        return `找到 ${grepLines.length} 个匹配项:\n\n` + 
-               grepLines.slice(0, 10).map(match => `- ${match}`).join('\n') + 
-               (grepLines.length > 10 ? `\n... 还有 ${grepLines.length - 10} 个匹配项` : '');
+        
+        // 解析内置 grep 工具的特殊格式：文件路径后跟缩进的内容行
+        const parsedResults: string[] = [];
+        let currentFile = '';
+        
+        for (const line of grepLines) {
+          // 检查是否是文件路径行（以冒号结尾，且不以空格开头）
+          if (line.endsWith(':') && !line.startsWith(' ')) {
+            currentFile = line.slice(0, -1); // 移除末尾的冒号
+          } 
+          // 检查是否是内容行（以空格开头，包含行号:内容格式）
+          else if (line.startsWith(' ') && line.includes(':')) {
+            const content = line.trim();
+            if (currentFile) {
+              parsedResults.push(`📄 \`${currentFile}\`\n   🔹 ${content}`);
+            } else {
+              parsedResults.push(`🔹 ${content}`);
+            }
+          }
+          // 处理其他可能的格式（兼容标准 grep 格式）
+          else if (line.includes(':') && /^\d+:/.test(line.split(':')[1] || '')) {
+            // 标准格式：文件:行号:内容
+            const parts = line.split(':');
+            if (parts.length >= 3) {
+              const file = parts[0];
+              const lineNumber = parts[1];
+              const content = parts.slice(2).join(':');
+              parsedResults.push(`📄 \`${file}\`\n   🔹 第${lineNumber}行: ${content}`);
+            }
+          }
+          // 兜底处理
+          else {
+            parsedResults.push(`🔹 ${line}`);
+          }
+        }
+        
+        if (parsedResults.length === 0) return '未找到匹配内容';
+        
+        const displayResults = parsedResults.slice(0, 10);
+        let resultText = `找到 ${parsedResults.length} 个匹配项:\n\n${displayResults.join('\n\n')}`;
+        
+        if (parsedResults.length > 10) {
+          resultText += `\n\n... 还有 ${parsedResults.length - 10} 个匹配项`;
+        }
+        
+        return resultText;
       
       case 'read_file':
         // read_file 工具的字符串结果直接显示
@@ -167,7 +210,7 @@ const formatFilesystemResult = (name: string, result: any): string => {
 /**
  * 格式化系统/Bash工具结果
  */
-const formatSystemResult = (name: string, result: any): string => {
+export const formatSystemResult = (name: string, result: any): string => {
   // 处理字符串输入（非JSON格式）
   if (typeof result === 'string') {
     const trimmed = result.trim();
@@ -235,7 +278,7 @@ const formatSystemResult = (name: string, result: any): string => {
 /**
  * 格式化GitHub工具结果
  */
-const formatGithubResult = (result: any): string => {
+export const formatGithubResult = (result: any): string => {
   if (result.content) {
     const lines = result.content.split('\n').length;
     const githubLang = inferLanguageType(undefined, result.content);
@@ -248,7 +291,7 @@ const formatGithubResult = (result: any): string => {
 /**
  * 格式化代码分析工具结果
  */
-const formatCodeAnalysisResult = (result: any): string => {
+export const formatCodeAnalysisResult = (result: any): string => {
   if (result.implementation || result.definition || result.references) {
     const content = result.implementation || result.definition || result.references;
     return `🔍 **代码分析结果**\n\n\`\`\`typescript\n${content}\n\`\`\``;
@@ -259,7 +302,7 @@ const formatCodeAnalysisResult = (result: any): string => {
 /**
  * 格式化知识库工具结果
  */
-const formatKnowledgeResult = (name: string, result: any): string => {
+export const formatKnowledgeResult = (name: string, result: any): string => {
   switch (name) {
     case 'add_knowledge':
       if (result.success) {
@@ -293,7 +336,7 @@ const formatKnowledgeResult = (name: string, result: any): string => {
 /**
  * 格式化搜索工具结果
  */
-const formatSearchResult = (result: any): string => {
+export const formatSearchResult = (result: any): string => {
   // 获取搜索结果数组（兼容不同结构）
   let searchResults: any[] = [];
   
@@ -347,7 +390,7 @@ const formatSearchResult = (result: any): string => {
     const safeUrl = url && url !== '#' ? url : '#';
     const linkText = safeUrl !== '#' ? `[${title}](${safeUrl})` : title;
     
-    return `${index + 1}. **${linkText}**\n   ${String(snippet)}`;
+    return `${index + 1}. **${linkText}**\n\`\`\` \n${String(snippet)}\n \`\`\``;
   });
   
   return `🌐 **网络搜索结果 (${searchResults.length} 项)**\n\n` + formattedResults.join('\n\n');
@@ -356,7 +399,7 @@ const formatSearchResult = (result: any): string => {
 /**
  * 格式化任务管理工具结果
  */
-const formatTaskManagementResult = (name: string, result: any): string => {
+export const formatTaskManagementResult = (name: string, result: any): string => {
   if (name === 'write-subagent-todos' || name === 'write_todos') {
     if (result.todos && Array.isArray(result.todos)) {
       const completed = result.todos.filter((t: any) => t.status === 'completed').length;
@@ -373,7 +416,7 @@ const formatTaskManagementResult = (name: string, result: any): string => {
 /**
  * 格式化Composio工具结果
  */
-const formatComposioResult = (name: string, result: any): string => {
+export const formatComposioResult = (name: string, result: any): string => {
   // Composio工具通常返回结构化的数据，尝试提取有用信息
   if (result.data) {
     if (Array.isArray(result.data)) {
@@ -515,7 +558,7 @@ export const formatStructuredResult = (result: any, verbose: boolean): string =>
  * @param parsedResult - 已解析的结果（可能是字符串、对象或数组）
  * @returns 格式化后的内容字符串
  */
-const formatDefaultToolResult = (parsedResult: any): string => {
+export const formatDefaultToolResult = (parsedResult: any): string => {
   // 其他工具类型，尝试智能格式化
   if (typeof parsedResult === 'object' && parsedResult !== null) {
     if (parsedResult.stdout || parsedResult.stderr) {

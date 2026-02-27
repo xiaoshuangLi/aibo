@@ -1,0 +1,31 @@
+{
+  "name": "github",
+  "description": "Access GitHub repositories, create issues, manage pull requests, and perform code operations",
+  "endpoint": "https://api.github.com",
+  "authentication": {
+    "type": "bearer"
+  },
+  "tools": [
+    {
+      "name": "create_issue",
+      "description": "Create a new GitHub issue",
+      "parameters": {
+        "required": ["owner", "repo", "title"],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -82,6 +82,21 @@ describe('Restart Helper', () => {
       (process as any).argv = originalArgv;
     });
 
+    it('should fallback to src/main.ts when no .ts file in argv', () => {
+      const originalArgv = process.argv;
+      const originalEnv = process.env.TS_NODE_DEV;
+      // Force ts-node detection via env var, but no .ts in argv
+      process.env.TS_NODE_DEV = 'true';
+      (process as any).argv = ['node', 'dist/main.js', '--test'];
+
+      const result = getRestartCommand();
+
+      expect(result.restartArgs).toContain('src/main.ts');
+
+      (process as any).argv = originalArgv;
+      process.env.TS_NODE_DEV = originalEnv;
+    });
+
     it('should return compiled node restart command when not running in ts-node', () => {
       const originalProcess = { ...process };
       const originalEnv = { ...process.env };

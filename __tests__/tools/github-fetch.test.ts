@@ -93,4 +93,31 @@ describe('GitHub Fetch Tool', () => {
     expect(parsedResult.message).toBe('File not found');
     expect(parsedResult.github_url).toBe('https://gh.llkk.cc/https://raw.githubusercontent.com/nonexistent/nonexistent/refs/heads/main/nonexistent.txt');
   });
+
+  test('should handle Error instance with .code property', async () => {
+    const err: any = new Error('Permission denied');
+    err.code = 'EACCES';
+    (axios.get as jest.Mock).mockRejectedValue(err);
+
+    const tools = await githubFetch();
+    const tool = tools[0];
+    const result = await tool.invoke({ owner: 'u', repo: 'r', path: 'f.txt' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.error).toBe('EACCES');
+    expect(parsedResult.message).toBe('Permission denied');
+  });
+
+  test('should handle primitive (string) error', async () => {
+    (axios.get as jest.Mock).mockRejectedValue('string error');
+
+    const tools = await githubFetch();
+    const tool = tools[0];
+    const result = await tool.invoke({ owner: 'u', repo: 'r', path: 'f.txt' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.message).toBe('string error');
+  });
 });

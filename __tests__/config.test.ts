@@ -128,13 +128,13 @@ describe('Configuration Module', () => {
     }).toThrow();
     
     process.env.AIBO_CHECKPOINTER_TYPE = 'memory';
-    const { config: testConfig1 } = require('../src/core/config/Config');
+    const { config: testConfig1 } = require('../src/core/config/config');
     expect(testConfig1.langgraph.checkpointerType).toBe('memory');
     
     // 重置模块缓存
     jest.resetModules();
     process.env.AIBO_CHECKPOINTER_TYPE = 'sqlite';
-    const { config: testConfig2 } = require('../src/core/config/Config');
+    const { config: testConfig2 } = require('../src/core/config/config');
     expect(testConfig2.langgraph.checkpointerType).toBe('sqlite');
   });
 });

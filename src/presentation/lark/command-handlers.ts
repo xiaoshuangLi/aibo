@@ -17,6 +17,83 @@ import { getRestartCommand } from '@/shared/utils/restart-helper';
 // ==================== 内部命令处理器辅助函数 ====================
 
 /**
+ * 将Token数量格式化为带单位的字符串，并保留原始数字
+ * 
+ * @param tokenCount - Token数量
+ * @returns 格式化后的字符串，如 "1.39M (1,387,210)" 或 "5.53K (5,525)"
+ */
+function formatTokenWithUnit(tokenCount: number): string {
+  const originalFormatted = tokenCount.toLocaleString();
+  
+  if (tokenCount >= 1_000_000) {
+    const inMillions = tokenCount / 1_000_000;
+    return `${inMillions.toFixed(2)}M (${originalFormatted})`;
+  } else if (tokenCount >= 1_000) {
+    const inThousands = tokenCount / 1_000;
+    return `${inThousands.toFixed(2)}K (${originalFormatted})`;
+  } else {
+    return `${originalFormatted} (${originalFormatted})`;
+  }
+}
+
+/**
+ * 将会话元数据转换为Markdown格式
+ * 
+ * 中文名称：将会话元数据转换为Markdown格式
+ * 
+ * 预期行为：
+ * - 接收session metadata对象（AITelemetryRecord结构）
+ * - 将其转换为格式化的Markdown字符串
+ * - 包含模型使用量、token统计、执行时间等信息
+ * - Token数字转换为带单位格式（M/K）并在括号中显示原始数字
+ * - 移除"资源使用概览"部分和底部提示文本
+ * - 返回Markdown格式的字符串
+ * 
+ * 行为分支：
+ * 1. 正常情况：成功转换并返回Markdown格式字符串
+ * 2. 元数据为空或无效：返回空字符串或默认信息
+ * 3. 无异常情况：该函数不抛出异常，始终返回字符串
+ * 
+ * @param metadata - 会话元数据对象，包含AI监控信息（AITelemetryRecord类型）
+ * @returns string - Markdown格式的元数据信息
+ */
+export function formatSessionMetadataToMarkdown(metadata: any): string {
+  if (!metadata) {
+    return "ℹ️ **无会话元数据**\n\n当前会话没有可用的元数据信息。";
+  }
+
+  try {
+    // 提取关键信息 - 支持 AITelemetryRecord 嵌套结构
+    const model = metadata.model_info?.model_name || metadata.model || '未知模型';
+    const totalTokens = metadata.token_usage?.total_tokens || metadata.totalTokens || 0;
+    const promptTokens = metadata.token_usage?.input_tokens || metadata.promptTokens || 0;
+    const completionTokens = metadata.token_usage?.output_tokens || metadata.completionTokens || 0;
+    const timestamp = metadata.start_time ? new Date(metadata.start_time).toLocaleString('zh-CN') : 
+                     (metadata.timestamp ? new Date(metadata.timestamp).toLocaleString('zh-CN') : '未知时间');
+    const sessionId = metadata.session_info?.session_id || metadata.sessionId || '未知会话ID';
+
+    // 构建Markdown格式 - 移除了"资源使用概览"部分和底部提示
+    const markdown = `📊 **会话元数据统计**
+
+**会话信息**
+- 会话ID: \`${sessionId}\`
+- 时间戳: ${timestamp}
+
+**模型使用**
+- 模型: ${model}
+- 总Token数: ${formatTokenWithUnit(totalTokens)}
+- 输入Token: ${formatTokenWithUnit(promptTokens)}
+- 输出Token: ${formatTokenWithUnit(completionTokens)}
+`;
+
+    return markdown;
+  } catch (error) {
+    console.error('格式化会话元数据时出错:', error);
+    return "⚠️ **元数据格式化失败**\n\n无法正确显示会话元数据信息。";
+  }
+}
+
+/**
  * 处理帮助命令
  * 
  * 中文名称：处理帮助命令
@@ -104,13 +181,15 @@ export async function handleVerboseCommand(): Promise<boolean> {
  * 中文名称：处理创建新会话命令
  * 
  * 预期行为：
+ * - 获取当前会话的AI监控元数据
+ * - 如果元数据存在，通过Lark消息系统发送模型使用量统计信息
  * - 为会话生成新的线程ID
  * - 显示新会话创建成功的消息
  * - 触发commandExecuted事件
  * - 返回true表示命令处理成功
  * 
  * 行为分支：
- * 1. 正常情况：成功生成新ID并显示消息，返回true
+ * 1. 正常情况：成功发送使用量信息、生成新ID并显示消息，返回true
  * 2. 无异常情况：该函数不抛出异常，始终返回true
  * 
  * @param session - 会话对象，其threadId属性将被更新为新的会话ID
@@ -118,9 +197,29 @@ export async function handleVerboseCommand(): Promise<boolean> {
  */
 export async function handleNewCommand(session: any): Promise<boolean> {
   const sessionManager = SessionManager.getInstance();
+  
+  // 先获取当前会话的AI监控元数据并通过Lark消息系统发送统计信息
+  const metadata = sessionManager.getCurrentSessionMetadata();
+  if (metadata) {
+    const formattedInfo = formatSessionMetadataToMarkdown(metadata);
+    
+    // 通过 Lark 消息系统发送使用量统计信息
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { 
+        command: '/new', 
+        result: { 
+          success: true, 
+          message: formattedInfo
+        } 
+      },
+      timestamp: Date.now()
+    });
+  }
+  
   session.threadId = sessionManager.clearCurrentSession();
   
-  // 触发commandExecuted事件
+  // 触发commandExecuted事件（新会话创建成功）
   await session.adapter.emit({
     type: 'commandExecuted',
     data: { 
@@ -232,6 +331,27 @@ export async function handleExitCommand(session: any): Promise<boolean> {
  */
 export async function handleRebotCommand(session: any): Promise<boolean> {
   try {
+    const sessionManager = SessionManager.getInstance();
+    
+    // 先获取当前会话的AI监控元数据并通过Lark消息系统发送统计信息
+    const metadata = sessionManager.getCurrentSessionMetadata();
+    if (metadata) {
+      const formattedInfo = formatSessionMetadataToMarkdown(metadata);
+      
+      // 通过 Lark 消息系统发送使用量统计信息
+      await session.adapter.emit({
+        type: 'commandExecuted',
+        data: { 
+          command: '/rebot', 
+          result: { 
+            success: true, 
+            message: formattedInfo
+          } 
+        },
+        timestamp: Date.now()
+      });
+    }
+    
     console.log(styled.system("🔄 **正在执行项目构建**\n\n这可能需要几秒钟时间，请稍候..."));
     
     // 执行 npm run build 命令

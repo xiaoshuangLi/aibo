@@ -1,6 +1,13 @@
 import { tencentWsaSearchTool } from '@/tools/tencent-wsa';
+import * as wsaService from '@/infrastructure/tencent-cloud/wsa-service';
+
+jest.mock('@/infrastructure/tencent-cloud/wsa-service');
 
 describe('Tencent WSA Search Tool', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // Skip actual API calls in tests to avoid external dependencies
   // These tests verify the tool structure and error handling
   
@@ -26,38 +33,50 @@ describe('Tencent WSA Search Tool', () => {
     }
   });
 
-  it('should handle missing configuration gracefully', async () => {
-    // Create a WSA instance with empty config to simulate missing credentials
-    const result = await tencentWsaSearchTool.invoke({ 
-      query: 'test',
-      // This will use the default config from the environment, but we can't easily mock it
-      // So we'll test that the tool doesn't crash and returns a proper response structure
-    });
-    
+  it('should return MISSING_CONFIG when canSearch() returns false', async () => {
+    const mockWsa = { canSearch: jest.fn().mockReturnValue(false), search: jest.fn() };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
+    const result = await tencentWsaSearchTool.invoke({ query: 'test' });
     const parsedResult = JSON.parse(result);
-    
-    // The result should either be successful (if env vars are set) or contain an error
-    // Both cases should have the expected structure
-    expect(typeof parsedResult).toBe('object');
-    expect(parsedResult).toHaveProperty('success');
-    expect(parsedResult).toHaveProperty('message');
-    
-    // If it's not successful, it should contain error information
-    if (!parsedResult.success) {
-      expect(parsedResult).toHaveProperty('error');
-    }
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.error).toBe('MISSING_CONFIG');
   });
 
-  it('should handle search with different modes', async () => {
-    // This test verifies that the tool can be called with different modes
-    // Actual API calls are skipped in CI, but we verify the structure
-    
+  it('should return results when search succeeds', async () => {
+    const mockResponse = {
+      Pages: [{ Title: 'Result 1', Url: 'https://example.com' }],
+      Version: '1.0',
+      RequestId: 'req-123',
+    };
+    const mockWsa = {
+      canSearch: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockResolvedValue(mockResponse),
+    };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
     const result = await tencentWsaSearchTool.invoke({ query: 'JavaScript', mode: 1 });
     const parsedResult = JSON.parse(result);
-    
-    // The result should either be successful or contain an error about missing config
-    // Both cases are valid for testing purposes
-    expect(typeof parsedResult).toBe('object');
-    expect(parsedResult).toHaveProperty('success');
+
+    expect(parsedResult.success).toBe(true);
+    expect(parsedResult.query).toBe('JavaScript');
+    expect(parsedResult.results).toHaveLength(1);
+    expect(parsedResult.version).toBe('1.0');
+    expect(parsedResult.requestId).toBe('req-123');
+  });
+
+  it('should handle search exception', async () => {
+    const mockWsa = {
+      canSearch: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockRejectedValue(new Error('Network error')),
+    };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
+    const result = await tencentWsaSearchTool.invoke({ query: 'test' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.error).toBe('Network error');
   });
 });
