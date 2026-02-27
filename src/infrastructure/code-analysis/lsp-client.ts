@@ -118,12 +118,16 @@ export interface LspClientConfig {
   maxBufferSize?: number;
 }
 
+/** Maximum time (ms) to wait for a graceful LSP shutdown response before force-killing. */
+const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 3000;
+
 /**
  * LSP 客户端核心实现
  */
 export class LspClient extends EventEmitter {
   private childProcess: ChildProcess | null = null;
-  private buffer: string = '';
+  /** Raw-byte accumulation buffer for the LSP framing layer. */
+  private bufferBytes: Buffer = Buffer.alloc(0);
   private nextId: number = 1;
   private responsePromises: Map<number | string, {
     resolve: (value: any) => void;
@@ -131,6 +135,8 @@ export class LspClient extends EventEmitter {
     timeout: NodeJS.Timeout;
   }> = new Map();
   private initialized: boolean = false;
+  /** True once the child process has emitted 'exit' or 'error', regardless of who caused it. */
+  private processDead: boolean = false;
   private config: LspClientConfig;
   private openedDocuments: Map<string, { uri: string; version: number; text: string }> = new Map();
   private documentDiagnostics: Map<string, Diagnostic[]> = new Map();
@@ -172,9 +178,25 @@ export class LspClient extends EventEmitter {
 
   /**
    * 启动 LSP 服务器进程
+   *
+   * Waits one event-loop tick (setImmediate) before resolving so that a
+   * synchronous spawn 'error' event (e.g. binary not found) can be caught
+   * and turned into a rejection rather than being swallowed.
    */
   public startProcess(): Promise<void> {
     return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const settle = (err?: Error) => {
+        if (settled) return;
+        settled = true;
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      };
+
       try {
         console.log(`[LSP] Starting server: ${this.config.serverCommand}`);
         console.log(`[LSP] Arguments: ${(this.config.serverArgs || []).join(' ')}`);
@@ -204,16 +226,20 @@ export class LspClient extends EventEmitter {
           });
         }
 
-        // 处理进程错误
+        // 处理进程错误（binary 不存在等异步错误）
         this.childProcess.on('error', (err: Error) => {
           console.error(`[LSP ERROR] Failed to start process: ${err.message}`);
+          this.processDead = true;
+          this.initialized = false;
           this.rejectAllPending(err);
-          reject(err);
+          settle(err);
+          this.emit('exit', { code: null });
         });
 
         // 处理进程退出
         this.childProcess.on('exit', (code: number | null) => {
           console.log(`[LSP] Server process exited with code ${code}`);
+          this.processDead = true;
           this.initialized = false;
           this.openedDocuments.clear();
           this.documentDiagnostics.clear();
@@ -221,48 +247,71 @@ export class LspClient extends EventEmitter {
           this.emit('exit', { code });
         });
 
-        resolve();
+        // Give the event loop one tick so that a synchronous 'error' emission
+        // (e.g. ENOENT for the binary) is caught above before we resolve.
+        setImmediate(() => settle());
       } catch (error) {
-        reject(error);
+        settle(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
 
   /**
    * 处理 stdout 数据
+   *
+   * Bug fix: the LSP Content-Length header is a BYTE count (UTF-8), but
+   * JavaScript strings use UTF-16 code-unit indices.  If the message body
+   * contains non-ASCII characters (multi-byte in UTF-8, single unit in JS
+   * strings) the old string-based slicing was off by the number of extra
+   * bytes, silently corrupting the framing for all subsequent messages.
+   *
+   * Fix: accumulate raw bytes and use byte-offset arithmetic throughout.
+   * Only convert to a JS string after isolating the exact body bytes.
+   *
+   * Additionally, the regex used to require Content-Length to be the only
+   * header.  typescript-language-server also sends a Content-Type header;
+   * we now find the end of the entire header block via the \r\n\r\n
+   * byte boundary instead.
    */
   private handleStdoutData(data: Buffer): void {
-    this.buffer += data.toString('utf-8');
+    this.bufferBytes = Buffer.concat([this.bufferBytes, data]);
 
     // Prevent unbounded buffer growth
-    if (this.buffer.length > this.config.maxBufferSize!) {
-      console.error(`[LSP] Buffer overflow (${this.buffer.length} bytes), resetting buffer`);
-      this.buffer = '';
+    if (this.bufferBytes.length > this.config.maxBufferSize!) {
+      console.error(`[LSP] Buffer overflow (${this.bufferBytes.length} bytes), resetting buffer`);
+      this.bufferBytes = Buffer.alloc(0);
       return;
     }
 
     while (true) {
-      const headerMatch = this.buffer.match(/^Content-Length: (\d+)\r\n\r\n/);
-      if (!headerMatch) {
+      // Locate the end of the HTTP-style header block (\r\n\r\n).
+      const headerEnd = this.bufferBytes.indexOf('\r\n\r\n');
+      if (headerEnd === -1) break;
+
+      // Parse headers as ASCII (they are always ASCII in LSP).
+      const headerStr = this.bufferBytes.slice(0, headerEnd).toString('ascii');
+      const contentLengthMatch = headerStr.match(/Content-Length: (\d+)/);
+      if (!contentLengthMatch) {
+        // Malformed headers — skip to next potential message.
+        console.error('[LSP] Missing Content-Length header, discarding buffer');
+        this.bufferBytes = Buffer.alloc(0);
         break;
       }
 
-      const contentLength = parseInt(headerMatch[1], 10);
-      const headerLength = headerMatch[0].length;
-      const totalLength = headerLength + contentLength;
+      const contentLength = parseInt(contentLengthMatch[1], 10);
+      // headerEnd points to the start of \r\n\r\n; add 4 bytes to skip it.
+      const bodyStart = headerEnd + 4;
+      const totalLength = bodyStart + contentLength;
 
-      if (this.buffer.length < totalLength) {
-        break;
-      }
+      if (this.bufferBytes.length < totalLength) break;
 
-      const message = this.buffer.substring(headerLength, totalLength);
-      // Advance the buffer before parsing so that a JSON.parse failure
-      // does not leave the framing cursor stuck — the next message will
-      // still be processed correctly.
-      this.buffer = this.buffer.substring(totalLength);
+      // Extract exactly contentLength bytes for the body, then decode as UTF-8.
+      const messageBytes = this.bufferBytes.slice(bodyStart, totalLength);
+      // Advance the byte buffer before parsing so a JSON error doesn't stall framing.
+      this.bufferBytes = this.bufferBytes.slice(totalLength);
 
       try {
-        this.processMessage(JSON.parse(message));
+        this.processMessage(JSON.parse(messageBytes.toString('utf-8')));
       } catch (error) {
         console.error(`[LSP] Failed to process message: ${error}`);
       }
@@ -342,6 +391,10 @@ export class LspClient extends EventEmitter {
 
   /**
    * 发送请求并等待响应
+   *
+   * The internal timeout is unref()'d so it does NOT keep the Node.js event
+   * loop alive.  This prevents Jest (and any long-running process) from
+   * hanging after all user-visible work is complete.
    */
   private async request<T = any>(method: string, params?: any): Promise<T> {
     if (!this.initialized && method !== 'initialize') {
@@ -357,10 +410,11 @@ export class LspClient extends EventEmitter {
     };
 
     return new Promise((resolve, reject) => {
+      // unref() so this timer does NOT keep the Node.js event loop alive.
       const timeout = setTimeout(() => {
         this.responsePromises.delete(id);
         reject(new Error(`LSP request timeout for method: ${method}`));
-      }, this.config.timeout);
+      }, this.config.timeout).unref();
 
       this.responsePromises.set(id, { resolve, reject, timeout });
 
@@ -667,24 +721,51 @@ export class LspClient extends EventEmitter {
 
   /**
    * 关闭 LSP 服务器
+   *
+   * Tries a graceful LSP shutdown handshake with a short (3 s) timeout, then
+   * unconditionally kills the child process.  This avoids blocking for the
+   * full config.timeout (up to 60 s) when the server is slow or already dead.
    */
   public async shutdown(): Promise<void> {
-    try {
-      await this.request('shutdown');
-      this.notify('exit');
+    // Reject all in-flight requests immediately so callers don't wait.
+    this.rejectAllPending(new Error('LSP client shutting down'));
 
-      if (this.childProcess) {
-        this.childProcess.kill();
-      }
+    const proc = this.childProcess;
+    this.initialized = false;
+    this.processDead = true;
+    this.childProcess = null;
 
-      this.initialized = false;
-      console.log('[LSP] Server shutdown successfully');
-    } catch (error) {
-      console.error(`[LSP] Error during shutdown: ${error}`);
-      if (this.childProcess) {
-        this.childProcess.kill(9);
-      }
+    if (!proc) {
+      return;
     }
+
+    // Attempt a graceful LSP shutdown with a hard 3-second cap.
+    try {
+      // Temporarily restore state so request() and sendMessage() work.
+      this.childProcess = proc;
+      this.initialized = true;
+
+      await Promise.race([
+        this.request('shutdown').then(() => {
+          try { this.notify('exit'); } catch (_) { /* ignore */ }
+        }),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error('LSP shutdown timeout')), GRACEFUL_SHUTDOWN_TIMEOUT_MS).unref()
+        )
+      ]);
+    } catch (_) {
+      // Graceful shutdown failed or timed out — fall through to force-kill.
+    } finally {
+      this.childProcess = null;
+      this.initialized = false;
+    }
+
+    // Kill the process regardless.
+    if (!proc.killed) {
+      try { proc.kill(); } catch (_) { /* ignore */ }
+    }
+
+    console.log('[LSP] Server shutdown successfully');
   }
 
   /**
@@ -743,9 +824,13 @@ export class LspClient extends EventEmitter {
 
   /**
    * 检查服务器是否正在运行
+   *
+   * Uses the internal processDead flag rather than ChildProcess.killed because
+   * ChildProcess.killed is only true when *we* called kill() — a process that
+   * exited on its own keeps killed=false.
    */
   public isRunning(): boolean {
-    return this.childProcess !== null && !this.childProcess.killed;
+    return !this.processDead && this.childProcess !== null;
   }
 }
 
@@ -758,6 +843,9 @@ export class LspClientManager {
 
   /**
    * 获取或创建客户端
+   *
+   * If the cached client for the given directory is no longer running (process
+   * died unexpectedly) it is evicted and a fresh client is started.
    */
   static async getClient(
     workingDirectory: string,
@@ -767,7 +855,11 @@ export class LspClientManager {
 
     const existing = this.clients.get(key);
     if (existing) {
-      return existing;
+      if (existing.isRunning()) {
+        return existing;
+      }
+      // Dead client — remove it so we start fresh below.
+      this.clients.delete(key);
     }
 
     // Avoid duplicate initialization when called concurrently
@@ -792,6 +884,14 @@ export class LspClientManager {
 
       this.clients.set(key, client);
       this.pending.delete(key);
+
+      // Auto-evict this client when the underlying process exits unexpectedly.
+      client.once('exit', () => {
+        if (this.clients.get(key) === client) {
+          this.clients.delete(key);
+        }
+      });
+
       return client;
     })();
 
