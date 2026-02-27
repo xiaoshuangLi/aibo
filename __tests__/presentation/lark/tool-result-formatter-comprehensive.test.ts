@@ -1,7 +1,10 @@
 import { 
   getToolType, 
   formatToolResultByType,
-  formatStructuredResult
+  formatStructuredResult,
+  formatWebFetchResult,
+  formatThinkResult,
+  formatTaskManagementResult
 } from '@/presentation/lark/tool-result-formatter';
 
 describe('Tool Result Formatter - Comprehensive Tests', () => {
@@ -326,8 +329,8 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       const result = formatToolResultByType('WebFetchFromGithub', 'github', true, { 
         content: 'console.log("github file");' 
       });
-      expect(result).toContain('🐙 **GitHub文件内容**');
-      expect(result).toContain('**行数:** 1');
+      expect(result).toContain('🐙 **GitHub 文件内容**');
+      expect(result).toContain('(1 行)');
       expect(result).toContain('console.log("github file");');
     });
 
@@ -380,7 +383,7 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
         });
         expect(result).toContain('📚 **知识添加成功**');
         expect(result).toContain('**标题:** Test Knowledge');
-        expect(result).toContain('**关键词:** test, knowledge');
+        expect(result).toContain('**关键词数量:** 2');
       });
 
       it('should format failed add_knowledge result', () => {
@@ -764,6 +767,338 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       expect(result).toContain('```json');
       expect(result).toContain('"item1"');
       expect(result).toContain('"item2"');
+    });
+  });
+
+  // ─── Tests for new/actual tool names ────────────────────────────────────────
+
+  describe('getToolType - new tool names', () => {
+    it('should return filesystem for view_file', () => {
+      expect(getToolType('view_file')).toBe('filesystem');
+    });
+    it('should return filesystem for glob_files', () => {
+      expect(getToolType('glob_files')).toBe('filesystem');
+    });
+    it('should return filesystem for grep_files', () => {
+      expect(getToolType('grep_files')).toBe('filesystem');
+    });
+    it('should return web for web_fetch', () => {
+      expect(getToolType('web_fetch')).toBe('web');
+    });
+    it('should return thinking for think', () => {
+      expect(getToolType('think')).toBe('thinking');
+    });
+    it('should return task_management for read-subagent-todos', () => {
+      expect(getToolType('read-subagent-todos')).toBe('task_management');
+    });
+  });
+
+  describe('formatToolResultByType - view_file tool (actual name)', () => {
+    it('should format successful view_file result with content', () => {
+      const result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 50,
+        start_line: 1,
+        end_line: 50,
+        content: 'const x = 1;'
+      });
+      expect(result).toContain('`/src/index.ts`');
+      expect(result).toContain('共 50 行');
+      expect(result).toContain('const x = 1;');
+    });
+
+    it('should format view_file result with line range', () => {
+      const result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 100,
+        start_line: 10,
+        end_line: 20,
+        content: 'some code'
+      });
+      expect(result).toContain('第 10–20 行 / 共 100 行');
+    });
+
+    it('should format failed view_file result', () => {
+      const result = formatToolResultByType('view_file', 'filesystem', false, {
+        success: false,
+        error: 'FILE_NOT_FOUND',
+        message: 'File not found: /missing.ts'
+      });
+      expect(result).toContain('❌');
+      expect(result).toContain('File not found');
+    });
+  });
+
+  describe('formatToolResultByType - glob_files tool (actual name)', () => {
+    it('should format successful glob_files result', () => {
+      const result = formatToolResultByType('glob_files', 'filesystem', true, {
+        success: true,
+        pattern: '**/*.ts',
+        cwd: '/src',
+        count: 3,
+        files: ['a.ts', 'b.ts', 'c.ts']
+      });
+      expect(result).toContain('找到 3 个匹配文件');
+      expect(result).toContain('`**/*.ts`');
+      expect(result).toContain('- `a.ts`');
+    });
+
+    it('should format glob_files result with no matches', () => {
+      const result = formatToolResultByType('glob_files', 'filesystem', true, {
+        success: true,
+        pattern: '**/*.xyz',
+        count: 0,
+        files: []
+      });
+      expect(result).toContain('未找到匹配模式');
+    });
+
+    it('should format failed glob_files result', () => {
+      const result = formatToolResultByType('glob_files', 'filesystem', false, {
+        success: false,
+        error: 'INVALID_PATTERN',
+        pattern: '?!'
+      });
+      expect(result).toContain('❌');
+    });
+  });
+
+  describe('formatToolResultByType - grep_files tool (actual name)', () => {
+    it('should format successful grep_files result', () => {
+      const result = formatToolResultByType('grep_files', 'filesystem', true, {
+        success: true,
+        pattern: 'export',
+        include: '**/*.ts',
+        count: 2,
+        truncated: false,
+        results: [
+          { file: 'src/a.ts', line: 5, content: 'export const foo = 1;' },
+          { file: 'src/b.ts', line: 12, content: 'export default class Bar {}' }
+        ]
+      });
+      expect(result).toContain('找到 2 个匹配项');
+      expect(result).toContain('`export`');
+      expect(result).toContain('`src/a.ts`');
+      expect(result).toContain('第 5 行');
+      expect(result).toContain('export const foo = 1;');
+    });
+
+    it('should format grep_files result with no matches', () => {
+      const result = formatToolResultByType('grep_files', 'filesystem', true, {
+        success: true,
+        pattern: 'nonexistent',
+        count: 0,
+        truncated: false,
+        results: []
+      });
+      expect(result).toContain('未找到匹配模式');
+    });
+
+    it('should format truncated grep_files result', () => {
+      const results = Array.from({ length: 11 }, (_, i) => ({
+        file: `file${i}.ts`,
+        line: i + 1,
+        content: `content ${i}`
+      }));
+      const result = formatToolResultByType('grep_files', 'filesystem', true, {
+        success: true,
+        pattern: 'test',
+        count: 500,
+        truncated: true,
+        results
+      });
+      expect(result).toContain('⚠️ 结果已截断');
+    });
+  });
+
+  describe('formatToolResultByType - write_file result (actual format)', () => {
+    it('should format write_file created result with lines_written', () => {
+      const result = formatToolResultByType('write_file', 'filesystem', true, {
+        success: true,
+        action: 'created',
+        file_path: '/src/new.ts',
+        lines_written: 42
+      });
+      expect(result).toContain('✅ 文件操作成功');
+      expect(result).toContain('新建');
+      expect(result).toContain('`/src/new.ts`');
+      expect(result).toContain('**写入行数:** 42');
+    });
+
+    it('should format edit_file result with lines_removed and lines_added', () => {
+      const result = formatToolResultByType('edit_file', 'filesystem', true, {
+        success: true,
+        action: 'edited',
+        file_path: '/src/existing.ts',
+        lines_removed: 3,
+        lines_added: 5
+      });
+      expect(result).toContain('✅ 文件操作成功');
+      expect(result).toContain('编辑');
+      expect(result).toContain('-3');
+      expect(result).toContain('+5');
+    });
+  });
+
+  describe('formatWebFetchResult', () => {
+    it('should format successful web_fetch result', () => {
+      const result = formatWebFetchResult({
+        success: true,
+        url: 'https://example.com',
+        status: 200,
+        content_type: 'text/html',
+        content_length: 100,
+        truncated: false,
+        content: '<html>hello</html>'
+      });
+      expect(result).toContain('🌐 **网页内容**');
+      expect(result).toContain('https://example.com');
+      expect(result).toContain('<html>hello</html>');
+    });
+
+    it('should show truncated warning when content is truncated', () => {
+      const result = formatWebFetchResult({
+        success: true,
+        url: 'https://example.com',
+        status: 200,
+        content_type: 'text/plain',
+        truncated: true,
+        content: 'long content...'
+      });
+      expect(result).toContain('⚠️ 内容已截断');
+    });
+
+    it('should format failed web_fetch result', () => {
+      const result = formatWebFetchResult({
+        success: false,
+        url: 'https://example.com',
+        status: 404,
+        error: 'NOT_FOUND',
+        message: 'Page not found'
+      });
+      expect(result).toContain('❌ **网页获取失败**');
+      expect(result).toContain('404');
+      expect(result).toContain('Page not found');
+    });
+  });
+
+  describe('formatThinkResult', () => {
+    it('should format think result with reasoning', () => {
+      const result = formatThinkResult({
+        type: 'thinking',
+        reasoning: 'I need to consider all the options before proceeding.',
+        note: 'This is internal reasoning.'
+      });
+      expect(result).toContain('💭 **思考过程**');
+      expect(result).toContain('I need to consider all the options');
+    });
+
+    it('should fallback to JSON for think result without reasoning', () => {
+      const result = formatThinkResult({ type: 'thinking', note: 'no reasoning' });
+      expect(result).toContain('```json');
+    });
+  });
+
+  describe('formatTaskManagementResult - read-subagent-todos', () => {
+    it('should format read-subagent-todos result with todos', () => {
+      const result = formatTaskManagementResult('read-subagent-todos', {
+        success: true,
+        todos: [
+          { content: 'Code the feature', status: 'completed', subagent_type: 'coder' },
+          { content: 'Write tests', status: 'in_progress', subagent_type: 'testing' },
+          { content: 'Review docs', status: 'pending', subagent_type: 'documentation' }
+        ],
+        total: 3
+      });
+      expect(result).toContain('📋 **待办事项 (1/3 完成)**');
+      expect(result).toContain('[✓]');
+      expect(result).toContain('`coder`');
+      expect(result).toContain('[🔄]');
+      expect(result).toContain('`testing`');
+    });
+
+    it('should handle empty read-subagent-todos list', () => {
+      const result = formatTaskManagementResult('read-subagent-todos', {
+        success: true,
+        todos: [],
+        total: 0
+      });
+      expect(result).toContain('📋 **待办事项列表为空**');
+    });
+  });
+
+  describe('formatToolResultByType - web and thinking types', () => {
+    it('should handle web_fetch via formatToolResultByType', () => {
+      const result = formatToolResultByType('web_fetch', 'web', true, {
+        success: true,
+        url: 'https://example.com',
+        status: 200,
+        content_type: 'text/plain',
+        truncated: false,
+        content: 'hello world'
+      });
+      expect(result).toContain('🌐 **网页内容**');
+      expect(result).toContain('hello world');
+    });
+
+    it('should handle think via formatToolResultByType', () => {
+      const result = formatToolResultByType('think', 'thinking', true, {
+        type: 'thinking',
+        reasoning: 'Step 1: analyze the problem.',
+        note: 'internal'
+      });
+      expect(result).toContain('💭 **思考过程**');
+      expect(result).toContain('Step 1');
+    });
+
+    it('should handle knowledge actual tool output for get_knowledge_summaries', () => {
+      const result = formatToolResultByType('get_knowledge_summaries', 'knowledge', true, {
+        success: true,
+        knowledgeSummaries: [
+          { title: 'Item 1', keywords: ['a', 'b'] },
+          { title: 'Item 2', keywords: [] }
+        ],
+        total: 2
+      });
+      expect(result).toContain('📚 **知识库摘要 (2 项)**');
+      expect(result).toContain('- **Item 1** [a, b]');
+    });
+
+    it('should handle knowledge actual tool output for search_knowledge', () => {
+      const result = formatToolResultByType('search_knowledge', 'knowledge', true, {
+        success: true,
+        message: '搜索完成，找到 1 个匹配项',
+        knowledgeItems: [
+          { title: 'Found Item', content: 'Details about it' }
+        ],
+        total: 1
+      });
+      expect(result).toContain('📚 **知识搜索结果 (1 项)**');
+      expect(result).toContain('**Found Item**');
+      expect(result).toContain('Details about it');
+    });
+
+    it('should handle add_knowledge actual tool output', () => {
+      const result = formatToolResultByType('add_knowledge', 'knowledge', true, {
+        success: true,
+        message: '知识项已成功添加到知识库',
+        title: 'New Knowledge',
+        keywordCount: 3
+      });
+      expect(result).toContain('📚 **知识添加成功**');
+      expect(result).toContain('**标题:** New Knowledge');
+      expect(result).toContain('**关键词数量:** 3');
+    });
+
+    it('should handle sleep actual tool output', () => {
+      const result = formatToolResultByType('sleep', 'system', true, {
+        success: true,
+        message: 'Slept for 1000 milliseconds'
+      });
+      expect(result).toContain('⏱️ 延迟执行完成');
+      expect(result).toContain('1000');
     });
   });
 });
