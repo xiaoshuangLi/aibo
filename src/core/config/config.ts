@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { Command } from 'commander';
+import { parseInteractionModeFromArgs } from '@/cli/program';
 
 /**
  * Application configuration module that loads and validates environment variables.
@@ -14,52 +14,6 @@ import { Command } from 'commander';
 
 // Load environment variables from .env file
 dotenv.config({ quiet: true });
-
-/**
- * Parses command line arguments using Commander.js to determine interaction mode.
- * 
- * Priority order:
- * 1. --interaction=console|lark (highest priority)
- * 2. --interactive or -i (equivalent to --interaction=console)
- * 3. Environment variable AIBO_INTERACTION
- * 4. Default value 'console'
- * 
- * @returns {'console' | 'lark' | null} The interaction mode or null if not specified via CLI
- */
-function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
-  const program = new Command();
-  
-  // Define the --interaction option with choices
-  program
-    .option('--interaction <mode>', 'Set interaction mode', 'console')
-    .option('-i, --interactive', 'Enable interactive console mode')
-    .allowUnknownOption(); // Allow other unknown options to pass through
-  
-  // Parse the arguments (skip the first two which are node and script path)
-  program.parse(process.argv);
-  const options = program.opts();
-  
-  // Check if --interactive or -i was provided (this should take precedence)
-  if (options.interactive) {
-    return 'console';
-  }
-  
-  // Check if --interaction was explicitly provided
-  // We need to check if the option was actually passed, not just the default value
-  const rawArgs = process.argv.slice(2);
-  const hasInteractionArg = rawArgs.some(arg => arg.startsWith('--interaction='));
-  
-  if (hasInteractionArg) {
-    const mode = options.interaction;
-    if (mode === 'console' || mode === 'lark') {
-      return mode;
-    }
-    // If invalid mode is provided, we'll let it fall through to env/default
-    // and potentially show a warning later if needed
-  }
-  
-  return null; // No relevant CLI argument specified
-}
 
 /**
  * Determines the final interaction mode based on CLI args and environment variables.
