@@ -13,6 +13,7 @@ import getViewFileTools from '@/tools/view-file';
 import getEditFileTools from '@/tools/edit-file';
 import getThinkTools from '@/tools/think';
 import getWriteFileTools from '@/tools/write-file';
+import getTodoTools from '@/tools/todo';
 
 /**
  * 异步获取所有工具的方法
@@ -36,6 +37,7 @@ export default async function getTools() {
     editFileTools,
     thinkTools,
     writeFileTools,
+    todoTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -52,6 +54,7 @@ export default async function getTools() {
     getEditFileTools(),
     getThinkTools(),
     getWriteFileTools(),
+    getTodoTools(),
   ]);
   
   return [
@@ -70,5 +73,6 @@ export default async function getTools() {
     ...editFileTools,
     ...thinkTools,
     ...writeFileTools,
+    ...todoTools,
   ];
 }

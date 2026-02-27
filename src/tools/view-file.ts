@@ -42,7 +42,16 @@ export const viewFileTool = tool(
       const end = end_line !== undefined ? Math.min(totalLines, end_line) : totalLines;
 
       const selectedLines = lines.slice(start - 1, end);
-      const selectedContent = selectedLines.join("\n");
+
+      // Build line-numbered content (like Claude Code's Read tool output)
+      // Format: right-aligned line number, tab, content
+      const lineNumWidth = String(end).length;
+      const numberedContent = selectedLines
+        .map((line, i) => {
+          const lineNum = start + i;
+          return `${String(lineNum).padStart(lineNumWidth)}\t${line}`;
+        })
+        .join("\n");
 
       return JSON.stringify({
         success: true,
@@ -50,7 +59,7 @@ export const viewFileTool = tool(
         total_lines: totalLines,
         start_line: start,
         end_line: end,
-        content: selectedContent,
+        content: numberedContent,
       }, null, 2);
     } catch (error) {
       return JSON.stringify({
@@ -64,7 +73,8 @@ export const viewFileTool = tool(
     name: "view_file",
     description: `Read file contents with optional line range support.
 Use start_line and end_line to read only a portion of large files.
-Line numbers are 1-based. Returns the content with metadata (total lines, file path).
+Line numbers are 1-based. Content is returned with line numbers prefixed
+(e.g. "  1\tconst x = 1;") so you can reference exact locations when editing.
 Always prefer this over shell 'cat' commands for reading files.`,
     schema: z.object({
       file_path: z.string().describe("Path to the file to read (absolute or relative to cwd)"),

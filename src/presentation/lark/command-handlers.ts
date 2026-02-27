@@ -3,6 +3,7 @@ import { styled } from '@/presentation/styling/output-styler';
 import { SessionManager } from '@/infrastructure/session/session-manager';
 import { executeBashTool } from '@/tools/bash';
 import { getRestartCommand } from '@/shared/utils/restart-helper';
+import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
 
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
@@ -118,6 +119,7 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/help\`      - 显示此帮助指南
 • \`/exit\`      - ✅ 立即安全退出
 • \`/new\`       - 🆕 创建全新会话
+• \`/compact\`   - 🧹 压缩对话（保留知识库，释放上下文）
 • \`/abort\`     - ⏹️  中断当前操作
 • \`/verbose\`   - 📊 切换详细/简洁模式
 • \`/rebot\`     - 🔄 重启并重新构建
@@ -172,6 +174,86 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 export async function handleVerboseCommand(): Promise<boolean> {
   config.output.verbose = !config.output.verbose;
   console.log(styled.system(`${config.output.verbose ? '📊 **输出模式已切换**\n\n当前模式: **详细输出**\n\n💡 在此模式下，您将看到完整的工具输出和详细信息。' : '📋 **输出模式已切换**\n\n当前模式: **简洁输出**\n\n💡 在此模式下，长内容会自动截断以保持界面整洁。'}`));
+  return true;
+}
+
+/**
+ * 处理压缩对话命令（对标 Claude Code /compact）
+ *
+ * 中文名称：处理压缩对话命令
+ *
+ * 预期行为：
+ * - 将当前会话的知识库内容迁移到新会话中
+ * - 开始一个全新的会话（清除大量消息历史以提升速度）
+ * - 通过 Lark 消息系统通知用户压缩结果和迁移的知识库摘要
+ *
+ * 行为分支：
+ * 1. 有知识库内容：迁移所有知识项到新会话，并发送摘要
+ * 2. 无知识库内容：直接创建新会话，提示用户可以用 add_knowledge 保存重要上下文
+ * 3. 发生异常：捕获错误，通过 Lark 发送错误消息，仍返回true
+ *
+ * @param session - 会话对象，其threadId将被更新为新的会话ID
+ * @returns Promise<boolean> - 始终返回true，表示命令处理成功
+ */
+export async function handleCompactCommand(session: any): Promise<boolean> {
+  try {
+    // 1. Capture all knowledge from the current session before resetting
+    const savedKnowledge = getAllKnowledge();
+
+    // 2. Create a fresh session (clears message history → speeds up responses)
+    const sessionManager = SessionManager.getInstance();
+    session.threadId = sessionManager.clearCurrentSession();
+
+    // 3. Re-populate the knowledge base in the new session
+    for (const item of savedKnowledge) {
+      addKnowledge(item.content, item.title, item.keywords);
+    }
+
+    // 4. Build result message
+    let resultMessage: string;
+    if (savedKnowledge.length > 0) {
+      const titles = savedKnowledge.map((k: any) => `- 📌 **${k.title}**`).join('\n');
+      resultMessage =
+        `✅ **对话已压缩**\n\n` +
+        `新会话 ID: \`${session.threadId}\`\n\n` +
+        `📚 已将 **${savedKnowledge.length}** 条知识项迁移到新会话：\n${titles}\n\n` +
+        `💡 在新会话中直接描述你的当前目标，AI 会从知识库中获取上下文继续工作。`;
+    } else {
+      resultMessage =
+        `✅ **对话已压缩**\n\n` +
+        `新会话 ID: \`${session.threadId}\`\n\n` +
+        `📭 知识库为空，未迁移任何内容。\n\n` +
+        `💡 使用 \`add_knowledge\` 工具保存重要的项目背景或目标，下次压缩时可自动保留。`;
+    }
+
+    // 5. Emit result via Lark message system
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: {
+        command: '/compact',
+        result: {
+          success: true,
+          sessionId: session.threadId,
+          message: resultMessage
+        }
+      },
+      timestamp: Date.now()
+    });
+
+    console.log(resultMessage);
+  } catch (error) {
+    const errMsg = `❌ 压缩失败: ${(error as Error).message}`;
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: {
+        command: '/compact',
+        result: { success: false, message: errMsg }
+      },
+      timestamp: Date.now()
+    });
+    console.log(errMsg);
+  }
+
   return true;
 }
 
@@ -907,15 +989,16 @@ export async function handleStageCommand(session: any, filePath: string): Promis
  * 1. /help命令：调用handleHelpCommand()
  * 2. /verbose命令：调用handleVerboseCommand()
  * 3. /new命令：调用handleNewCommand(session)
- * 4. /abort命令：调用handleAbortCommand(session)
- * 5. /rebot命令：调用handleRebotCommand(session)
- * 6. /exit、/quit、/q或/stop命令：调用handleExitCommand(session)
- * 7. /show-files命令：调用handleShowFilesCommand(session)
- * 8. /show-diff命令：调用handleShowDiffCommand(session)
- * 9. /diff <file>命令：调用handleDiffCommand(session, filePath)
- * 10. /revert <file>命令：调用handleRevertCommand(session, filePath)
- * 11. /stage <file>命令：调用handleStageCommand(session, filePath)
- * 12. 其他未知命令：调用handleUnknownCommand(command)
+ * 4. /compact命令：调用handleCompactCommand(session)
+ * 5. /abort命令：调用handleAbortCommand(session)
+ * 6. /rebot命令：调用handleRebotCommand(session)
+ * 7. /exit、/quit、/q或/stop命令：调用handleExitCommand(session)
+ * 8. /show-files命令：调用handleShowFilesCommand(session)
+ * 9. /show-diff命令：调用handleShowDiffCommand(session)
+ * 10. /diff <file>命令：调用handleDiffCommand(session, filePath)
+ * 11. /revert <file>命令：调用handleRevertCommand(session, filePath)
+ * 12. /stage <file>命令：调用handleStageCommand(session, filePath)
+ * 13. 其他未知命令：调用handleUnknownCommand(command)
  * 
  * @param session - 会话对象，包含threadId等会话状态信息
  * @returns (command: string) => Promise<boolean> - 返回一个接受命令字符串并返回Promise<boolean>的函数
@@ -936,6 +1019,9 @@ export function createHandleInternalCommand(session: any): (command: string) => 
         
       case "/new":
         return await handleNewCommand(session);
+        
+      case "/compact":
+        return await handleCompactCommand(session);
         
       case "/abort":
         return await handleAbortCommand(session);
