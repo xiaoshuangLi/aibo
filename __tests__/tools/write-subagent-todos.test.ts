@@ -1,4 +1,4 @@
-import { writeSubagentTodosTool } from '../../src/tools/write-subagent-todos';
+import { writeSubagentTodosTool, readSubagentTodosTool } from '../../src/tools/write-subagent-todos';
 
 describe('writeSubagentTodosTool', () => {
   describe('成功路径测试', () => {
@@ -221,5 +221,53 @@ describe('writeSubagentTodosTool', () => {
         Array.prototype.map = originalMap;
       }
     }
+  });
+});
+
+describe('readSubagentTodosTool', () => {
+  beforeEach(async () => {
+    // Reset shared state before each test to ensure test isolation
+    await writeSubagentTodosTool.invoke({ todos: [] });
+  });
+
+  test('应该读取 writeSubagentTodosTool 写入的任务清单', async () => {
+    const todos = [
+      { content: '读取测试任务', status: 'in_progress' as const, subagent_type: 'coder' }
+    ];
+    await writeSubagentTodosTool.invoke({ todos });
+
+    const result = await readSubagentTodosTool.invoke({});
+    expect(typeof result).toBe('string');
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(true);
+    expect(parsedResult.todos).toHaveLength(1);
+    expect(parsedResult.todos[0].content).toBe('读取测试任务');
+    expect(parsedResult.total).toBe(1);
+  });
+
+  test('应该在清单被覆盖后返回最新内容', async () => {
+    await writeSubagentTodosTool.invoke({
+      todos: [{ content: '旧任务', status: 'pending' as const, subagent_type: 'researcher' }]
+    });
+    await writeSubagentTodosTool.invoke({
+      todos: [{ content: '新任务', status: 'in_progress' as const, subagent_type: 'coder' }]
+    });
+
+    const result = await readSubagentTodosTool.invoke({});
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(true);
+    expect(parsedResult.todos).toHaveLength(1);
+    expect(parsedResult.todos[0].content).toBe('新任务');
+  });
+
+  test('应该在清单为空时返回空数组', async () => {
+    const result = await readSubagentTodosTool.invoke({});
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(true);
+    expect(parsedResult.todos).toHaveLength(0);
+    expect(parsedResult.total).toBe(0);
   });
 });

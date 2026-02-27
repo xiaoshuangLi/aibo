@@ -6,6 +6,9 @@ import getComposioTools from '@/tools/composio';
 import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
 import getKnowledgeTools from '@/tools/knowledge';
 import getLspTools from '@/tools/lsp-tools';
+import getGlobTools from '@/tools/glob';
+import getGrepTools from '@/tools/grep';
+import getWebFetchTools from '@/tools/web-fetch';
 
 /**
  * 异步获取所有工具的方法
@@ -22,6 +25,9 @@ export default async function getTools() {
     writeSubagentTodosTools,
     knowledgeTools,
     lspTools,
+    globTools,
+    grepTools,
+    webFetchTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -31,6 +37,9 @@ export default async function getTools() {
     getWriteSubagentTodosTools(),
     getKnowledgeTools(),
     getLspTools(),
+    getGlobTools(),
+    getGrepTools(),
+    getWebFetchTools(),
   ]);
   
   return [
@@ -42,5 +51,8 @@ export default async function getTools() {
     ...writeSubagentTodosTools,
     ...knowledgeTools,
     ...lspTools,
+    ...globTools,
+    ...grepTools,
+    ...webFetchTools,
   ];
 }
