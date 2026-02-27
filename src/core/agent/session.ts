@@ -40,7 +40,7 @@ export class Session {
       this.threadId = sessionManager.getCurrentSessionId();
     }
     
-    this.modelInfo = options.modelInfo || config.openai.modelName;
+    this.modelInfo = options.modelInfo || config.model.name;
     
     // 设置中止信号
     this.abortController = new AbortController();

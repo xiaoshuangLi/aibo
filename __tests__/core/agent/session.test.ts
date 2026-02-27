@@ -28,8 +28,8 @@ jest.mock('@/infrastructure/session/session-manager', () => {
 // Mock config
 jest.mock('@/core/config/config', () => ({
   config: {
-    openai: {
-      modelName: 'gpt-4o-mini'
+    model: {
+      name: 'gpt-4o-mini'
     }
   }
 }));

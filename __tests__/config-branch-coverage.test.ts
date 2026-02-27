@@ -3,9 +3,8 @@ import { config } from '@/core/config/config';
 describe('Config Branch Coverage Tests', () => {
   test('should have valid config structure', () => {
     expect(config).toBeDefined();
-    expect(config.openai).toBeDefined();
-    expect(config.openai.apiKey).toBeDefined();
-    expect(config.openai.modelName).toBeDefined();
+    expect(config.model).toBeDefined();
+    expect(config.model.name).toBeDefined();
     expect(config.langgraph).toBeDefined();
     expect(config.langgraph.recursionLimit).toBeDefined();
     expect(config.memory).toBeDefined();
@@ -13,7 +12,7 @@ describe('Config Branch Coverage Tests', () => {
   });
 
   test('should handle optional baseURL', () => {
-    // baseURL can be undefined, so we just check it exists
-    expect(config.openai.baseURL).toBeDefined();
+    // baseURL can be undefined when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set
+    expect(config.model).toBeDefined();
   });
 });

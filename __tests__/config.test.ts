@@ -23,14 +23,14 @@ describe('Configuration Module', () => {
   });
 
   test('should load required environment variables correctly', () => {
-    // 设置必要的环境变量
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
+    // AIBO_API_KEY is optional (Ollama doesn't need one), so any value works
+    process.env.AIBO_API_KEY = 'sk-test-key';
     
     // 重新导入配置模块
     const { config: testConfig } = require('../src/core/config/config');
     
-    expect(testConfig.openai.apiKey).toBe('sk-test12345678901234567890123456789012');
-    expect(testConfig.openai.modelName).toBe('gpt-4o'); // 默认值
+    expect(testConfig.model.apiKey).toBe('sk-test-key');
+    expect(testConfig.model.name).toBe('gpt-4o'); // 默认值
     expect(testConfig.langgraph.recursionLimit).toBe(1000); // 默认值
     expect(testConfig.langgraph.checkpointerType).toBe('memory'); // 默认值
     expect(testConfig.memory.windowSize).toBe(5); // 默认值
@@ -39,8 +39,8 @@ describe('Configuration Module', () => {
   });
 
   test('should use custom environment variables when provided', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-custom12345678901234567890123456789012';
-    process.env.AIBO_OPENAI_BASE_URL = 'https://custom-api.example.com/v1';
+    process.env.AIBO_API_KEY = 'sk-custom-key';
+    process.env.AIBO_BASE_URL = 'https://custom-api.example.com/v1';
     process.env.AIBO_MODEL_NAME = 'gpt-4-turbo';
     process.env.AIBO_RECURSION_LIMIT = '500';
     process.env.AIBO_CHECKPOINTER_TYPE = 'sqlite';
@@ -49,51 +49,44 @@ describe('Configuration Module', () => {
     
     const { config: testConfig } = require('../src/core/config/config');
     
-    expect(testConfig.openai.apiKey).toBe('sk-custom12345678901234567890123456789012');
-    expect(testConfig.openai.baseURL).toBe('https://custom-api.example.com/v1');
-    expect(testConfig.openai.modelName).toBe('gpt-4-turbo');
+    expect(testConfig.model.apiKey).toBe('sk-custom-key');
+    expect(testConfig.model.baseURL).toBe('https://custom-api.example.com/v1');
+    expect(testConfig.model.name).toBe('gpt-4-turbo');
     expect(testConfig.langgraph.recursionLimit).toBe(500);
     expect(testConfig.langgraph.checkpointerType).toBe('sqlite');
     expect(testConfig.memory.windowSize).toBe(10);
     expect(testConfig.output.verbose).toBe(true);
   });
 
-  test('should throw error when required AIBO_OPENAI_API_KEY is missing', () => {
-    delete process.env.AIBO_OPENAI_API_KEY;
+  test('should work without AIBO_API_KEY (e.g. for Ollama)', () => {
+    delete process.env.AIBO_API_KEY;
+    process.env.AIBO_MODEL_NAME = 'llama3';
+    process.env.AIBO_MODEL_PROVIDER = 'ollama';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.model.apiKey).toBeUndefined();
+    expect(testConfig.model.name).toBe('llama3');
+    expect(testConfig.model.provider).toBe('ollama');
+  });
+
+  test('should throw error when AIBO_BASE_URL has invalid format', () => {
+    process.env.AIBO_BASE_URL = 'not-a-url';
     
     expect(() => {
       require('../src/core/config/config');
     }).toThrow();
   });
 
-  test('should throw error when AIBO_OPENAI_API_KEY is empty', () => {
-    process.env.AIBO_OPENAI_API_KEY = '';
-    
-    expect(() => {
-      require('../src/core/config/config');
-    }).toThrow();
-  });
-
-  test('should validate AIBO_OPENAI_BASE_URL format', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
-    process.env.AIBO_OPENAI_BASE_URL = 'not-a-url';
-    
-    expect(() => {
-      require('../src/core/config/config');
-    }).toThrow();
-  });
-
-  test('should accept valid AIBO_OPENAI_BASE_URL', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
-    process.env.AIBO_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+  test('should accept valid AIBO_BASE_URL', () => {
+    process.env.AIBO_BASE_URL = 'https://api.openai.com/v1';
     
     const { config: testConfig } = require('../src/core/config/config');
     
-    expect(testConfig.openai.baseURL).toBe('https://api.openai.com/v1');
+    expect(testConfig.model.baseURL).toBe('https://api.openai.com/v1');
   });
 
   test('should validate AIBO_RECURSION_LIMIT as positive integer', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     process.env.AIBO_RECURSION_LIMIT = '0';
     
     expect(() => {
@@ -112,7 +105,6 @@ describe('Configuration Module', () => {
   });
 
   test('should validate AIBO_MEMORY_WINDOW_SIZE as positive integer', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     process.env.AIBO_MEMORY_WINDOW_SIZE = '0';
     
     expect(() => {
@@ -121,7 +113,6 @@ describe('Configuration Module', () => {
   });
 
   test('should validate AIBO_CHECKPOINTER_TYPE enum values', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     process.env.AIBO_CHECKPOINTER_TYPE = 'invalid';
     
     expect(() => {
@@ -140,7 +131,6 @@ describe('Configuration Module', () => {
   });
 
   test('should use default 魅魔 persona when AIBO_PERSONA is not set', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     delete process.env.AIBO_PERSONA;
 
     const { config: testConfig } = require('../src/core/config/config');
@@ -149,11 +139,44 @@ describe('Configuration Module', () => {
   });
 
   test('should use custom persona when AIBO_PERSONA is provided', () => {
-    process.env.AIBO_OPENAI_API_KEY = 'sk-test12345678901234567890123456789012';
     process.env.AIBO_PERSONA = '你是一个严肃的助手，回答简洁直接。';
 
     const { config: testConfig } = require('../src/core/config/config');
 
     expect(testConfig.persona.style).toBe('你是一个严肃的助手，回答简洁直接。');
+  });
+
+  test('AIBO_OPENAI_API_KEY is accepted as backward-compatible alias for AIBO_API_KEY', () => {
+    process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.model.apiKey).toBe('sk-legacy-key');
+  });
+
+  test('AIBO_API_KEY takes precedence over AIBO_OPENAI_API_KEY', () => {
+    process.env.AIBO_API_KEY = 'sk-new-key';
+    process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.model.apiKey).toBe('sk-new-key');
+  });
+
+  test('AIBO_OPENAI_BASE_URL is accepted as backward-compatible alias for AIBO_BASE_URL', () => {
+    process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.model.baseURL).toBe('https://legacy-endpoint.example.com/v1');
+  });
+
+  test('AIBO_BASE_URL takes precedence over AIBO_OPENAI_BASE_URL', () => {
+    process.env.AIBO_BASE_URL = 'https://new-endpoint.example.com/v1';
+    process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
+
+    const { config: testConfig } = require('../src/core/config/config');
+
+    expect(testConfig.model.baseURL).toBe('https://new-endpoint.example.com/v1');
   });
 });

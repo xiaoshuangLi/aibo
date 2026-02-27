@@ -159,9 +159,9 @@ jest.mock('deepagents', () => ({
 
 jest.mock('../src/core/config/config', () => ({
   config: {
-    openai: {
+    model: {
       apiKey: 'test-api-key',
-      modelName: 'gpt-4',
+      name: 'gpt-4',
       baseURL: 'https://api.openai.com/v1',
     },
     langgraph: {

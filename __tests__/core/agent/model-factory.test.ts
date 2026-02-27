@@ -3,28 +3,25 @@ jest.mock('dotenv', () => ({
   config: jest.fn(),
 }));
 
-// Mock @langchain/openai
+// Mock all LangChain provider packages
 jest.mock('@langchain/openai', () => ({
-  ChatOpenAI: jest.fn().mockImplementation((opts) => ({
-    _modelType: 'openai',
-    ...opts,
-  })),
+  ChatOpenAI: jest.fn().mockImplementation((opts) => ({ _modelType: 'openai', ...opts })),
+  AzureChatOpenAI: jest.fn().mockImplementation((opts) => ({ _modelType: 'azure', ...opts })),
 }));
-
-// Mock @langchain/anthropic
 jest.mock('@langchain/anthropic', () => ({
-  ChatAnthropic: jest.fn().mockImplementation((opts) => ({
-    _modelType: 'anthropic',
-    ...opts,
-  })),
+  ChatAnthropic: jest.fn().mockImplementation((opts) => ({ _modelType: 'anthropic', ...opts })),
 }));
-
-// Mock @langchain/google-genai
 jest.mock('@langchain/google-genai', () => ({
-  ChatGoogleGenerativeAI: jest.fn().mockImplementation((opts) => ({
-    _modelType: 'google',
-    ...opts,
-  })),
+  ChatGoogleGenerativeAI: jest.fn().mockImplementation((opts) => ({ _modelType: 'google', ...opts })),
+}));
+jest.mock('@langchain/mistralai', () => ({
+  ChatMistralAI: jest.fn().mockImplementation((opts) => ({ _modelType: 'mistral', ...opts })),
+}));
+jest.mock('@langchain/groq', () => ({
+  ChatGroq: jest.fn().mockImplementation((opts) => ({ _modelType: 'groq', ...opts })),
+}));
+jest.mock('@langchain/ollama', () => ({
+  ChatOllama: jest.fn().mockImplementation((opts) => ({ _modelType: 'ollama', ...opts })),
 }));
 
 describe('createModel', () => {
@@ -32,41 +29,29 @@ describe('createModel', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = {
-      AIBO_OPENAI_API_KEY: 'sk-test-key',
-    };
+    process.env = {};
   });
 
   afterEach(() => {
     process.env = originalEnv;
   });
 
-  test('creates ChatOpenAI for default gpt-4o model', () => {
+  // ── Auto-detection from model name prefix ──────────────────────────────────
+
+  test('creates ChatOpenAI for gpt-4o (default)', () => {
+    process.env.AIBO_API_KEY = 'sk-test';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model-factory');
     const { ChatOpenAI } = require('@langchain/openai');
 
     const model = createModel();
 
-    expect(ChatOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({ modelName: 'gpt-4o', temperature: 0 })
-    );
+    expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-4o', temperature: 0 }));
     expect(model._modelType).toBe('openai');
   });
 
-  test('creates ChatOpenAI for gpt-4-turbo model', () => {
-    process.env.AIBO_MODEL_NAME = 'gpt-4-turbo';
-    const { createModel } = require('@/core/agent/model-factory');
-    const { ChatOpenAI } = require('@langchain/openai');
-
-    createModel();
-
-    expect(ChatOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({ modelName: 'gpt-4-turbo', temperature: 0 })
-    );
-  });
-
-  test('creates ChatAnthropic for claude model', () => {
+  test('creates ChatAnthropic for claude- prefix', () => {
+    process.env.AIBO_API_KEY = 'sk-ant-test';
     process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
     const { createModel } = require('@/core/agent/model-factory');
     const { ChatAnthropic } = require('@langchain/anthropic');
@@ -74,52 +59,13 @@ describe('createModel', () => {
     const model = createModel();
 
     expect(ChatAnthropic).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'claude-3-5-sonnet-20241022',
-        temperature: 0,
-      })
+      expect.objectContaining({ model: 'claude-3-5-sonnet-20241022', anthropicApiKey: 'sk-ant-test', temperature: 0 })
     );
     expect(model._modelType).toBe('anthropic');
   });
 
-  test('creates ChatAnthropic for any claude- prefixed model', () => {
-    process.env.AIBO_MODEL_NAME = 'claude-opus-4-5';
-    const { createModel } = require('@/core/agent/model-factory');
-    const { ChatAnthropic } = require('@langchain/anthropic');
-
-    createModel();
-
-    expect(ChatAnthropic).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-opus-4-5' })
-    );
-  });
-
-  test('passes AIBO_ANTHROPIC_API_KEY to ChatAnthropic when set', () => {
-    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
-    process.env.AIBO_ANTHROPIC_API_KEY = 'sk-ant-test-key';
-    const { createModel } = require('@/core/agent/model-factory');
-    const { ChatAnthropic } = require('@langchain/anthropic');
-
-    createModel();
-
-    expect(ChatAnthropic).toHaveBeenCalledWith(
-      expect.objectContaining({ anthropicApiKey: 'sk-ant-test-key' })
-    );
-  });
-
-  test('does not pass anthropicApiKey when AIBO_ANTHROPIC_API_KEY is not set', () => {
-    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
-    delete process.env.AIBO_ANTHROPIC_API_KEY;
-    const { createModel } = require('@/core/agent/model-factory');
-    const { ChatAnthropic } = require('@langchain/anthropic');
-
-    createModel();
-
-    const callArgs = (ChatAnthropic as jest.Mock).mock.calls[0][0];
-    expect(callArgs.anthropicApiKey).toBeUndefined();
-  });
-
-  test('creates ChatGoogleGenerativeAI for gemini model', () => {
+  test('creates ChatGoogleGenerativeAI for gemini- prefix', () => {
+    process.env.AIBO_API_KEY = 'AIzaSy-test';
     process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
     const { createModel } = require('@/core/agent/model-factory');
     const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
@@ -127,66 +73,150 @@ describe('createModel', () => {
     const model = createModel();
 
     expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-2.0-flash', temperature: 0 })
+      expect.objectContaining({ model: 'gemini-2.0-flash', apiKey: 'AIzaSy-test', temperature: 0 })
     );
     expect(model._modelType).toBe('google');
   });
 
-  test('creates ChatGoogleGenerativeAI for any gemini- prefixed model', () => {
-    process.env.AIBO_MODEL_NAME = 'gemini-1.5-pro';
+  test('creates ChatMistralAI for mistral- prefix', () => {
+    process.env.AIBO_API_KEY = 'mistral-test';
+    process.env.AIBO_MODEL_NAME = 'mistral-large-latest';
     const { createModel } = require('@/core/agent/model-factory');
-    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+    const { ChatMistralAI } = require('@langchain/mistralai');
 
-    createModel();
+    const model = createModel();
 
-    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-1.5-pro' })
+    expect(ChatMistralAI).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'mistral-large-latest', temperature: 0 })
     );
+    expect(model._modelType).toBe('mistral');
   });
 
-  test('passes AIBO_GOOGLE_API_KEY to ChatGoogleGenerativeAI when set', () => {
-    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
-    process.env.AIBO_GOOGLE_API_KEY = 'AIzaSy-test-key';
+  test('creates ChatMistralAI for mixtral- prefix', () => {
+    process.env.AIBO_MODEL_NAME = 'mixtral-8x7b-instruct';
     const { createModel } = require('@/core/agent/model-factory');
-    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+    const { ChatMistralAI } = require('@langchain/mistralai');
 
     createModel();
 
-    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'AIzaSy-test-key' })
+    expect(ChatMistralAI).toHaveBeenCalledWith(expect.objectContaining({ model: 'mixtral-8x7b-instruct' }));
+  });
+
+  test('creates ChatMistralAI for codestral- prefix', () => {
+    process.env.AIBO_MODEL_NAME = 'codestral-latest';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatMistralAI } = require('@langchain/mistralai');
+
+    createModel();
+
+    expect(ChatMistralAI).toHaveBeenCalledWith(expect.objectContaining({ model: 'codestral-latest' }));
+  });
+
+  // ── Explicit provider override ─────────────────────────────────────────────
+
+  test('creates ChatGroq when AIBO_MODEL_PROVIDER=groq', () => {
+    process.env.AIBO_API_KEY = 'gsk-test';
+    process.env.AIBO_MODEL_NAME = 'llama-3.3-70b-versatile';
+    process.env.AIBO_MODEL_PROVIDER = 'groq';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGroq } = require('@langchain/groq');
+
+    const model = createModel();
+
+    expect(ChatGroq).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'llama-3.3-70b-versatile', apiKey: 'gsk-test', temperature: 0 })
     );
+    expect(model._modelType).toBe('groq');
   });
 
-  test('does not pass apiKey to ChatGoogleGenerativeAI when AIBO_GOOGLE_API_KEY is not set', () => {
-    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
-    delete process.env.AIBO_GOOGLE_API_KEY;
+  test('creates ChatOllama when AIBO_MODEL_PROVIDER=ollama (default baseUrl)', () => {
+    process.env.AIBO_MODEL_NAME = 'llama3';
+    process.env.AIBO_MODEL_PROVIDER = 'ollama';
     const { createModel } = require('@/core/agent/model-factory');
-    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+    const { ChatOllama } = require('@langchain/ollama');
+
+    const model = createModel();
+
+    expect(ChatOllama).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'llama3', baseUrl: 'http://localhost:11434', temperature: 0 })
+    );
+    expect(model._modelType).toBe('ollama');
+  });
+
+  test('creates ChatOllama with custom AIBO_BASE_URL', () => {
+    process.env.AIBO_MODEL_NAME = 'llama3';
+    process.env.AIBO_MODEL_PROVIDER = 'ollama';
+    process.env.AIBO_BASE_URL = 'http://myserver:11434';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatOllama } = require('@langchain/ollama');
 
     createModel();
 
-    const callArgs = (ChatGoogleGenerativeAI as jest.Mock).mock.calls[0][0];
-    expect(callArgs.apiKey).toBeUndefined();
+    expect(ChatOllama).toHaveBeenCalledWith(expect.objectContaining({ baseUrl: 'http://myserver:11434' }));
   });
 
-  test('passes baseURL configuration to ChatOpenAI when provided', () => {
+  test('creates AzureChatOpenAI when AIBO_MODEL_PROVIDER=azure', () => {
+    process.env.AIBO_API_KEY = 'azure-test-key';
+    process.env.AIBO_BASE_URL = 'https://my-instance.openai.azure.com';
+    process.env.AIBO_MODEL_NAME = 'my-deployment';
+    process.env.AIBO_MODEL_PROVIDER = 'azure';
+    process.env.AIBO_AZURE_API_VERSION = '2024-05-01-preview';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { AzureChatOpenAI } = require('@langchain/openai');
+
+    const model = createModel();
+
+    expect(AzureChatOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'my-deployment',
+        azureOpenAIApiKey: 'azure-test-key',
+        azureOpenAIBasePath: 'https://my-instance.openai.azure.com',
+        azureOpenAIApiVersion: '2024-05-01-preview',
+      })
+    );
+    expect(model._modelType).toBe('azure');
+  });
+
+  test('AIBO_MODEL_PROVIDER overrides auto-detection (e.g. groq running a mistral- model)', () => {
+    process.env.AIBO_API_KEY = 'gsk-test';
+    process.env.AIBO_MODEL_NAME = 'mistral-saba-v1';
+    process.env.AIBO_MODEL_PROVIDER = 'groq';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGroq } = require('@langchain/groq');
+
+    createModel();
+
+    expect(ChatGroq).toHaveBeenCalledWith(expect.objectContaining({ model: 'mistral-saba-v1' }));
+  });
+
+  // ── Unified AIBO_API_KEY and AIBO_BASE_URL ─────────────────────────────────
+
+  test('passes AIBO_API_KEY to ChatOpenAI', () => {
+    process.env.AIBO_API_KEY = 'sk-unified-key';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    process.env.AIBO_OPENAI_BASE_URL = 'https://custom-endpoint.example.com/v1';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-unified-key' }));
+  });
+
+  test('passes AIBO_BASE_URL as configuration.baseURL to ChatOpenAI', () => {
+    process.env.AIBO_BASE_URL = 'https://custom-endpoint.example.com/v1';
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model-factory');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
 
     expect(ChatOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        configuration: { baseURL: 'https://custom-endpoint.example.com/v1' },
-      })
+      expect.objectContaining({ configuration: { baseURL: 'https://custom-endpoint.example.com/v1' } })
     );
   });
 
-  test('does not pass configuration when baseURL is not set', () => {
+  test('no configuration.baseURL when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    delete process.env.AIBO_OPENAI_BASE_URL;
     const { createModel } = require('@/core/agent/model-factory');
     const { ChatOpenAI } = require('@langchain/openai');
 
@@ -195,4 +225,43 @@ describe('createModel', () => {
     const callArgs = (ChatOpenAI as jest.Mock).mock.calls[0][0];
     expect(callArgs.configuration).toBeUndefined();
   });
+
+  // ── Backward compatibility: AIBO_OPENAI_API_KEY / AIBO_OPENAI_BASE_URL ─────
+
+  test('AIBO_OPENAI_API_KEY works as fallback when AIBO_API_KEY is not set', () => {
+    process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-legacy-key' }));
+  });
+
+  test('AIBO_OPENAI_BASE_URL works as fallback when AIBO_BASE_URL is not set', () => {
+    process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({ configuration: { baseURL: 'https://legacy-endpoint.example.com/v1' } })
+    );
+  });
+
+  test('AIBO_API_KEY takes precedence over AIBO_OPENAI_API_KEY', () => {
+    process.env.AIBO_API_KEY = 'sk-new-key';
+    process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-new-key' }));
+  });
 });
+
