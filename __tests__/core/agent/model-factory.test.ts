@@ -19,6 +19,14 @@ jest.mock('@langchain/anthropic', () => ({
   })),
 }));
 
+// Mock @langchain/google-genai
+jest.mock('@langchain/google-genai', () => ({
+  ChatGoogleGenerativeAI: jest.fn().mockImplementation((opts) => ({
+    _modelType: 'google',
+    ...opts,
+  })),
+}));
+
 describe('createModel', () => {
   const originalEnv = { ...process.env };
 
@@ -84,6 +92,81 @@ describe('createModel', () => {
     expect(ChatAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'claude-opus-4-5' })
     );
+  });
+
+  test('passes AIBO_ANTHROPIC_API_KEY to ChatAnthropic when set', () => {
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    process.env.AIBO_ANTHROPIC_API_KEY = 'sk-ant-test-key';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    expect(ChatAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({ anthropicApiKey: 'sk-ant-test-key' })
+    );
+  });
+
+  test('does not pass anthropicApiKey when AIBO_ANTHROPIC_API_KEY is not set', () => {
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    delete process.env.AIBO_ANTHROPIC_API_KEY;
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    const callArgs = (ChatAnthropic as jest.Mock).mock.calls[0][0];
+    expect(callArgs.anthropicApiKey).toBeUndefined();
+  });
+
+  test('creates ChatGoogleGenerativeAI for gemini model', () => {
+    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
+    const model = createModel();
+
+    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gemini-2.0-flash', temperature: 0 })
+    );
+    expect(model._modelType).toBe('google');
+  });
+
+  test('creates ChatGoogleGenerativeAI for any gemini- prefixed model', () => {
+    process.env.AIBO_MODEL_NAME = 'gemini-1.5-pro';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
+    createModel();
+
+    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gemini-1.5-pro' })
+    );
+  });
+
+  test('passes AIBO_GOOGLE_API_KEY to ChatGoogleGenerativeAI when set', () => {
+    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
+    process.env.AIBO_GOOGLE_API_KEY = 'AIzaSy-test-key';
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
+    createModel();
+
+    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'AIzaSy-test-key' })
+    );
+  });
+
+  test('does not pass apiKey to ChatGoogleGenerativeAI when AIBO_GOOGLE_API_KEY is not set', () => {
+    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
+    delete process.env.AIBO_GOOGLE_API_KEY;
+    const { createModel } = require('@/core/agent/model-factory');
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
+    createModel();
+
+    const callArgs = (ChatGoogleGenerativeAI as jest.Mock).mock.calls[0][0];
+    expect(callArgs.apiKey).toBeUndefined();
   });
 
   test('passes baseURL configuration to ChatOpenAI when provided', () => {

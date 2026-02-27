@@ -105,6 +105,8 @@ function resolveInteractionMode(): 'console' | 'lark' {
 const envSchema = z.object({
   AIBO_OPENAI_API_KEY: z.string().min(1),
   AIBO_OPENAI_BASE_URL: z.string().url().optional(),
+  AIBO_ANTHROPIC_API_KEY: z.string().optional(),
+  AIBO_GOOGLE_API_KEY: z.string().optional(),
   AIBO_MODEL_NAME: z.string().min(1).default('gpt-4o'),
   AIBO_RECURSION_LIMIT: z.coerce.number().int().positive().default(1000),
   AIBO_CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite', 'filesystem']).default('memory'),
@@ -171,6 +173,12 @@ export const config = {
     apiKey: env.AIBO_OPENAI_API_KEY,
     baseURL: env.AIBO_OPENAI_BASE_URL,
     modelName: env.AIBO_MODEL_NAME,
+  },
+  anthropic: {
+    apiKey: env.AIBO_ANTHROPIC_API_KEY,
+  },
+  google: {
+    apiKey: env.AIBO_GOOGLE_API_KEY,
   },
   langgraph: {
     recursionLimit: env.AIBO_RECURSION_LIMIT,
