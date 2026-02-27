@@ -207,12 +207,13 @@ describe('Lark Command Handlers', () => {
   });
 
   describe('handleAbortCommand', () => {
-    it('should abort current operation when abortController exists and is not aborted', async () => {
+    it('should abort current operation when isRunning is true and abortController is not aborted', async () => {
       const mockAbortController = {
         signal: { aborted: false },
         abort: jest.fn()
       };
       const mockSession = {
+        isRunning: true,
         abortController: mockAbortController,
         adapter: {
           emit: jest.fn()
@@ -238,8 +239,41 @@ describe('Lark Command Handlers', () => {
       );
     });
 
+    it('should show no operation message when isRunning is false even if abortController is not aborted', async () => {
+      const mockAbortController = {
+        signal: { aborted: false },
+        abort: jest.fn()
+      };
+      const mockSession = {
+        isRunning: false,
+        abortController: mockAbortController,
+        adapter: {
+          emit: jest.fn()
+        }
+      };
+
+      const result = await handleAbortCommand(mockSession as any);
+
+      expect(result).toBe(true);
+      expect(mockAbortController.abort).not.toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('无操作可中断'));
+      expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'commandExecuted',
+          data: expect.objectContaining({
+            command: '/abort',
+            result: expect.objectContaining({
+              success: false,
+              message: expect.stringContaining('无操作可中断')
+            })
+          })
+        })
+      );
+    });
+
     it('should show no operation message when no abortController exists', async () => {
       const mockSession = {
+        isRunning: true,
         abortController: null,
         adapter: {
           emit: jest.fn()
@@ -270,6 +304,7 @@ describe('Lark Command Handlers', () => {
         abort: jest.fn()
       };
       const mockSession = {
+        isRunning: true,
         abortController: mockAbortController,
         adapter: {
           emit: jest.fn()
@@ -987,6 +1022,7 @@ describe('Lark Command Handlers', () => {
       });
       mockSession = {
         threadId: 'test-session-id',
+        isRunning: true,
         adapter: {
           emit: jest.fn()
         },
