@@ -23,10 +23,10 @@ describe('File Diff Visualizer Additional Tests', () => {
     
     expect(result.success).toBe(true);
     expect(result.files).toHaveLength(4);
-    expect(result.files[0].status).toBe('修改 (M)');
-    expect(result.files[1].status).toBe('新增 (A)');
-    expect(result.files[2].status).toBe('删除 (D)');
-    expect(result.files[3].status).toBe('新增 (A)');
+    expect(result.files[0].status).toBe('修改');
+    expect(result.files[1].status).toBe('新增');
+    expect(result.files[2].status).toBe('删除');
+    expect(result.files[3].status).toBe('新增');
   });
 
   it('should handle empty git status', async () => {
