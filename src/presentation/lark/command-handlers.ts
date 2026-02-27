@@ -4,6 +4,7 @@ import { SessionManager } from '@/infrastructure/session/session-manager';
 import { executeBashTool } from '@/tools/bash';
 import { getRestartCommand } from '@/shared/utils/restart-helper';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
+import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
@@ -387,6 +388,7 @@ export async function handleExitCommand(session: any): Promise<boolean> {
   
   // End the session properly
   session.end();
+  await LspClientManager.shutdownAll();
   process.exit(0);
   return true;
 }
@@ -483,12 +485,12 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
       
       // 等待子进程启动后退出当前进程
       child.on('spawn', () => {
-        process.exit(0);
+        LspClientManager.shutdownAll().then(() => process.exit(0));
       });
       
       child.on('error', (error: Error) => {
         console.error(styled.error(`❌ 重启失败: ${error.message}`));
-        process.exit(1);
+        LspClientManager.shutdownAll().then(() => process.exit(1));
       });
 
       return true;

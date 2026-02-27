@@ -5,6 +5,7 @@ import { SessionManager } from '@/infrastructure/session/session-manager';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
 import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { handleUserInput } from '@/presentation/console/user-input-handler';
+import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 
 /**
  * Command Handlers module that provides internal command processing functionality.
@@ -348,6 +349,7 @@ export async function handleExitCommand(session: any): Promise<boolean> {
   
   // End the session properly
   session.end();
+  await LspClientManager.shutdownAll();
   process.exit(0);
   return true;
 }

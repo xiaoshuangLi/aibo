@@ -1,5 +1,6 @@
 import { config } from '@/core/config/config';
 import { SessionManager } from '@/infrastructure/session/session-manager';
+import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 import {
   handleHelpCommand,
   handleVerboseCommand,
@@ -96,6 +97,13 @@ jest.mock('child_process', () => ({
     on: jest.fn(),
     unref: jest.fn()
   }))
+}));
+
+// Mock LspClientManager
+jest.mock('@/infrastructure/code-analysis/lsp-client', () => ({
+  LspClientManager: {
+    shutdownAll: jest.fn().mockResolvedValue(undefined),
+  }
 }));
 
 describe('Lark Command Handlers', () => {
@@ -343,6 +351,7 @@ describe('Lark Command Handlers', () => {
       
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在安全退出'));
       expect(mockSession.end).toHaveBeenCalledWith();
+      expect(LspClientManager.shutdownAll).toHaveBeenCalled();
       expect(mockProcessExit).toHaveBeenCalledWith(0);
     });
   });
