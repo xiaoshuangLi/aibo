@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { writeEnvFile, createAiboSymlink, resolvePackageDir } from '@/cli/init';
+import { copyEnvExample, createAiboSymlink, resolvePackageDir } from '@/cli/init';
 
 describe('resolvePackageDir', () => {
   it('should return a path that ends with two segments up from __dirname equivalent', () => {
@@ -14,33 +14,38 @@ describe('resolvePackageDir', () => {
   });
 });
 
-describe('writeEnvFile', () => {
+describe('copyEnvExample', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibo-init-test-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibo-copy-env-test-'));
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('writes key=value pairs to the target file', () => {
-    const envPath = path.join(tmpDir, '.env');
-    writeEnvFile({ AIBO_API_KEY: 'sk-test', AIBO_MODEL_NAME: 'gpt-4o' }, envPath);
+  it('copies the source file content to the destination', () => {
+    const srcPath = path.join(tmpDir, '.env.example');
+    const destPath = path.join(tmpDir, '.env');
+    fs.writeFileSync(srcPath, 'AIBO_API_KEY=your-api-key\nAIBO_MODEL_NAME=gpt-4o\n', 'utf-8');
 
-    const content = fs.readFileSync(envPath, 'utf-8');
-    expect(content).toContain('AIBO_API_KEY=sk-test');
+    copyEnvExample(srcPath, destPath);
+
+    const content = fs.readFileSync(destPath, 'utf-8');
+    expect(content).toContain('AIBO_API_KEY=your-api-key');
     expect(content).toContain('AIBO_MODEL_NAME=gpt-4o');
   });
 
-  it('overwrites an existing .env file', () => {
-    const envPath = path.join(tmpDir, '.env');
-    fs.writeFileSync(envPath, 'OLD_VAR=old\n', 'utf-8');
+  it('overwrites an existing destination file', () => {
+    const srcPath = path.join(tmpDir, '.env.example');
+    const destPath = path.join(tmpDir, '.env');
+    fs.writeFileSync(srcPath, 'NEW_VAR=new\n', 'utf-8');
+    fs.writeFileSync(destPath, 'OLD_VAR=old\n', 'utf-8');
 
-    writeEnvFile({ NEW_VAR: 'new' }, envPath);
+    copyEnvExample(srcPath, destPath);
 
-    const content = fs.readFileSync(envPath, 'utf-8');
+    const content = fs.readFileSync(destPath, 'utf-8');
     expect(content).not.toContain('OLD_VAR');
     expect(content).toContain('NEW_VAR=new');
   });

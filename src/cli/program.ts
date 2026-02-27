@@ -46,14 +46,10 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
     return 'console';
   }
 
-  // Check if --interaction=<mode> or --interaction <mode> was explicitly supplied
-  // (not just the default), to distinguish "user passed it" from "Commander default".
-  const rawArgs = process.argv.slice(2);
-  const hasInteractionArg = rawArgs.some(
-    arg => arg.startsWith('--interaction=') || arg === '--interaction',
-  );
-
-  if (hasInteractionArg) {
+  // Use Commander's built-in source tracking to reliably detect whether the
+  // option was explicitly provided via CLI (handles both --interaction=lark and
+  // --interaction lark) versus being the programmatic default.
+  if (program.getOptionValueSource('interaction') === 'cli') {
     const mode = options.interaction;
     if (mode === 'console' || mode === 'lark') {
       return mode;
