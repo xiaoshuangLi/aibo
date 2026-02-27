@@ -15,6 +15,7 @@ import { createAIAgent } from '@/core/agent/agent-factory';
 import { config } from '@/core/config/config';
 import { processStreamChunks } from '@/core/utils/stream-handler';
 import { createHandleInternalCommand } from '@/presentation/lark/command-handlers';
+import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 
 // 全局会话和代理实例
 let currentSession: Session | null = null;
@@ -52,7 +53,7 @@ export async function startLarkInteractiveMode(): Promise<void> {
       if (currentSession) {
         currentSession.end("再见！");
       }
-      process.exit(0);
+      LspClientManager.shutdownAll().then(() => process.exit(0));
     });
     
     process.on('SIGTERM', () => {
@@ -60,7 +61,7 @@ export async function startLarkInteractiveMode(): Promise<void> {
       if (currentSession) {
         currentSession.end("再见！");
       }
-      process.exit(0);
+      LspClientManager.shutdownAll().then(() => process.exit(0));
     });
     
   } catch (error) {

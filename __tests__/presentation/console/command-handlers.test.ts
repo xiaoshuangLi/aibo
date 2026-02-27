@@ -4,9 +4,11 @@ import {
   handleNewCommand,
   handleCompactCommand,
   handleUnknownCommand,
+  handleExitCommand,
   createHandleInternalCommand,
 } from '@/presentation/console/command-handlers';
 import * as library from '@/shared/utils/library';
+import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 
 // Mock dependencies
 jest.mock('@/core/config/config', () => ({
@@ -41,6 +43,12 @@ jest.mock('@/shared/utils/library', () => ({
   addKnowledge: jest.fn(),
 }));
 
+jest.mock('@/infrastructure/code-analysis/lsp-client', () => ({
+  LspClientManager: {
+    shutdownAll: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 jest.mock('@/features/voice-input/voice-recognition', () => ({
   createVoiceRecognition: jest.fn().mockReturnValue({
     canRecord: jest.fn().mockReturnValue(false),
@@ -53,13 +61,20 @@ jest.mock('@/presentation/console/user-input-handler', () => ({
 
 const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
+// Mock process.exit to prevent actual process termination
+const originalProcessExit = process.exit;
+const mockProcessExit = jest.fn();
+process.exit = mockProcessExit as any;
+
 afterEach(() => {
   consoleSpy.mockClear();
+  mockProcessExit.mockClear();
   // resetAllMocks resets both calls AND implementations, ensuring
   // mockImplementation changes in one test don't bleed into the next
   jest.resetAllMocks();
   // Re-apply default return values after reset
   (library.getAllKnowledge as jest.Mock).mockReturnValue([]);
+  (LspClientManager.shutdownAll as jest.Mock).mockResolvedValue(undefined);
   const { SessionManager } = require('@/infrastructure/session/session-manager');
   SessionManager.getInstance.mockReturnValue({
     clearCurrentSession: jest.fn().mockReturnValue('new-thread-123'),
@@ -69,6 +84,17 @@ afterEach(() => {
 
 afterAll(() => {
   consoleSpy.mockRestore();
+  process.exit = originalProcessExit;
+});
+
+// ===== handleExitCommand =====
+describe('handleExitCommand', () => {
+  it('should shut down LSP clients and call process.exit(0)', async () => {
+    const session = { rl: null, end: jest.fn() };
+    await handleExitCommand(session as any);
+    expect(LspClientManager.shutdownAll).toHaveBeenCalled();
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
+  });
 });
 
 // ===== handleHelpCommand =====
