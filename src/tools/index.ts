@@ -11,6 +11,7 @@ import getGrepTools from '@/tools/grep';
 import getWebFetchTools from '@/tools/web-fetch';
 import getViewFileTools from '@/tools/view-file';
 import getEditFileTools from '@/tools/edit-file';
+import getThinkTools from '@/tools/think';
 
 /**
  * 异步获取所有工具的方法
@@ -32,6 +33,7 @@ export default async function getTools() {
     webFetchTools,
     viewFileTools,
     editFileTools,
+    thinkTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -46,6 +48,7 @@ export default async function getTools() {
     getWebFetchTools(),
     getViewFileTools(),
     getEditFileTools(),
+    getThinkTools(),
   ]);
   
   return [
@@ -62,5 +65,6 @@ export default async function getTools() {
     ...webFetchTools,
     ...viewFileTools,
     ...editFileTools,
+    ...thinkTools,
   ];
 }
