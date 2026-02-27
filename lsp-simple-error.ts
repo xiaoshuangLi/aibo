@@ -1,1 +1,0 @@
-const x: number = "this is a string";
