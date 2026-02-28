@@ -5,7 +5,7 @@
  * It provides comprehensive logging and monitoring of agent behavior by calling appropriate
  * session methods for different types of events.
  * 
- * @module capture
+ * @module session-capture
  */
 
 import { createMiddleware, ToolMessage } from 'langchain';

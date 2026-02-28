@@ -1,4 +1,4 @@
-import { createSessionOutputCaptureMiddleware } from '@/core/utils/capture';
+import { createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 import { ToolMessage } from 'langchain';
 
 // Mock the session object with all required methods

@@ -1,4 +1,4 @@
-import { createSessionOutputCaptureMiddleware } from '@/core/utils/capture';
+import { createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 
 const createMockSession = () => ({
   logToolCall: jest.fn(),

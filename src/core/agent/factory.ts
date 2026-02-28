@@ -8,7 +8,7 @@ import { SYSTEM_PROMPT } from '@/shared/constants';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents';
 import { findSkillsDirectories } from '@/core/utils';
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem';
-import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/utils';
+import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 import { Session } from './session';
 import { SubAgentPromptTemplate } from '@/infrastructure/prompt';
 

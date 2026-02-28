@@ -32,13 +32,10 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       ])
     }));
 
-    jest.doMock('@/core/utils/retry', () => ({
+    jest.doMock('@/core/middlewares', () => ({
       createLangChainToolRetryMiddleware: jest.fn().mockReturnValue({
         name: 'test-middleware', wrapToolCall: jest.fn()
-      })
-    }));
-
-    jest.doMock('@/core/utils/capture', () => ({
+      }),
       createSessionOutputCaptureMiddleware: jest.fn().mockReturnValue({
         name: 'capture-middleware', wrapToolCall: jest.fn()
       })
@@ -106,7 +103,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
     setupMocks('memory');
     
     const { createAIAgent } = require('@/core/agent/factory');
-    const { createSessionOutputCaptureMiddleware } = require('@/core/utils/capture');
+    const { createSessionOutputCaptureMiddleware } = require('@/core/middlewares');
     
     const mockSession = {
       logToolCall: jest.fn(),
