@@ -42,6 +42,24 @@ describe('Config - CLI Args and Interaction Mode Coverage', () => {
     expect(config.interaction.mode).toBe('console');
   });
 
+  it('should return console mode when interact subcommand is used without --mode', () => {
+    process.argv = ['node', 'script.js', 'interact'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('console');
+  });
+
+  it('should return console mode when interact --mode=console is passed', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=console'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('console');
+  });
+
+  it('should return lark mode when interact --mode=lark is passed', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=lark'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('lark');
+  });
+
   it('should return console mode as default when no interaction env/cli is set', () => {
     const { config } = require('../src/core/config/config');
     expect(config.interaction.mode).toBe('console');

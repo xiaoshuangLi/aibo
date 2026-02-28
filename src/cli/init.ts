@@ -53,6 +53,35 @@ export function createAiboSymlink(targetDir: string, packageDir: string): void {
 }
 
 /**
+ * Checks whether the current working directory requires `aibo init` to be run.
+ *
+ * Returns `true` when the user needs to run `aibo init` before other commands.
+ * This is the case when:
+ * 1. The cwd is NOT the aibo package directory (i.e., not running from inside the package)
+ * 2. There is no `.aibo` folder/symlink in the cwd
+ *
+ * @returns `true` if `aibo init` is required, `false` otherwise
+ */
+export function isAiboInitRequired(): boolean {
+  const cwd = process.cwd();
+  const packageDir = resolvePackageDir();
+
+  // Running from the package directory itself — no init required
+  if (path.resolve(cwd) === path.resolve(packageDir)) {
+    return false;
+  }
+
+  // Check for .aibo folder/symlink in current directory
+  const aiboPath = path.join(cwd, '.aibo');
+  try {
+    fs.accessSync(aiboPath);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Entry point for `aibo init`.
  *
  * Creates the `.aibo` symlink in the current working directory and prints

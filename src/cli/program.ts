@@ -17,9 +17,10 @@ import { runInit } from '@/cli/init';
  * Parses CLI arguments using Commander.js to determine the interaction mode.
  *
  * Priority order:
- * 1. `--interaction=console|lark` (highest priority)
- * 2. `--interactive` or `-i` (equivalent to `--interaction=console`)
- * 3. Falls back to `null` (caller resolves via env vars)
+ * 1. `aibo interact --mode=console|lark` subcommand (highest priority)
+ * 2. `--interaction=console|lark` (legacy flag, kept for backward compatibility)
+ * 3. `--interactive` or `-i` (equivalent to `--interaction=console`)
+ * 4. Falls back to `null` (caller resolves via env vars)
  *
  * A fresh, minimal Command instance is created on every call so that:
  *  - Module reloads during tests start from a clean state.
@@ -31,6 +32,21 @@ import { runInit } from '@/cli/init';
  *   specified via CLI arguments.
  */
 export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
+  // Check for 'interact' subcommand: aibo interact --mode=console|lark
+  if (process.argv[2] === 'interact') {
+    const subCmd = new Command();
+    subCmd
+      .option('--mode <mode>', 'Set interaction mode (console|lark)')
+      .allowUnknownOption();
+    subCmd.parse(['node', 'interact', ...process.argv.slice(3)]);
+    const opts = subCmd.opts();
+    if (opts.mode === 'console' || opts.mode === 'lark') {
+      return opts.mode;
+    }
+    // Default to console for `aibo interact` without --mode
+    return 'console';
+  }
+
   const program = new Command();
 
   program
@@ -83,6 +99,11 @@ export function createProgram(): Command {
     .action(async () => {
       await runInit();
     });
+
+  program
+    .command('interact')
+    .description('Start interactive mode (console or lark)')
+    .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console');
 
   return program;
 }

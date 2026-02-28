@@ -4,6 +4,7 @@ import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
 import { createAIAgent } from '@/core/agent/agent-factory';
 import { createProgram } from '@/cli/program';
+import { isAiboInitRequired } from '@/cli/init';
 
 /**
  * Main entry point module for the AIBO AI Assistant application.
@@ -66,13 +67,36 @@ export async function main() {
 if (require.main === module) {
   // Use the central Commander program to dispatch subcommands.
   // `aibo init` is handled by the 'init' subcommand action defined in program.ts.
+  // `aibo interact` starts interactive mode (console or lark) via --mode flag.
   // Any other invocation (no subcommand, or with --interaction / -i flags) falls
   // through to the default action which starts the normal agent loop.
   const program = createProgram();
 
+  const printInitRequired = () => {
+    console.error('\n❌  No .aibo folder found in the current directory.');
+    console.error('    Please run `aibo init` first to set up this directory.\n');
+  };
+
   program.action(() => {
+    if (isAiboInitRequired()) {
+      printInitRequired();
+      process.exit(1);
+    }
     main().catch(console.error);
   });
+
+  // Wire up the 'interact' subcommand action here to avoid circular imports
+  // (program.ts cannot import from main.ts).
+  const interactCmd = program.commands.find(c => c.name() === 'interact');
+  if (interactCmd) {
+    interactCmd.action(async () => {
+      if (isAiboInitRequired()) {
+        printInitRequired();
+        process.exit(1);
+      }
+      await main();
+    });
+  }
 
   program.parseAsync(process.argv).catch((err) => {
     console.error(err);
