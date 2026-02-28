@@ -16,6 +16,8 @@ import getWriteFileTools from '@/tools/write-file';
 import getTodoTools from '@/tools/todo';
 import getClaudeTools from '@/tools/claude';
 import getCursorTools from '@/tools/cursor';
+import getGeminiTools from '@/tools/gemini';
+import getCodexTools from '@/tools/codex';
 
 /**
  * 异步获取所有工具的方法
@@ -42,6 +44,8 @@ export default async function getTools() {
     todoTools,
     claudeTools,
     cursorTools,
+    geminiTools,
+    codexTools,
   ] = await Promise.all([
     getBashTools(),
     getUtilsTools(),
@@ -61,6 +65,8 @@ export default async function getTools() {
     getTodoTools(),
     getClaudeTools(),
     getCursorTools(),
+    getGeminiTools(),
+    getCodexTools(),
   ]);
   
   return [
@@ -82,5 +88,7 @@ export default async function getTools() {
     ...todoTools,
     ...claudeTools,
     ...cursorTools,
+    ...geminiTools,
+    ...codexTools,
   ];
 }

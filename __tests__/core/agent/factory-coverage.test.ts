@@ -136,7 +136,12 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
 });
 
 describe('buildCodingAgentHint', () => {
-  it('should return empty string when neither claude nor cursor is available', () => {
+  it('should return empty string when no coding agent tools are available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    expect(buildCodingAgentHint(false, false, false, false)).toBe('');
+  });
+
+  it('should return empty string with default params (backward-compat)', () => {
     const { buildCodingAgentHint } = require('@/core/agent/factory');
     expect(buildCodingAgentHint(false, false)).toBe('');
   });
@@ -146,6 +151,8 @@ describe('buildCodingAgentHint', () => {
     const hint = buildCodingAgentHint(true, false);
     expect(hint).toContain('claude_execute');
     expect(hint).not.toContain('cursor_execute');
+    expect(hint).not.toContain('gemini_execute');
+    expect(hint).not.toContain('codex_execute');
     expect(hint).toContain('PRIORITY');
   });
 
@@ -157,12 +164,44 @@ describe('buildCodingAgentHint', () => {
     expect(hint).toContain('PRIORITY');
   });
 
-  it('should include both hints when both tools are available', () => {
+  it('should include gemini hint when only gemini is available', () => {
     const { buildCodingAgentHint } = require('@/core/agent/factory');
-    const hint = buildCodingAgentHint(true, true);
+    const hint = buildCodingAgentHint(false, false, true, false);
+    expect(hint).toContain('gemini_execute');
+    expect(hint).not.toContain('claude_execute');
+    expect(hint).not.toContain('codex_execute');
+    expect(hint).toContain('PRIORITY');
+    expect(hint).toContain('frontend');
+  });
+
+  it('should include codex hint when only codex is available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    const hint = buildCodingAgentHint(false, false, false, true);
+    expect(hint).toContain('codex_execute');
+    expect(hint).not.toContain('claude_execute');
+    expect(hint).not.toContain('gemini_execute');
+    expect(hint).toContain('PRIORITY');
+    expect(hint).toContain('backend');
+  });
+
+  it('should include all four agents when all tools are available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    const hint = buildCodingAgentHint(true, true, true, true);
     expect(hint).toContain('claude_execute');
     expect(hint).toContain('cursor_execute');
+    expect(hint).toContain('gemini_execute');
+    expect(hint).toContain('codex_execute');
     expect(hint).toContain('PRIORITY');
+    expect(hint).toContain('Routing rules');
+  });
+
+  it('should include routing table when multiple tools are available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    const hint = buildCodingAgentHint(true, false, true, true);
+    expect(hint).toContain('| Tool | Best for |');
+    expect(hint).toContain('claude_execute');
+    expect(hint).toContain('gemini_execute');
+    expect(hint).toContain('codex_execute');
   });
 
   it('should append hint to system prompt when claude tool is present in tools list', async () => {
@@ -191,6 +230,7 @@ describe('buildCodingAgentHint', () => {
       default: jest.fn().mockResolvedValue([
         { name: 'bash', invoke: jest.fn() },
         { name: 'claude_execute', invoke: jest.fn() },
+        { name: 'gemini_execute', invoke: jest.fn() },
       ])
     }));
 
@@ -216,6 +256,7 @@ describe('buildCodingAgentHint', () => {
     expect(createDeepAgent).toHaveBeenCalled();
     const callArgs = createDeepAgent.mock.calls[0]?.[0];
     expect(callArgs.systemPrompt).toContain('claude_execute');
+    expect(callArgs.systemPrompt).toContain('gemini_execute');
     expect(callArgs.systemPrompt).toContain('PRIORITY');
 
     jest.resetModules();
