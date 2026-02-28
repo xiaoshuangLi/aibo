@@ -6,8 +6,13 @@ jest.mock('@/cli/init', () => ({
   printInitRequired: jest.fn(),
 }));
 
+jest.mock('@/cli/interact', () => ({
+  runInteract: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { createProgram } from '@/cli/program';
 import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
+import { runInteract } from '@/cli/interact';
 
 const mockProcessExit = jest.spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit called');
@@ -45,28 +50,24 @@ describe('createProgram', () => {
     expect(helpInfo).toContain('console|lark');
   });
 
-  it('registers a default action when defaultAction is provided', () => {
-    const defaultAction = jest.fn().mockResolvedValue(undefined);
-    const program = createProgram(defaultAction);
-    // The program should have an action handler registered
+  it('always registers a default action handler', () => {
+    const program = createProgram();
     expect((program as any)._actionHandler).toBeDefined();
   });
 
-  it('calls defaultAction when no subcommand is given and init is not required', async () => {
-    const defaultAction = jest.fn().mockResolvedValue(undefined);
-    const program = createProgram(defaultAction);
+  it('calls runInteract when no subcommand is given', async () => {
+    const program = createProgram();
     await program.parseAsync(['node', 'aibo']);
-    expect(defaultAction).toHaveBeenCalled();
+    expect(runInteract).toHaveBeenCalled();
   });
 
   it('calls printInitRequired and exits when default action fires and init is required', async () => {
     (isAiboInitRequired as jest.Mock).mockReturnValue(true);
-    const defaultAction = jest.fn().mockResolvedValue(undefined);
-    const program = createProgram(defaultAction);
+    const program = createProgram();
     await expect(program.parseAsync(['node', 'aibo'])).rejects.toThrow('process.exit called');
     expect(printInitRequired).toHaveBeenCalled();
     expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expect(defaultAction).not.toHaveBeenCalled();
+    expect(runInteract).not.toHaveBeenCalled();
   });
 
   it('calls runInit when init subcommand is invoked', async () => {

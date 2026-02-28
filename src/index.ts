@@ -1,5 +1,3 @@
-// Re-export main function and agent for backward compatibility
-export { main } from '@/main';
 export * from '@/core/agent/agent-factory';
 
 // Re-export other utilities that might be used externally

@@ -17,11 +17,18 @@ jest.mock('@/cli/init', () => ({
   printInitRequired: jest.fn(),
 }));
 
+jest.mock('@/core/config/config', () => ({
+  config: {
+    interaction: { mode: 'console' },
+  },
+}));
+
 import { runInteract } from '@/cli/interact';
 import { isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
 import { createAIAgent } from '@/core/agent/agent-factory';
+import { config } from '@/core/config/config';
 
 const mockProcessExit = jest.spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit called');
@@ -31,27 +38,24 @@ describe('runInteract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (isAiboInitRequired as jest.Mock).mockReturnValue(false);
+    (config.interaction as any).mode = 'console';
   });
 
   afterAll(() => {
     mockProcessExit.mockRestore();
   });
 
-  it('starts console interactive mode by default', async () => {
+  it('starts console interactive mode when config mode is "console"', async () => {
+    (config.interaction as any).mode = 'console';
     await runInteract();
     expect(startInteractiveMode).toHaveBeenCalled();
     expect(startLarkInteractiveMode).not.toHaveBeenCalled();
     expect(createAIAgent).toHaveBeenCalled();
   });
 
-  it('starts console interactive mode when mode is "console"', async () => {
-    await runInteract('console');
-    expect(startInteractiveMode).toHaveBeenCalled();
-    expect(startLarkInteractiveMode).not.toHaveBeenCalled();
-  });
-
-  it('starts lark interactive mode when mode is "lark"', async () => {
-    await runInteract('lark');
+  it('starts lark interactive mode when config mode is "lark"', async () => {
+    (config.interaction as any).mode = 'lark';
+    await runInteract();
     expect(startLarkInteractiveMode).toHaveBeenCalled();
     expect(startInteractiveMode).not.toHaveBeenCalled();
     expect(createAIAgent).toHaveBeenCalled();

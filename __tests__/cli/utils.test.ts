@@ -12,33 +12,15 @@ describe('parseInteractionModeFromArgs', () => {
     process.argv = originalArgv;
   });
 
-  it('returns null when no relevant flags are passed', () => {
+  it('returns null when no subcommand is passed', () => {
     const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
     expect(parseInteractionModeFromArgs()).toBeNull();
   });
 
-  it('returns "console" for --interactive flag', () => {
-    process.argv = ['node', 'script.js', '--interactive'];
+  it('returns null for unrelated subcommands', () => {
+    process.argv = ['node', 'script.js', 'init'];
     const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
-    expect(parseInteractionModeFromArgs()).toBe('console');
-  });
-
-  it('returns "console" for -i flag', () => {
-    process.argv = ['node', 'script.js', '-i'];
-    const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
-    expect(parseInteractionModeFromArgs()).toBe('console');
-  });
-
-  it('returns "lark" for --interaction=lark', () => {
-    process.argv = ['node', 'script.js', '--interaction=lark'];
-    const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
-    expect(parseInteractionModeFromArgs()).toBe('lark');
-  });
-
-  it('returns "console" for --interaction=console', () => {
-    process.argv = ['node', 'script.js', '--interaction=console'];
-    const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
-    expect(parseInteractionModeFromArgs()).toBe('console');
+    expect(parseInteractionModeFromArgs()).toBeNull();
   });
 
   it('returns "console" for interact subcommand without --mode', () => {
@@ -55,6 +37,12 @@ describe('parseInteractionModeFromArgs', () => {
 
   it('returns "console" for interact subcommand with --mode=console', () => {
     process.argv = ['node', 'script.js', 'interact', '--mode=console'];
+    const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
+    expect(parseInteractionModeFromArgs()).toBe('console');
+  });
+
+  it('returns "console" for interact subcommand with unknown --mode value', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=unknown'];
     const { parseInteractionModeFromArgs } = require('../../src/cli/utils');
     expect(parseInteractionModeFromArgs()).toBe('console');
   });

@@ -1,16 +1,12 @@
 import { Command } from 'commander';
 import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { runInteract } from '@/cli/interact';
-import { config } from '@/core/config/config';
 
 /**
  * Central Commander.js module for the aibo CLI.
  *
  * Exports `createProgram()` which returns the fully-wired root Command used
  * by `main.ts` to dispatch subcommands (e.g. `aibo init`, `aibo interact`).
- *
- * CLI argument parsing utilities (e.g. `parseInteractionModeFromArgs`) live in
- * `@/cli/utils` to avoid a circular dependency with `config.ts`.
  *
  * @module cli/program
  */
@@ -24,7 +20,8 @@ import { config } from '@/core/config/config';
  * to dispatch.
  *
  * When no subcommand is given, `runInteract` is started using the interaction
- * mode resolved from CLI flags and environment variables.
+ * mode resolved from environment variables (or `interact --mode` when the
+ * `interact` subcommand is used).
  *
  * @returns Configured Commander {@link Command} instance
  */
@@ -33,16 +30,14 @@ export function createProgram(): Command {
 
   program
     .description('AI bot with DeepAgents')
-    .allowUnknownOption()
-    .option('--interaction <mode>', 'Set interaction mode (console|lark)')
-    .option('-i, --interactive', 'Enable interactive console mode');
+    .allowUnknownOption();
 
   program.action(async () => {
     if (isAiboInitRequired()) {
       printInitRequired();
       process.exit(1);
     }
-    await runInteract(config.interaction.mode);
+    await runInteract();
   });
 
   program
@@ -56,8 +51,8 @@ export function createProgram(): Command {
     .command('interact')
     .description('Start interactive mode (console or lark)')
     .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console')
-    .action(async (options) => {
-      await runInteract(options.mode);
+    .action(async () => {
+      await runInteract();
     });
 
   return program;
