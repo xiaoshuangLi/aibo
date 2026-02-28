@@ -15,7 +15,7 @@
     "agents"
   ],
   "scripts": {
-    "build": "tsc && tsc-alias",
+    "build": "rm -rf dist && tsc && tsc-alias",
     "test": "jest --verbose=false",
     "test:watch": "jest --verbose=false --watch",
     "test:coverage": "jest --verbose=false --coverage",
