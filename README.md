@@ -23,7 +23,7 @@
 ### 📦 全局安装
 
 ```bash
-npm install -g aibo
+npm install -g @boay/aibo
 ```
 
 ### ⚙️ 配置
