@@ -1,72 +1,104 @@
-# AIBO - 高级多智能体自主编程AI助手
+# 🤖 AIBO - 高级多智能体自主编程AI助手
 
-一个由复杂多智能体架构驱动的高级自主编程AI助手，具备专业技能系统、深度代码智能和完整的本地文件系统访问能力。使用TypeScript、Jest和DeepAgents构建。
+一款基于多智能体架构的自主编程 AI 助手，支持终端和飞书两种交互方式，可接入主流 AI 模型服务。
 
-## 功能特性
+## ✨ 功能特性
 
-- ✅ **高级多智能体架构**: 7种专业智能体类型（编码器、协调器、文档、创新者、研究员、测试员、验证器）协同工作
-- ✅ **技能系统框架**: 31+个标准化技能模块，提供可重用的领域特定能力，支持渐进式披露
-- ✅ **混合代码智能**: 结合LSP（语义分析）和Tree-sitter（语法分析）的高级代码分析，实现60-90%的token节省
-- ✅ **语音输入集成**: 使用腾讯云官方ASR服务的实时语音输入支持，支持麦克风音频捕获和语音转文本
-- ✅ **高级自主编程**: 跨任何语言编写、编辑、调试和优化代码，具备智能上下文感知
-- ✅ **子智能体委托**: 为复杂、独立的任务生成专业子智能体，**强制并行执行**和协调结果 - 复杂任务必须拆分为多个可并行完成的子任务，每个子任务交给对应的子任务代理去完成
-- ✅ **高级子代理任务管理**: **write-subagent-todos** 工具提供结构化任务清单，支持专门的子代理类型分配和分组并发控制，确保主流程只负责规划而子任务代理执行实际工作
-- ✅ **错误恢复与重试策略**: 系统性错误分析、策略调整和后备方案，支持优雅降级
-- ✅ **完整系统访问**: 对本地文件系统和终端命令的完整读写访问，采用安全优先设计
-- ✅ **增强型Web工具**: 基于Puppeteer的WebSearch和WebFetch工具，具备适当的错误处理、资源管理和反机器人绕过能力
-- ✅ **双语系统提示**: 完整的中英文支持，包含全面的方法论和文化背景
-- ✅ **交互式聊天模式**: 支持实时交互模式，包含命令快捷键、会话管理和语音输入支持
-- ✅ **I/O 解耦架构**: 通过 `Adapter` 接口实现终端依赖与核心逻辑的完全分离，提高可测试性和可扩展性
-- ✅ **Lark 飞书集成**: 完整的企业级飞书(Lark)平台集成，支持实时消息交互、命令处理和会话管理
-- ✅ **Lark JSON 智能格式化**: 在 Lark 对话模式下实现 JSON 数据的优化输出格式，绝不截断任何内容，第一层属性以 "属性: 值" 形式展示，复杂文本保持原有格式
-- ✅ **Lark /rebot 命令支持**: 在 Lark 交互模式中支持 `/rebot` 命令，自动执行项目构建并重启对话模式
-- ✅ **全面测试**: 86.5%+的测试覆盖率，涵盖所有模块的单元测试、集成测试和边界情况测试
-- ✅ **问题解决方法论**: 7步结构化方法，包括最佳实践研究和多智能体协作
-- ✅ **功能开发工作流**: 严格的工作流程确保质量，包含文档和正确提交
-- ✅ **增强型整理代码技能**: 包含四阶段验证脚本（测试覆盖、需求提取、文档生成、提交结构），确保每个阶段的质量保证，并**强制更新 README.md 文档**
+- 🧠 **自主编程**: 跨语言编写、修改、调试和优化代码，具备完整的本地文件系统访问能力
+- 🔌 **多模型支持**: 兼容 OpenAI、Anthropic Claude、Google Gemini、Mistral、Groq、Ollama、Azure OpenAI 及任意 OpenAI 兼容接口
+- 🤝 **多智能体协作**: 内置 15 个专业 Agent（协调者、架构师、编码者、测试者等），支持并行任务分解与执行
+- 🛠️ **技能扩展（Skills）**: 通过 `skills/` 目录扩展 AI 的专项能力，内置 40+ 技能（代码审查、CI/CD、前端开发等）
+- 🔗 **MCP 工具集成**: 通过 `mcps/` 目录接入 GitHub、Slack 等外部服务，扩展 AI 工具调用范围
+- 🖥️ **本机 CLI 工具集成**: 自动检测并调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex），将编码子任务委派给这些工具执行
+- 🏢 **飞书企业集成**: 作为飞书机器人接入企业群/私聊，支持互动卡片消息和 `/rebot` 重启命令
+- 🎙️ **语音输入**: 通过腾讯云 ASR 实现实时语音转文字输入（需配置腾讯云密钥）
+- 🌐 **网页搜索与抓取**: 内置 Web 搜索和网页内容获取能力，辅助信息收集与研究
+- 🌍 **中英双语**: 支持中文和英文系统提示，可通过 `AIBO_LANGUAGE` 切换
 
-## 核心身份与目标
+## 🚀 快速开始
 
-您是' Aibo'，一个具有完整本地文件系统和终端访问权限的高级自主编程AI，以及复杂的子智能体委托能力。
-
-### 🎯 身份与核心目标
-您是一个高度能力的自主编程助手，旨在通过系统性问题解决、全面研究和精确执行来帮助用户解决复杂的软件开发挑战。
-
-### 🛡️ 增强型错误重试机制
-- **自动重试**: 工具调用失败时自动重试最多3次（可配置）
-- **指数退避**: 重试间隔使用指数退避策略，避免系统过载
-- **详细错误上下文**: 失败时提供包含原始输入、错误消息、堆栈跟踪的结构化上下文
-- **智能策略调整**: AI模型可基于错误上下文分析失败原因并调整后续策略
-- **透明集成**: 对现有工具完全透明，无需修改工具代码即可获得重试能力
-
-### 🖥️ 环境上下文
-- 操作系统: darwin x64
-- Node.js 版本: v22.15.0
-- 当前工作目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
-- 项目根目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
-
-## 快速开始
-
-### 先决条件
+### 📋 先决条件
 - Node.js 18+
-- npm 或 yarn
 
-### 安装
+### 📦 全局安装
+
 ```bash
+npm install -g aibo
+```
+
+### ⚙️ 配置
+
+在任意工作目录创建 `.env` 文件，至少填写 AI 模型相关配置：
+
+```dotenv
+# 必填：AI 模型（以 OpenAI 为例）
+AIBO_API_KEY=sk-...
+AIBO_MODEL_NAME=gpt-4o
+
+# 可选：语言（zh / en，默认 en）
+AIBO_LANGUAGE=zh
+```
+
+完整变量说明请参阅 **[docs/env.md](docs/env.md)**。
+
+### 🖥️ 使用场景
+
+#### 场景一：终端交互模式
+
+适合本地开发、日常编程辅助。
+
+```bash
+aibo
+# 或显式指定
+aibo --interaction=console
+```
+
+启动后直接在终端与 AIBO 对话，输入任务描述即可。
+
+#### 场景二：飞书机器人模式
+
+适合企业团队，通过飞书群聊或私聊与 AIBO 交互。
+
+在 `.env` 中额外配置飞书应用信息（详见 **[docs/env.md — Lark 飞书配置](docs/env.md#lark-飞书配置)**）：
+
+```dotenv
+AIBO_LARK_APP_ID=cli_xxxxxxxxxxxxxxxx
+AIBO_LARK_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+配置完成后启动：
+
+```bash
+aibo
+# 或显式指定
+aibo --interaction=lark
+```
+
+> 💡 同时配置了 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 时，`aibo` 默认以飞书模式启动。
+
+#### 场景三：语音输入模式
+
+在终端交互模式下，额外配置腾讯云 ASR 密钥后可直接通过麦克风语音输入：
+
+```dotenv
+AIBO_TENCENTCLOUD_APP_ID=1234567890
+AIBO_TENCENTCLOUD_SECRET_ID=AKIDxxxxxxxxxxxxxxxx
+AIBO_TENCENTCLOUD_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 🔧 本地开发
+
+```bash
+git clone https://github.com/xiaoshuangLi/aibo.git
+cd aibo
 npm install
-```
+cp .env.example .env  # 按需编辑
 
-### 配置
-复制示例环境文件并配置您的API密钥：
-```bash
-cp .env.example .env
-# 编辑 .env 文件添加您的 API 密钥
-```
-
-### 运行
-```bash
-# 开发模式
+# 终端模式
 npm run dev
+
+# 飞书模式
+npm run dev:lark
 
 # 构建
 npm run build
@@ -75,40 +107,254 @@ npm run build
 npm test
 ```
 
-## 交互模式架构
+---
 
-### I/O 解耦设计
-AIBO 采用 `Adapter` 接口实现 I/O 操作与核心逻辑的完全解耦：
+## 🔌 对接 AI 模型
 
-- **Adapter 接口**: 定义标准的 I/O 操作接口，支持多种输出事件类型
-- **TerminalAdapter**: 终端适配器实现，处理所有具体的终端输出逻辑  
-- **Session 类**: 会话管理类，通过依赖注入使用 Adapter
-- **可扩展性**: 可轻松添加新的 I/O 适配器（如 Web UI、API、移动端等）
-- **可测试性**: 核心逻辑不再直接依赖终端 API，可以轻松创建 mock 进行单元测试
+AIBO 支持市面上主流的 AI 模型服务商，只需在 `.env` 中配置对应的 API Key 和模型名称即可。
 
-### 工具函数模块化
-- 所有交互模式相关的工具函数已从 `agent` 目录移动到 `utils` 目录
-- 统一导出接口，简化导入路径
-- 提高代码复用性和维护性
+### 🟣 Anthropic Claude（推荐）
 
-## 错误处理与恢复策略
+Claude 是 Anthropic 开发的高性能大语言模型，在编程和推理任务上表现出色。
 
-### 错误分类与响应
-1. **工具执行失败**: 立即分析根本原因，检查命令语法，验证权限
-2. **文件系统错误**: 验证文件路径，检查权限，优雅处理竞态条件
-3. **网络/API失败**: 实施指数退避，提供替代数据源
-4. **逻辑/实现错误**: 跟踪执行流程，验证假设，测试边界情况
-5. **资源限制**: 优化内存使用，实施分页，建议替代方案
+```dotenv
+AIBO_API_KEY=sk-ant-api03-...
+AIBO_MODEL_NAME=claude-opus-4-5
+# 也可以使用其他 Claude 版本：
+# AIBO_MODEL_NAME=claude-3-5-sonnet-20241022
+# AIBO_MODEL_NAME=claude-3-5-haiku-20241022
+```
 
-### 恢复协议
-1. **即时分析**: 诊断确切的故障点和根本原因
-2. **策略调整**: 修改方法 - 尝试替代方法、工具、参数或工作流
-3. **系统性重试**: 尝试修复并提供清晰推理，限制重试以防止无限循环（最多3次尝试）
-4. **后备实现**: 如果主要方法失败，提出并实施替代解决方案
-5. **透明沟通**: 向用户清楚解释错误、分析、调整策略和后续步骤
-6. **持续执行**: 当单个工具失败时，绝不中断整个工作流。始终尝试恢复并继续执行剩余任务。
+> 🔑 **获取 API Key**：访问 [https://console.anthropic.com](https://console.anthropic.com) → Settings → API Keys → Create Key
 
-## 贡献指南
+### 🟢 OpenAI GPT
+
+```dotenv
+AIBO_API_KEY=sk-...
+AIBO_MODEL_NAME=gpt-4o
+# 其他可选模型：gpt-4o-mini、o1、o3-mini
+```
+
+> 🔑 **获取 API Key**：访问 [https://platform.openai.com](https://platform.openai.com) → API keys → Create new secret key
+
+### 🔵 Google Gemini
+
+```dotenv
+AIBO_API_KEY=AIzaSy-...
+AIBO_MODEL_NAME=gemini-2.0-flash
+# 其他可选模型：gemini-2.0-pro、gemini-1.5-flash
+```
+
+> 🔑 **获取 API Key**：访问 [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+
+### 🟡 Groq（超高速推理）
+
+```dotenv
+AIBO_API_KEY=gsk_...
+AIBO_MODEL_NAME=llama-3.3-70b-versatile
+AIBO_MODEL_PROVIDER=groq
+```
+
+> 🔑 **获取 API Key**：访问 [https://console.groq.com](https://console.groq.com) → API Keys
+
+### 🟠 Mistral
+
+```dotenv
+AIBO_API_KEY=...
+AIBO_MODEL_NAME=mistral-large-latest
+```
+
+### 🏠 Ollama（本地部署，完全免费）
+
+无需 API Key，在本地运行开源模型，保护数据隐私。
+
+```dotenv
+AIBO_BASE_URL=http://localhost:11434
+AIBO_MODEL_NAME=llama3
+AIBO_MODEL_PROVIDER=ollama
+```
+
+> 💻 **安装 Ollama**：访问 [https://ollama.com](https://ollama.com) 下载，然后执行 `ollama pull llama3`
+
+### ☁️ Azure OpenAI
+
+```dotenv
+AIBO_API_KEY=...
+AIBO_BASE_URL=https://<your-instance>.openai.azure.com
+AIBO_MODEL_NAME=<your-deployment-name>
+AIBO_MODEL_PROVIDER=azure
+AIBO_AZURE_API_VERSION=2024-02-15-preview
+```
+
+### 🇨🇳 国产模型（DeepSeek、Qwen 等 OpenAI 兼容接口）
+
+```dotenv
+# DeepSeek
+AIBO_API_KEY=...
+AIBO_BASE_URL=https://api.deepseek.com
+AIBO_MODEL_NAME=deepseek-chat
+
+# 阿里云百炼（Qwen）
+AIBO_API_KEY=...
+AIBO_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+AIBO_MODEL_NAME=qwen-max
+```
+
+---
+
+## 🤝 多智能体系统（Agents）
+
+AIBO 内置了 15 个专业 Agent，通过多智能体协作完成复杂任务。这些 Agent 定义在 `agents/` 目录中，每个 Agent 拥有独立的专业能力和职责边界。
+
+| 🤖 Agent | 职责 |
+|----------|------|
+| 🎯 `coordinator` | **协调者** — 任务分解、多 Agent 调度、依赖管理 |
+| 🏗️ `architect` | **架构师** — 系统设计、技术选型、架构评审 |
+| 💻 `coder` | **编码者** — 功能实现、Bug 修复、代码重构 |
+| 🧪 `testing` | **测试工程师** — 测试用例编写、自动化测试 |
+| ✅ `validator` | **验证者** — 代码质量验证、规范检查 |
+| 🔐 `security` | **安全专家** — 安全漏洞扫描、安全加固建议 |
+| ⚡ `performance` | **性能工程师** — 性能分析、优化方案 |
+| 🚀 `devops` | **DevOps 工程师** — CI/CD、部署、运维 |
+| 📖 `documentation` | **文档工程师** — 文档撰写、API 文档生成 |
+| 🔬 `researcher` | **研究员** — 技术调研、方案比较、信息收集 |
+| 🔄 `refactoring` | **重构专家** — 代码重构、技术债务清理 |
+| 💡 `innovator` | **创新者** — 创意方案、新技术探索 |
+| 📊 `data-analyst` | **数据分析师** — 数据处理、可视化方案 |
+| ✏️ `prompt_engineer` | **提示词工程师** — Prompt 优化、AI 交互设计 |
+| 🌐 `nexus` | **枢纽** — 跨 Agent 信息整合与汇报 |
+
+**📁 自定义 Agent**：在 `agents/` 目录下新建 Markdown 文件，按照现有格式定义 Agent 的名称、描述和能力，即可扩展自己的专属 Agent。
+
+---
+
+## 🛠️ 技能系统（Skills）
+
+Skills 是 AIBO 的专项能力模块，定义在 `skills/` 目录中，每个 Skill 为 AI 提供特定场景下的工作流指导。
+
+### 🎨 内置技能一览
+
+| 分类 | 技能 |
+|------|------|
+| 💻 **编程开发** | `autonomous-coding`、`debugging`、`self-debugging`、`code-review`、`refactoring` |
+| 🌐 **前端** | `react-development`、`vue-development`、`typescript-frontend`、`frontend-design`、`web-artifacts-builder` |
+| 🧪 **测试** | `test-driven-development`、`webapp-testing`、`playwright-skill` |
+| 🔧 **工程化** | `ci-cd`、`git-workflow`、`using-git-worktrees`、`spec-driven-development` |
+| 📄 **文档与内容** | `doc-coauthoring`、`pdf`、`docx`、`pptx`、`xlsx` |
+| 🤖 **AI & Agent** | `coding-agent-router`、`parallel-agents`、`subagent-driven-development`、`write-subagent-todos`、`mcp-builder`、`skill-creator` |
+| 🎨 **设计** | `canvas-design`、`brand-guidelines`、`theme-factory`、`algorithmic-art`、`d3js-skill` |
+| ☁️ **平台集成** | `github-automation`、`gitlab-automation`、`slack-gif-creator`、`tencent-wsa` |
+| 📋 **项目管理** | `project-context`、`context-management`、`feature-organizer`、`internal-comms` |
+| 🧠 **提示词** | `chain-of-thought`、`few-shot-prompting`、`api-design` |
+
+**📁 自定义技能**：在 `skills/` 目录下创建新文件夹，添加 `SKILL.md` 文件，按照现有格式描述技能的触发条件、工作流程和最佳实践。
+
+---
+
+## 🔗 MCP 工具集成（Model Context Protocol）
+
+MCP（Model Context Protocol）允许 AIBO 连接外部工具和服务，极大扩展其能力边界。工具配置定义在 `mcps/` 目录中。
+
+### 🎯 功能场景
+
+AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范围：
+
+- 🐙 **GitHub / Slack 等**：通过标准 MCP 配置接入第三方服务 API，实现自动化操作
+- 🌐 **自定义服务**：接入任意支持 MCP 协议的 HTTP 服务，灵活扩展能力边界
+
+> 💡 **与本机 CLI 工具集成的区别**：AIBO 还支持直接调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex 等），这是独立于 MCP 的另一项功能特性，无需额外配置，AIBO 启动时会自动检测并加载。
+
+### ➕ 添加 MCP 工具
+
+在 `mcps/` 目录下创建 JSON 配置文件，格式如下：
+
+```json
+{
+  "name": "my-tool",
+  "description": "工具描述",
+  "endpoint": "http://localhost:8080/mcp",
+  "authentication": {
+    "type": "none"
+  }
+}
+```
+
+> `tools` 字段可选，省略时由 MCP Server 自动发现可用工具。
+
+> 📖 详细说明请参阅 **[docs/mcp.md](docs/mcp.md)**
+
+---
+
+## 📊 环境变量概览
+
+以下列出所有支持的环境变量及其简要说明，完整配置步骤请查阅 **[docs/env.md](docs/env.md)**。
+
+### 🧠 模型配置
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_API_KEY` | 视服务商而定 | 统一 API 密钥（OpenAI / Anthropic / Google 等） |
+| `AIBO_BASE_URL` | 视服务商而定 | 自定义 API 基础 URL（Azure / Ollama / 兼容接口必填） |
+| `AIBO_MODEL_NAME` | ✅ | 模型名称，如 `gpt-4o`、`claude-opus-4-5` |
+| `AIBO_MODEL_PROVIDER` | 部分必填 | 显式指定服务商，Groq / Ollama / Azure 必须设置 |
+| `AIBO_AZURE_API_VERSION` | 仅 Azure | Azure OpenAI API 版本，默认 `2024-02-15-preview` |
+
+### ⚙️ 运行时配置
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `AIBO_RECURSION_LIMIT` | ❌ | `1000` | LangGraph 递归深度上限 |
+| `AIBO_CHECKPOINTER_TYPE` | ❌ | `memory` | 检查点存储类型：`memory` / `sqlite` / `filesystem` |
+| `AIBO_MEMORY_WINDOW_SIZE` | ❌ | `5` | 对话滑动窗口记忆大小 |
+| `AIBO_VERBOSE_OUTPUT` | ❌ | `false` | 是否开启调试输出 |
+| `AIBO_LANGUAGE` | ❌ | `en` | 提示语言：`en` / `zh` |
+| `AIBO_PERSONA` | ❌ | 魅魔人设 | 自定义 AI 人设描述 |
+| `AIBO_MAX_CONCURRENT_SUBTASKS` | ❌ | `5` | 最大并发子任务数（1–50） |
+| `AIBO_SPECIAL_KEYWORD` | ❌ | `干活` | 触发特殊行为的关键词 |
+
+### 🎙️ 腾讯云 ASR（语音功能）
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_TENCENTCLOUD_APP_ID` | ✅ | 腾讯云账号 AppID |
+| `AIBO_TENCENTCLOUD_SECRET_ID` | ✅ | 腾讯云 API SecretId |
+| `AIBO_TENCENTCLOUD_SECRET_KEY` | ✅ | 腾讯云 API SecretKey |
+| `AIBO_TENCENTCLOUD_REGION` | ❌ | 服务地域，默认 `ap-guangzhou` |
+
+### 🔗 Composio 集成
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_COMPOSIO_API_KEY` | ✅ | Composio 平台 API Key |
+| `AIBO_COMPOSIO_EXTERNAL_USER_ID` | ✅ | Composio 外部用户 ID |
+
+### 🏢 Lark 飞书集成
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_LARK_APP_ID` | ✅ | 飞书自建应用 App ID |
+| `AIBO_LARK_APP_SECRET` | ✅ | 飞书自建应用 App Secret |
+| `AIBO_LARK_RECEIVE_ID` | ❌ | 默认消息接收方 ID |
+| `AIBO_LARK_INTERACTIVE_TEMPLATE_ID` | ❌ | 飞书互动卡片模板 ID |
+
+> 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --interaction=console` 或 `aibo --interaction=lark` 显式指定模式。
+>
+> 📖 详细配置步骤（含飞书卡片搭建说明）请参阅 **[docs/env.md — Lark 飞书配置](docs/env.md#lark-飞书配置)**。
+
+---
+
+## 📚 文档
+
+| 📄 文件 | 说明 |
+|---------|------|
+| [docs/env.md](docs/env.md) | 所有环境变量的详细说明及获取步骤 |
+| [docs/mcp.md](docs/mcp.md) | MCP 工具集成说明（接入 GitHub、Slack 等外部服务） |
+| [agents/](agents/) | 内置 Agent 定义，可扩展自定义 Agent |
+| [skills/](skills/) | 内置技能列表，可扩展自定义技能 |
+
+---
+
+## 🤝 贡献指南
 
 我们欢迎贡献！请遵循以下步骤：
 
@@ -118,10 +364,10 @@ AIBO 采用 `Adapter` 接口实现 I/O 操作与核心逻辑的完全解耦：
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 打开 Pull Request
 
-## 许可证
+## 📜 许可证
 
 此项目在 MIT 许可证下发布 - 有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
 
-## 联系方式
+## 📬 联系方式
 
 如有问题或建议，请创建 GitHub Issue 或联系项目维护者。
