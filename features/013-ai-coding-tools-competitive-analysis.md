@@ -110,18 +110,20 @@ AI Agent → git_operation({operation, args}) → execGit() → JSON 响应
 - [x] 分析 Cursor、Claude Code、Aider、Windsurf 等 10 款工具
 - [x] 识别 AIBO 最高优先级差距：结构化 Git 集成
 
-✅ **Git 工具实现** (`src/tools/git.ts`)
-- [x] 实现 `git_operation` 工具，支持 11 种 git 操作
-- [x] 结构化 JSON 响应，统一错误处理
-- [x] 注册到工具系统 (`src/tools/index.ts`)
+~~✅ **Git 工具实现** (`src/tools/git.ts`)~~
+- ~~[x] 实现 `git_operation` 工具，支持 11 种 git 操作~~
+- ~~[x] 结构化 JSON 响应，统一错误处理~~
+- ~~[x] 注册到工具系统 (`src/tools/index.ts`)~~
 
-✅ **测试覆盖** (`__tests__/tools/git.test.ts`)
-- [x] 工具 schema 验证测试
-- [x] status / diff / log / blame / add / commit 操作测试
-- [x] 错误处理测试（非 git 目录、无效操作等）
+> ⚠️ **已移除**：`git_operation` 工具已从工具系统中移除（`src/tools/git.ts` 已删除）。Git 操作改为通过通用 `execute_bash` 工具执行。
+
+~~✅ **测试覆盖** (`__tests__/tools/git.test.ts`)~~
+- ~~[x] 工具 schema 验证测试~~
+- ~~[x] status / diff / log / blame / add / commit 操作测试~~
+- ~~[x] 错误处理测试（非 git 目录、无效操作等）~~
 
 ✅ **文档更新** (README.md)
-- [x] 在功能特性中新增 Git 工具说明
+- [x] 移除 Git 工具相关说明
 
 ---
 
