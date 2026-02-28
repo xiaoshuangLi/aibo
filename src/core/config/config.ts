@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { parseInteractionModeFromArgs } from '@/cli/program';
+import { parseInteractionModeFromArgs } from '@/cli/utils';
 
 /**
  * Application configuration module that loads and validates environment variables.
@@ -19,7 +19,7 @@ dotenv.config({ quiet: true });
  * Determines the final interaction mode based on CLI args and environment variables.
  * 
  * Priority order:
- * 1. Command line arguments (--interaction=console|lark, --interactive/-i)
+ * 1. `aibo interact --mode console|lark` subcommand option
  * 2. All four Lark config vars present (AIBO_LARK_APP_ID, AIBO_LARK_APP_SECRET,
  *    AIBO_LARK_RECEIVE_ID, AIBO_LARK_INTERACTIVE_TEMPLATE_ID) → lark mode
  * 3. Default: console mode
@@ -27,7 +27,7 @@ dotenv.config({ quiet: true });
  * @returns {'console' | 'lark'} The resolved interaction mode
  */
 function resolveInteractionMode(): 'console' | 'lark' {
-  // 1. CLI args take highest priority
+  // 1. `aibo interact --mode` takes highest priority
   const cliMode = parseInteractionModeFromArgs();
   if (cliMode !== null) {
     return cliMode;
@@ -106,7 +106,7 @@ const envSchema = z.object({
 // Parse and validate environment variables
 const env = envSchema.parse(process.env);
 
-// Resolve the actual interaction mode considering CLI args
+// Resolve the actual interaction mode considering CLI args and env vars
 const resolvedInteractionMode = resolveInteractionMode();
 
 /**

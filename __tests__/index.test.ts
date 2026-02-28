@@ -231,7 +231,6 @@ describe('index module comprehensive tests', () => {
     expect(index.createHandleInternalCommand).toBeDefined();
     expect(index.startInteractiveMode).toBeDefined();
     expect(index.createAIAgent).toBeDefined();
-    expect(index.main).toBeDefined();
     // Voice input functions
     expect(index.cleanupVoiceRecording).toBeDefined();
     expect(index.startRecord).toBeDefined();
@@ -508,49 +507,11 @@ describe('index module comprehensive tests', () => {
     });
   });
 
-  describe('main function', () => {
-    let originalArgv: string[];
-
-    beforeEach(() => {
-      originalArgv = [...process.argv];
-    });
-
-    afterEach(() => {
-      process.argv = originalArgv;
-    });
-
-    test('returns agent in non-interactive mode', async () => {
-      process.argv = ['node', 'index.js'];
-      const agent = await index.main();
-      expect(agent).toBeDefined();
-      // We can't compare with index.agent since it doesn't exist
-      // Just verify that main returns a valid agent object
-    });
-
-    test('calls startInteractiveMode with --interactive flag', async () => {
-      process.argv = ['node', 'index.js', '--interactive'];
-      // We can't easily spy on startInteractiveMode because it's called during module execution
-      // Instead, we'll just verify that main doesn't throw
-      await expect(index.main()).resolves.toBeDefined();
-    });
-
-    test('calls startInteractiveMode with -i flag', async () => {
-      process.argv = ['node', 'index.js', '-i'];
-      await expect(index.main()).resolves.toBeDefined();
-    });
-
-    test('calls startInteractiveMode with AIBO_INTERACTIVE env var', async () => {
-      process.env.AIBO_INTERACTIVE = 'true';
-      await expect(index.main()).resolves.toBeDefined();
-    });
-  });
-
   // Test the main module execution path
   test('covers require.main execution path', () => {
-    // This is covered by the fact that the file can be imported and used
-    // The actual require.main === module path is covered when the file is run directly
-    // For testing purposes, we ensure the main function exists and is callable
-    expect(typeof index.main).toBe('function');
+    // main() has been removed; the CLI entry point now calls createProgram().parseAsync()
+    // directly from main.ts. Verify createAIAgent is still accessible from index.
+    expect(typeof index.createAIAgent).toBe('function');
   });
 });
 
@@ -699,10 +660,9 @@ describe('index module - simple coverage tests', () => {
   // });
 
   test('require.main === module condition coverage', () => {
-    // This test ensures that the require.main === module condition is covered
-    // In the test environment, this condition is false, but we can verify that
-    // the code structure is correct
-    expect(typeof index.main).toBe('function');
+    // main() has been removed; the CLI entry point calls createProgram().parseAsync()
+    // directly. Verify a core export is still available.
+    expect(typeof index.createAIAgent).toBe('function');
   });
 });
 

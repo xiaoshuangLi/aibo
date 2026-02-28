@@ -3,7 +3,7 @@ jest.mock('dotenv', () => ({
   config: jest.fn()
 }));
 
-describe('Config - CLI Args and Interaction Mode Coverage', () => {
+describe('Config - Interaction Mode Coverage', () => {
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
 
@@ -18,31 +18,7 @@ describe('Config - CLI Args and Interaction Mode Coverage', () => {
     process.env = originalEnv;
   });
 
-  it('should return console mode when --interactive flag is passed', () => {
-    process.argv = ['node', 'script.js', '--interactive'];
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('console');
-  });
-
-  it('should return console mode when -i flag is passed', () => {
-    process.argv = ['node', 'script.js', '-i'];
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('console');
-  });
-
-  it('should return lark mode when --interaction=lark is passed', () => {
-    process.argv = ['node', 'script.js', '--interaction=lark'];
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('lark');
-  });
-
-  it('should return console mode when --interaction=console is passed', () => {
-    process.argv = ['node', 'script.js', '--interaction=console'];
-    const { config } = require('../src/core/config/config');
-    expect(config.interaction.mode).toBe('console');
-  });
-
-  it('should return console mode as default when no interaction env/cli is set', () => {
+  it('should return console mode as default when no Lark vars are set', () => {
     const { config } = require('../src/core/config/config');
     expect(config.interaction.mode).toBe('console');
   });
@@ -64,13 +40,27 @@ describe('Config - CLI Args and Interaction Mode Coverage', () => {
     expect(config.interaction.mode).toBe('console');
   });
 
-  it('CLI --interaction=console takes precedence over all 4 Lark vars', () => {
-    process.argv = ['node', 'script.js', '--interaction=console'];
-    process.env.AIBO_LARK_APP_ID = 'app-id';
-    process.env.AIBO_LARK_APP_SECRET = 'app-secret';
-    process.env.AIBO_LARK_RECEIVE_ID = 'receive-id';
-    process.env.AIBO_LARK_INTERACTIVE_TEMPLATE_ID = 'template-id';
+  it('should return console mode when interact subcommand is used without --mode', () => {
+    process.argv = ['node', 'script.js', 'interact'];
     const { config } = require('../src/core/config/config');
     expect(config.interaction.mode).toBe('console');
+  });
+
+  it('should return lark mode when interact --mode=lark is passed', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=lark'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('lark');
+  });
+
+  it('should return console mode when interact --mode=console is passed', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=console'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('console');
+  });
+
+  it('interact --mode=lark takes precedence over all 4 Lark vars being absent', () => {
+    process.argv = ['node', 'script.js', 'interact', '--mode=lark'];
+    const { config } = require('../src/core/config/config');
+    expect(config.interaction.mode).toBe('lark');
   });
 });

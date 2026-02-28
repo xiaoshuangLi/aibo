@@ -1,70 +1,27 @@
 import { Command } from 'commander';
-import { runInit } from '@/cli/init';
+import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
+import { runInteract } from '@/cli/interact';
 
 /**
  * Central Commander.js module for the aibo CLI.
  *
- * Responsibilities:
- *  - Exports `parseInteractionModeFromArgs()` so that `config.ts` can determine
- *    the interaction mode from CLI flags without duplicating Commander setup.
- *  - Exports `createProgram()` which returns the fully-wired root Command used
- *    by `main.ts` to dispatch subcommands (e.g. `aibo init`).
+ * Exports `createProgram()` which returns the fully-wired root Command used
+ * by `main.ts` to dispatch subcommands (e.g. `aibo init`, `aibo interact`).
  *
  * @module cli/program
  */
 
 /**
- * Parses CLI arguments using Commander.js to determine the interaction mode.
- *
- * Priority order:
- * 1. `--interaction=console|lark` (highest priority)
- * 2. `--interactive` or `-i` (equivalent to `--interaction=console`)
- * 3. Falls back to `null` (caller resolves via env vars)
- *
- * A fresh, minimal Command instance is created on every call so that:
- *  - Module reloads during tests start from a clean state.
- *  - Subcommand actions (e.g. `init`) are NOT registered here, preventing
- *    accidental side-effects when this function is invoked at config-load time
- *    (before the main entry point calls `createProgram().parseAsync()`).
- *
- * @returns {'console' | 'lark' | null} The interaction mode, or null if not
- *   specified via CLI arguments.
- */
-export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
-  const program = new Command();
-
-  program
-    .option('--interaction <mode>', 'Set interaction mode (console|lark)', 'console')
-    .option('-i, --interactive', 'Enable interactive console mode')
-    .allowUnknownOption(); // let unknown options (and subcommands) pass through
-
-  program.parse(process.argv);
-  const options = program.opts();
-
-  // --interactive / -i takes highest precedence
-  if (options.interactive) {
-    return 'console';
-  }
-
-  // Use Commander's built-in source tracking to reliably detect whether the
-  // option was explicitly provided via CLI (handles both --interaction=lark and
-  // --interaction lark) versus being the programmatic default.
-  if (program.getOptionValueSource('interaction') === 'cli') {
-    const mode = options.interaction;
-    if (mode === 'console' || mode === 'lark') {
-      return mode;
-    }
-    // Invalid mode value — fall through so the caller can use env vars
-  }
-
-  return null;
-}
-
-/**
  * Creates the root aibo Commander program.
  *
- * Registers all first-class subcommands (currently `init`) so that callers can
- * simply invoke `createProgram().parseAsync(process.argv)` to dispatch.
+ * Registers all first-class subcommands (`init`, `interact`) with their
+ * respective handler functions, so that `--help` shows complete documentation
+ * and callers can simply invoke `createProgram().parseAsync(process.argv)`
+ * to dispatch.
+ *
+ * When no subcommand is given, `runInteract` is started using the interaction
+ * mode resolved from environment variables (or `interact --mode` when the
+ * `interact` subcommand is used).
  *
  * @returns Configured Commander {@link Command} instance
  */
@@ -73,15 +30,29 @@ export function createProgram(): Command {
 
   program
     .description('AI bot with DeepAgents')
-    .allowUnknownOption()
-    .option('--interaction <mode>', 'Set interaction mode (console|lark)')
-    .option('-i, --interactive', 'Enable interactive console mode');
+    .allowUnknownOption();
+
+  program.action(async () => {
+    if (isAiboInitRequired()) {
+      printInitRequired();
+      process.exit(1);
+    }
+    await runInteract();
+  });
 
   program
     .command('init')
     .description('Create the .aibo symlink and display setup instructions')
     .action(async () => {
       await runInit();
+    });
+
+  program
+    .command('interact')
+    .description('Start interactive mode (console or lark)')
+    .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console')
+    .action(async () => {
+      await runInteract();
     });
 
   return program;
