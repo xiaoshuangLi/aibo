@@ -97,7 +97,7 @@ describe('grepFilesTool - skip unreadable file', () => {
     realFs.chmodSync(bad, 0o000);
 
     try {
-      const result = await grepFilesTool.invoke({ pattern: 'hello', directory: tmpDir });
+      const result = await grepFilesTool.invoke({ pattern: 'hello', cwd: tmpDir });
       const parsed = JSON.parse(result);
       expect(parsed.success).toBe(true);
     } finally {
