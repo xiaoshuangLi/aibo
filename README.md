@@ -25,26 +25,6 @@
 - ✅ **功能开发工作流**: 严格的工作流程确保质量，包含文档和正确提交
 - ✅ **增强型整理代码技能**: 包含四阶段验证脚本（测试覆盖、需求提取、文档生成、提交结构），确保每个阶段的质量保证，并**强制更新 README.md 文档**
 
-## 核心身份与目标
-
-您是' Aibo'，一个具有完整本地文件系统和终端访问权限的高级自主编程AI，以及复杂的子智能体委托能力。
-
-### 🎯 身份与核心目标
-您是一个高度能力的自主编程助手，旨在通过系统性问题解决、全面研究和精确执行来帮助用户解决复杂的软件开发挑战。
-
-### 🛡️ 增强型错误重试机制
-- **自动重试**: 工具调用失败时自动重试最多3次（可配置）
-- **指数退避**: 重试间隔使用指数退避策略，避免系统过载
-- **详细错误上下文**: 失败时提供包含原始输入、错误消息、堆栈跟踪的结构化上下文
-- **智能策略调整**: AI模型可基于错误上下文分析失败原因并调整后续策略
-- **透明集成**: 对现有工具完全透明，无需修改工具代码即可获得重试能力
-
-### 🖥️ 环境上下文
-- 操作系统: darwin x64
-- Node.js 版本: v22.15.0
-- 当前工作目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
-- 项目根目录: /Users/xiaoshuang/xiaoshuang/code/mine-code/aibo
-
 ## 快速开始
 
 ### 先决条件
@@ -57,23 +37,85 @@ npm install
 ```
 
 ### 配置
-复制示例环境文件并配置您的API密钥：
+复制示例环境文件并按需编辑：
 ```bash
 cp .env.example .env
-# 编辑 .env 文件添加您的 API 密钥
+# 编辑 .env 文件，填入您的 API 密钥和其他配置
 ```
+
+变量说明及获取方式请参阅 **[docs/env.md](docs/env.md)**。
 
 ### 运行
 ```bash
-# 开发模式
+# 开发模式（终端交互）
 npm run dev
+
+# 开发模式（飞书模式）
+npm run dev:lark
 
 # 构建
 npm run build
 
+# 生产模式启动
+npm start
+
 # 测试
 npm test
 ```
+
+## 环境变量概览
+
+以下列出所有支持的环境变量及其简要说明，完整配置步骤请查阅 **[docs/env.md](docs/env.md)**。
+
+### 模型配置
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_API_KEY` | 视服务商而定 | 统一 API 密钥（OpenAI / Anthropic / Google 等） |
+| `AIBO_BASE_URL` | 视服务商而定 | 自定义 API 基础 URL（Azure / Ollama / 兼容接口必填） |
+| `AIBO_MODEL_NAME` | ✅ | 模型名称，如 `gpt-4o`、`claude-3-5-sonnet-20241022` |
+| `AIBO_MODEL_PROVIDER` | 部分必填 | 显式指定服务商，Groq / Ollama / Azure 必须设置 |
+| `AIBO_AZURE_API_VERSION` | 仅 Azure | Azure OpenAI API 版本，默认 `2024-02-15-preview` |
+
+### 运行时配置
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `AIBO_RECURSION_LIMIT` | ❌ | `1000` | LangGraph 递归深度上限 |
+| `AIBO_CHECKPOINTER_TYPE` | ❌ | `memory` | 检查点存储类型：`memory` / `sqlite` / `filesystem` |
+| `AIBO_MEMORY_WINDOW_SIZE` | ❌ | `5` | 对话滑动窗口记忆大小 |
+| `AIBO_VERBOSE_OUTPUT` | ❌ | `false` | 是否开启调试输出 |
+| `AIBO_LANGUAGE` | ❌ | `en` | 提示语言：`en` / `zh` |
+| `AIBO_PERSONA` | ❌ | 魅魔人设 | 自定义 AI 人设描述 |
+| `AIBO_MAX_CONCURRENT_SUBTASKS` | ❌ | `5` | 最大并发子任务数（1–50） |
+| `AIBO_SPECIAL_KEYWORD` | ❌ | `干活` | 触发特殊行为的关键词 |
+
+### 腾讯云 ASR（语音功能）
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_TENCENTCLOUD_APP_ID` | ✅ | 腾讯云账号 AppID |
+| `AIBO_TENCENTCLOUD_SECRET_ID` | ✅ | 腾讯云 API SecretId |
+| `AIBO_TENCENTCLOUD_SECRET_KEY` | ✅ | 腾讯云 API SecretKey |
+| `AIBO_TENCENTCLOUD_REGION` | ❌ | 服务地域，默认 `ap-guangzhou` |
+
+### Composio 集成
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_COMPOSIO_API_KEY` | ✅ | Composio 平台 API Key |
+| `AIBO_COMPOSIO_EXTERNAL_USER_ID` | ✅ | Composio 外部用户 ID |
+
+### Lark 飞书集成
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `AIBO_LARK_APP_ID` | ✅ | 飞书自建应用 App ID |
+| `AIBO_LARK_APP_SECRET` | ✅ | 飞书自建应用 App Secret |
+| `AIBO_LARK_RECEIVE_ID` | ❌ | 默认消息接收方 ID |
+| `AIBO_LARK_INTERACTIVE_TEMPLATE_ID` | ❌ | 飞书互动卡片模板 ID |
+
+> 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --interaction=console` 或 `aibo --interaction=lark` 显式指定模式。
 
 ## 交互模式架构
 
@@ -81,7 +123,7 @@ npm test
 AIBO 采用 `Adapter` 接口实现 I/O 操作与核心逻辑的完全解耦：
 
 - **Adapter 接口**: 定义标准的 I/O 操作接口，支持多种输出事件类型
-- **TerminalAdapter**: 终端适配器实现，处理所有具体的终端输出逻辑  
+- **TerminalAdapter**: 终端适配器实现，处理所有具体的终端输出逻辑
 - **Session 类**: 会话管理类，通过依赖注入使用 Adapter
 - **可扩展性**: 可轻松添加新的 I/O 适配器（如 Web UI、API、移动端等）
 - **可测试性**: 核心逻辑不再直接依赖终端 API，可以轻松创建 mock 进行单元测试
@@ -107,6 +149,12 @@ AIBO 采用 `Adapter` 接口实现 I/O 操作与核心逻辑的完全解耦：
 4. **后备实现**: 如果主要方法失败，提出并实施替代解决方案
 5. **透明沟通**: 向用户清楚解释错误、分析、调整策略和后续步骤
 6. **持续执行**: 当单个工具失败时，绝不中断整个工作流。始终尝试恢复并继续执行剩余任务。
+
+## 文档
+
+| 文件 | 说明 |
+|------|------|
+| [docs/env.md](docs/env.md) | 所有环境变量的详细说明及获取步骤 |
 
 ## 贡献指南
 
