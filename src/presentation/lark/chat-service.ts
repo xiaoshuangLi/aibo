@@ -4,13 +4,13 @@
  * 中文名称：飞书群聊服务
  *
  * 负责创建和复用与当前执行命令目录绑定的飞书群聊。
- * 使用标签(Tag)机制避免在同一目录下重复创建群聊。
+ * 通过群聊描述中是否包含 【`${cwd}`】 来判断是否已创建过对应群聊。
  *
  * 流程：
- * 1. 通过标签名称（工作目录路径）查询已有标签
- * 2. 如果标签存在，通过标签绑定关系查找已绑定的群聊
+ * 1. 获取机器人所在的所有群列表
+ * 2. 通过描述中包含 【`${cwd}`】 查找已有群聊
  * 3. 如果群聊存在，直接复用
- * 4. 如果不存在，创建群聊 → 创建/复用标签 → 绑定标签到群聊 → 更新群公告
+ * 4. 如果不存在，创建群聊（描述中包含 【`${cwd}`】）→ 更新群公告
  *
  * @module lark-chat-service
  */
@@ -18,8 +18,8 @@
 import * as lark from '@larksuiteoapi/node-sdk';
 import { config } from '@/core/config/config';
 
-/** 标签绑定的实体类型；Feishu tag API 要求传 'chat'，与 lark 交互类型的 'chat' 含义不同 */
-const TAG_ENTITY_TYPE = 'chat';
+/** 根据工作目录生成用于标识群聊的描述标记，格式如：【`/path/to/cwd`】 */
+const getChatDescriptionMarker = (cwd: string): string => `【\`${cwd}\`】`;
 
 /**
  * 飞书群聊服务
@@ -54,78 +54,48 @@ export class LarkChatService {
       throw new Error('Missing required Lark config: AIBO_LARK_APP_ID');
     }
 
-    // 1. 查找是否已有以 cwd 命名的标签
-    const tagId = await this.findOrCreateTag(cwd);
-
-    // 2. 通过标签绑定关系查找已有群聊
-    const existingChatId = await this.findChatByTag(tagId);
+    // 1. 通过描述查找已有群聊
+    const existingChatId = await this.findChatByDescription(cwd);
     if (existingChatId) {
       console.log(`✅ 找到已有群聊: ${existingChatId}，跳过创建`);
       return existingChatId;
     }
 
-    // 3. 创建群聊
+    // 2. 创建群聊（描述中包含 【`${cwd}`】）
     const chatId = await this.createChat(cwd, receiveId, appId);
 
-    // 4. 绑定标签到群聊
-    await this.bindTagToChat(tagId, chatId);
-
-    // 5. 更新群公告
+    // 3. 更新群公告
     await this.updateChatAnnouncement(chatId, cwd);
 
     return chatId;
   }
 
   /**
-   * 查找名称匹配 cwd 的标签，若不存在则创建并返回其 id。
+   * 遍历机器人所在的所有群聊，查找描述中包含 【`${cwd}`】 标记的群聊。
+   * 返回匹配的 chat_id，未找到则返回 null。
    */
-  private async findOrCreateTag(cwd: string): Promise<string> {
-    // 通过绑定关系侧查不到"按名称列举"的 SDK 方法，先用 request 查询列表
-    const listResp = await this.client.request({
-      method: 'GET',
-      url: '/open-apis/im/v2/tags',
-      params: { name: cwd },
-    });
+  private async findChatByDescription(cwd: string): Promise<string | null> {
+    let pageToken: string | undefined;
 
-    const tags: Array<{ id: string; name: string }> = listResp?.data?.items ?? [];
-    const existing = tags.find((t) => t.name === cwd);
-    if (existing) {
-      console.log(`🏷️  找到已有标签 id=${existing.id}`);
-      return existing.id;
-    }
-
-    // 使用 SDK 创建新标签
-    const createResp = await (this.client.im.v2.tag as any).create({
-      data: {
-        create_tag: {
-          tag_type: 'tenant',
-          name: cwd,
-          i18n_names: [{ locale: 'zh_cn', name: cwd }],
+    do {
+      const resp = await (this.client.im.chat as any).list({
+        params: {
+          page_size: 100,
+          ...(pageToken ? { page_token: pageToken } : {}),
         },
-      },
-    });
+      });
 
-    const tagId: string | undefined = createResp?.data?.tag_detail?.id;
-    if (!tagId) {
-      throw new Error(`创建标签失败，响应: ${JSON.stringify(createResp)}`);
-    }
+      const items: Array<{ chat_id: string; description?: string }> = resp?.data?.items ?? [];
+      for (const item of items) {
+        const desc = item.description ?? '';
+        if (desc.includes(getChatDescriptionMarker(cwd))) {
+          return item.chat_id;
+        }
+      }
 
-    console.log(`🏷️  创建标签成功 id=${tagId}`);
-    return tagId;
-  }
+      pageToken = resp?.data?.has_more ? resp?.data?.page_token : undefined;
+    } while (pageToken);
 
-  /**
-   * 通过标签 id 查询绑定的群聊，返回第一个绑定的 chat_id，或 null。
-   */
-  private async findChatByTag(tagId: string): Promise<string | null> {
-    const resp = await (this.client.im.v2.bizEntityTagRelation as any).get({
-      params: { tag_id: tagId, entity_type: TAG_ENTITY_TYPE },
-    });
-
-    const relationships: Array<{ entity_id: string }> = resp?.data?.items ?? [];
-    if (relationships.length > 0) {
-      return relationships[0].entity_id;
-    }
     return null;
   }
 
@@ -138,7 +108,7 @@ export class LarkChatService {
     const resp = await (this.client.im.chat as any).create({
       data: {
         name,
-        description: `aibo 工作目录: ${name}`,
+        description: `aibo 工作目录: ${name} ${getChatDescriptionMarker(name)}`,
         owner_id: receiveId,
         user_id_list: [receiveId],
         bot_id_list: [botId],
@@ -171,21 +141,6 @@ export class LarkChatService {
 
     console.log(`💬 创建群聊成功 chat_id=${chatId}`);
     return chatId;
-  }
-
-  /**
-   * 将标签绑定到群聊。
-   */
-  private async bindTagToChat(tagId: string, chatId: string): Promise<void> {
-    await (this.client.im.v2.bizEntityTagRelation as any).create({
-      data: {
-        tag_id: tagId,
-        entity_id: chatId,
-        entity_type: TAG_ENTITY_TYPE,
-      },
-    });
-
-    console.log(`🔗 标签 ${tagId} 已绑定到群聊 ${chatId}`);
   }
 
   /**
