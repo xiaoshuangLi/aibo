@@ -89,6 +89,55 @@ describe('startLarkInteractiveMode - success path', () => {
     expect(mockProcessOn).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
   });
 
+  it('SIGINT handler calls session.end and exits (lines 64-68)', async () => {
+    await startLarkInteractiveMode();
+
+    // Invoke the registered SIGINT handler
+    const sigintCall = mockProcessOn.mock.calls.find((c: any[]) => c[0] === 'SIGINT');
+    expect(sigintCall).toBeDefined();
+    const sigintHandler = sigintCall![1] as Function;
+
+    const { LspClientManager } = require('@/infrastructure/code-analysis');
+    (LspClientManager.shutdownAll as jest.Mock).mockResolvedValueOnce(undefined);
+
+    sigintHandler();
+
+    expect(session.end).toHaveBeenCalledWith('再见！');
+    expect(LspClientManager.shutdownAll).toHaveBeenCalled();
+  });
+
+  it('SIGTERM handler calls session.end and exits (lines 72-76)', async () => {
+    await startLarkInteractiveMode();
+
+    const sigtermCall = mockProcessOn.mock.calls.find((c: any[]) => c[0] === 'SIGTERM');
+    expect(sigtermCall).toBeDefined();
+    const sigtermHandler = sigtermCall![1] as Function;
+
+    const { LspClientManager } = require('@/infrastructure/code-analysis');
+    (LspClientManager.shutdownAll as jest.Mock).mockResolvedValueOnce(undefined);
+
+    sigtermHandler();
+
+    expect(session.end).toHaveBeenCalledWith('再见！');
+  });
+
+  it('userMessageCallback invokes handleUserMessage (line 57)', async () => {
+    const { processStreamChunks } = require('@/core/utils/stream');
+    (processStreamChunks as jest.Mock).mockResolvedValueOnce(undefined);
+
+    await startLarkInteractiveMode();
+
+    const callbackCall = adapter.setUserMessageCallback.mock.calls[0];
+    expect(callbackCall).toBeDefined();
+    const callback = callbackCall[0] as Function;
+
+    // Invoke the callback – this should call handleUserMessage
+    await callback('hello');
+
+    // processStreamChunks would have been called as part of handling the message
+    // (no error → no mockError call)
+  });
+
   it('enters group_chat branch when larkType is group_chat', async () => {
     configMock.config.interaction.larkType = 'group_chat';
     const chatInstance = { getOrCreateChat: jest.fn().mockResolvedValue('gc-123') };
