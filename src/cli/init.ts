@@ -90,10 +90,40 @@ export function printInitRequired(): void {
 }
 
 /**
+ * Ensures that the given entries exist in the `.gitignore` file inside
+ * `targetDir`.  If the file does not exist it is created.  Entries that are
+ * already present are not duplicated.
+ *
+ * @param targetDir - Directory that contains (or should contain) `.gitignore`
+ * @param entries   - Lines to add when they are not already present
+ */
+export function updateGitignore(targetDir: string, entries: string[]): void {
+  const gitignorePath = path.join(targetDir, '.gitignore');
+
+  let existing = '';
+  try {
+    existing = fs.readFileSync(gitignorePath, 'utf-8');
+  } catch {
+    // File doesn't exist yet — that's fine, we'll create it
+  }
+
+  const existingLines = existing.split('\n');
+  const toAdd = entries.filter(entry => !existingLines.includes(entry));
+
+  if (toAdd.length === 0) {
+    return;
+  }
+
+  const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(gitignorePath, existing + separator + toAdd.join('\n') + '\n', 'utf-8');
+}
+
+/**
  * Entry point for `aibo init`.
  *
- * Creates the `.aibo` symlink in the current working directory and prints
- * the README URL so the user can follow the configuration guide.
+ * Creates the `.aibo` symlink in the current working directory, adds `.data`
+ * and `.aibo` to the local `.gitignore`, and prints the README URL so the user
+ * can follow the configuration guide.
  */
 export async function runInit(): Promise<void> {
   const cwd = process.cwd();
@@ -107,6 +137,14 @@ export async function runInit(): Promise<void> {
     console.log(`✅  Created .aibo → ${packageDir}\n`);
   } catch (error: any) {
     console.error(`⚠️   Failed to create .aibo symlink: ${error.message}\n`);
+  }
+
+  // Update .gitignore with .data and .aibo entries
+  try {
+    updateGitignore(cwd, ['.data', '.aibo']);
+    console.log(`✅  Updated .gitignore with .data and .aibo entries\n`);
+  } catch (error: any) {
+    console.error(`⚠️   Failed to update .gitignore: ${error.message}\n`);
   }
 
   console.log(`📖  To configure aibo, create a .env file in this directory.`);

@@ -10,7 +10,37 @@ const DEFAULT_IGNORE = [
   "**/dist/**",
   "**/build/**",
   "**/coverage/**",
+  "**/out/**",
+  "**/.cache/**",
+  "**/.data/**",
+  "**/.aibo/**",
+  "**/__pycache__/**",
+  "**/.next/**",
+  "**/.nuxt/**",
+  "**/.svelte-kit/**",
+  "**/venv/**",
+  "**/.venv/**",
+  "**/autos/**",
 ];
+
+const BLOCKED_EXTENSIONS = new Set([
+  // Binary/model files
+  '.bin', '.dat', '.model', '.pth', '.pt', '.ckpt', '.h5', '.pb', '.onnx',
+  '.tflite', '.safetensors', '.gguf', '.ggml', '.npy', '.npz',
+  // System files
+  '.dll', '.so', '.dylib', '.exe', '.app', '.dmg', '.pkg', '.msi',
+  // Media files
+  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg',
+  '.mp3', '.wav', '.ogg', '.flac', '.mp4', '.avi', '.mov', '.wmv', '.mkv',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.tar',
+  '.gz', '.7z', '.rar', '.iso', '.img', '.vmdk', '.ova',
+  // Cache and temporary files
+  '.cache', '.tmp', '.temp', '.swp', '.swo', '.lock',
+  // Database files
+  '.db', '.sqlite', '.sqlite3', '.mdb', '.accdb', '.dbf',
+  // Font files
+  '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt', '.tsbuildinfo',
+]);
 
 const MAX_RESULTS = 500;
 
@@ -48,6 +78,11 @@ export const grepFilesTool = tool(
 
       for (const file of files) {
         if (results.length >= MAX_RESULTS) break;
+
+        // Skip binary and non-text files
+        const match = path.basename(file).match(/\.[^\.]+$/);
+        const ext = match ? match[0].toLowerCase() : '';
+        if (BLOCKED_EXTENSIONS.has(ext)) continue;
 
         const absolutePath = path.join(workingDir, file);
         let content: string;
