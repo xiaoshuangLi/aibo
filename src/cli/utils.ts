@@ -40,3 +40,31 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
   }
   return 'console';
 }
+
+/**
+ * Parses the `aibo interact --type` subcommand option from process.argv.
+ *
+ * Only meaningful when `--mode=lark`. Returns `'chat'` when the user passes
+ * `--type=chat`, `'user'` for `--type=user` (or any other value), and `null`
+ * when the `interact` subcommand is not present.
+ *
+ * @returns {'user' | 'chat' | null} The lark interaction type, or null if not
+ *   invoked via the `interact` subcommand.
+ */
+export function parseLarkTypeFromArgs(): 'user' | 'chat' | null {
+  if (process.argv[2] !== 'interact') {
+    return null;
+  }
+
+  const subCmd = new Command();
+  subCmd
+    .option('--type <type>', 'Set lark interaction type (user|chat)')
+    .allowUnknownOption();
+  subCmd.parse(['node', 'interact', ...process.argv.slice(3)]);
+  const opts = subCmd.opts();
+
+  if (opts.type === 'chat') {
+    return 'chat';
+  }
+  return 'user';
+}

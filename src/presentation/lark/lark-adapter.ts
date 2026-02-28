@@ -32,12 +32,13 @@ export class LarkAdapter extends DefaultAdapter {
   private abortController: AbortController | null = null;
   private isDestroyed = false;
   private userMessageCallback: UserMessageCallback | null = null;
+  private chatId: string | null = null;
   
   // 存储待处理的消息队列（用于处理并发消息）
   private messageQueue: Array<{ content: string; chatId: string }> = [];
   private isProcessingQueue = false;
 
-  constructor() {
+  constructor(chatId?: string) {
     super();
     
     // 验证环境变量
@@ -45,6 +46,9 @@ export class LarkAdapter extends DefaultAdapter {
     if (!larkConfig.appId || !larkConfig.appSecret) {
       throw new Error('Missing required Lark environment variables: AIBO_LARK_APP_ID and AIBO_LARK_APP_SECRET');
     }
+
+    // 存储群聊 ID（chat 模式下使用）
+    this.chatId = chatId ?? null;
 
     // 初始化飞书客户端
     this.client = new lark.Client({
@@ -195,7 +199,11 @@ export class LarkAdapter extends DefaultAdapter {
     }
 
     const larkConfig = this.getLarkConfig();
-    const targetReceiveId = larkConfig.receiveId;
+
+    // chat 模式：发送到群聊；user 模式：发送到用户
+    const isChatMode = this.chatId !== null;
+    const targetReceiveId = isChatMode ? this.chatId! : larkConfig.receiveId;
+    const receiveIdType = isChatMode ? 'chat_id' : 'user_id';
 
     if (!targetReceiveId) {
       console.warn('⚠️ 无法发送消息：没有设置接收ID');
@@ -218,7 +226,7 @@ export class LarkAdapter extends DefaultAdapter {
 
       return this.client.im.message.create({
         params: {
-          receive_id_type: 'user_id',
+          receive_id_type: receiveIdType,
         },
         data: {
           msg_type: 'text',

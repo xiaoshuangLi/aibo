@@ -47,3 +47,51 @@ describe('parseInteractionModeFromArgs', () => {
     expect(parseInteractionModeFromArgs()).toBe('console');
   });
 });
+
+describe('parseLarkTypeFromArgs', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.argv = ['node', 'script.js'];
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  it('returns null when no subcommand is passed', () => {
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBeNull();
+  });
+
+  it('returns null for unrelated subcommands', () => {
+    process.argv = ['node', 'script.js', 'init'];
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBeNull();
+  });
+
+  it('returns "user" for interact subcommand without --type', () => {
+    process.argv = ['node', 'script.js', 'interact'];
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBe('user');
+  });
+
+  it('returns "chat" for interact subcommand with --type=chat', () => {
+    process.argv = ['node', 'script.js', 'interact', '--type=chat'];
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBe('chat');
+  });
+
+  it('returns "user" for interact subcommand with --type=user', () => {
+    process.argv = ['node', 'script.js', 'interact', '--type=user'];
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBe('user');
+  });
+
+  it('returns "user" for interact subcommand with unknown --type value', () => {
+    process.argv = ['node', 'script.js', 'interact', '--type=unknown'];
+    const { parseLarkTypeFromArgs } = require('../../src/cli/utils');
+    expect(parseLarkTypeFromArgs()).toBe('user');
+  });
+});

@@ -51,6 +51,7 @@ export function createProgram(): Command {
     .command('interact')
     .description('Start interactive mode (console or lark)')
     .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console')
+    .option('--type <type>', 'Set lark interaction type (user|chat), only effective when --mode=lark', 'user')
     .action(async () => {
       await runInteract();
     });
