@@ -179,10 +179,6 @@ Default timeout is 2 minutes — increase for long-running commands like npm ins
  * 
  * @returns Promise<Array<any>> - 包含 Bash 工具的数组
  */
-// Session-less instance exported for testing purposes only.
-// In production use getBashTools(session) to get a session-aware instance.
-export const executeBashTool = createExecuteBashTool();
-
 export default async function getBashTools(session?: Session) {
   return [createExecuteBashTool(session)];
 }

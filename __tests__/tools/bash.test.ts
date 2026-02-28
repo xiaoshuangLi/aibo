@@ -1,7 +1,14 @@
-import { executeBashTool } from '@/tools/bash';
+import getBashTools from '@/tools/bash';
 
 // Since the actual bash tool executes system commands, we'll test the structure
 // rather than the actual command execution for safety
+
+let executeBashTool: any;
+
+beforeAll(async () => {
+  const tools = await getBashTools();
+  executeBashTool = tools[0];
+});
 
 describe('Bash Tool', () => {
   test('should have correct tool schema', () => {

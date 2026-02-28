@@ -1,4 +1,3 @@
-import { claudeExecuteTool } from '@/tools/claude';
 import getClaudeTools from '@/tools/claude';
 import * as childProcess from 'child_process';
 
@@ -13,6 +12,14 @@ describe('Claude CLI Tool', () => {
   });
 
   describe('claudeExecuteTool', () => {
+    let claudeExecuteTool: any;
+
+    beforeAll(async () => {
+      (childProcess.execSync as jest.Mock).mockReturnValue('');
+      const tools = await getClaudeTools();
+      claudeExecuteTool = tools[0];
+    });
+
     it('should have correct tool name', () => {
       expect(claudeExecuteTool.name).toBe('claude_execute');
     });

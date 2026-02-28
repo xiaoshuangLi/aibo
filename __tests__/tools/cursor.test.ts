@@ -1,4 +1,4 @@
-import { cursorExecuteTool, cursorOpenTool } from '@/tools/cursor';
+import { cursorOpenTool } from '@/tools/cursor';
 import getCursorTools from '@/tools/cursor';
 import * as childProcess from 'child_process';
 
@@ -13,6 +13,14 @@ describe('Cursor CLI Tool', () => {
   });
 
   describe('cursorExecuteTool', () => {
+    let cursorExecuteTool: any;
+
+    beforeAll(async () => {
+      (childProcess.execSync as jest.Mock).mockReturnValue('');
+      const tools = await getCursorTools();
+      cursorExecuteTool = tools[0];
+    });
+
     it('should have correct tool name', () => {
       expect(cursorExecuteTool.name).toBe('cursor_execute');
     });

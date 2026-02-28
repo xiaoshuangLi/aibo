@@ -141,10 +141,6 @@ Requires the 'gemini' command to be installed locally (https://github.com/google
  *
  * @returns Promise<Array<any>> - 包含 Gemini CLI 工具的数组，或空数组（如果命令不可用）
  */
-// Session-less instance exported for testing purposes only.
-// In production use getGeminiTools(session) to get a session-aware instance.
-export const geminiExecuteTool = createGeminiExecuteTool();
-
 export default async function getGeminiTools(session?: Session) {
   if (!isGeminiAvailable()) {
     return [];

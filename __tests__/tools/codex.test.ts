@@ -1,4 +1,3 @@
-import { codexExecuteTool } from '@/tools/codex';
 import getCodexTools from '@/tools/codex';
 import * as childProcess from 'child_process';
 
@@ -13,6 +12,14 @@ describe('Codex CLI Tool', () => {
   });
 
   describe('codexExecuteTool', () => {
+    let codexExecuteTool: any;
+
+    beforeAll(async () => {
+      (childProcess.execSync as jest.Mock).mockReturnValue('');
+      const tools = await getCodexTools();
+      codexExecuteTool = tools[0];
+    });
+
     it('should have correct tool name', () => {
       expect(codexExecuteTool.name).toBe('codex_execute');
     });

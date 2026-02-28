@@ -196,10 +196,6 @@ Requires the 'cursor' command to be installed locally.`,
  *
  * @returns Promise<Array<any>> - 包含 Cursor CLI 工具的数组，或空数组（如果命令不可用）
  */
-// Session-less instance exported for testing purposes only.
-// In production use getCursorTools(session) to get a session-aware instance.
-export const cursorExecuteTool = createCursorExecuteTool();
-
 export default async function getCursorTools(session?: Session) {
   if (!isCursorAvailable()) {
     return [];

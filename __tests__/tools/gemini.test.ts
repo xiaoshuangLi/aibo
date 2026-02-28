@@ -1,4 +1,3 @@
-import { geminiExecuteTool } from '@/tools/gemini';
 import getGeminiTools from '@/tools/gemini';
 import * as childProcess from 'child_process';
 
@@ -13,6 +12,14 @@ describe('Gemini CLI Tool', () => {
   });
 
   describe('geminiExecuteTool', () => {
+    let geminiExecuteTool: any;
+
+    beforeAll(async () => {
+      (childProcess.execSync as jest.Mock).mockReturnValue('');
+      const tools = await getGeminiTools();
+      geminiExecuteTool = tools[0];
+    });
+
     it('should have correct tool name', () => {
       expect(geminiExecuteTool.name).toBe('gemini_execute');
     });

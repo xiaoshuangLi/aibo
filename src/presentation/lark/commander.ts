@@ -1,7 +1,7 @@
 import { config } from '@/core/config';
 import { styled } from '@/presentation/styling';
 import { SessionManager } from '@/infrastructure/session';
-import { executeBashTool } from '@/tools/bash';
+import { exec } from 'child_process';
 import { getRestartCommand } from '@/shared/utils';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { LspClientManager } from '@/infrastructure/code-analysis';
@@ -439,14 +439,19 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
     console.log(styled.system("🔄 **正在执行项目构建**\n\n这可能需要几秒钟时间，请稍候..."));
     
     // 执行 npm run build 命令
-    const resultJson = await executeBashTool.invoke({
-      command: "npm run build",
-      timeout: 60000, // 60秒超时
-      cwd: process.cwd()
+    const result = await new Promise<{ success: boolean; stdout: string; stderr: string; error?: string; message?: string }>((resolve, reject) => {
+      try {
+        exec("npm run build", { timeout: 60000, cwd: process.cwd() }, (error, stdout, stderr) => {
+          if (error) {
+            resolve({ success: false, stdout, stderr, error: String(error.code ?? error.name), message: error.message });
+          } else {
+            resolve({ success: true, stdout, stderr });
+          }
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
-    
-    // 解析构建结果
-    const result = JSON.parse(resultJson);
     
     // 检查构建结果
     if (result.success) {

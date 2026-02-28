@@ -135,10 +135,6 @@ Requires the 'claude' command to be installed locally.`,
  *
  * @returns Promise<Array<any>> - 包含 Claude CLI 工具的数组，或空数组（如果命令不可用）
  */
-// Session-less instance exported for testing purposes only.
-// In production use getClaudeTools(session) to get a session-aware instance.
-export const claudeExecuteTool = createClaudeExecuteTool();
-
 export default async function getClaudeTools(session?: Session) {
   if (!isClaudeAvailable()) {
     return [];
