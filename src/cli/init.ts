@@ -107,8 +107,8 @@ export function updateGitignore(targetDir: string, entries: string[]): void {
     // File doesn't exist yet — that's fine, we'll create it
   }
 
-  const existingLines = existing.split('\n');
-  const toAdd = entries.filter(entry => !existingLines.includes(entry));
+  const existingLines = new Set(existing.split('\n'));
+  const toAdd = entries.filter(entry => !existingLines.has(entry));
 
   if (toAdd.length === 0) {
     return;

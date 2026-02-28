@@ -1,6 +1,8 @@
 import { FilesystemBackend, GrepMatch, WriteResult } from 'deepagents';
 import * as path from 'path';
 import * as fs from 'fs';
+import { BLOCKED_EXTENSIONS, IGNORED_DIRECTORIES } from '@/shared/constants/filesystem';
+import { hasBlockedExtension } from '@/shared/utils/filesystem';
 
 /**
  * Safe Filesystem Backend with restricted access and filtering
@@ -38,26 +40,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
     this.maxDepth = maxDepth;
 
     // Directories to ignore during grep operations
-    this.ignoredDirectories = new Set([
-      'node_modules',
-      'coverage',
-      'autos',
-      '.git',
-      '.cache',
-      'dist',
-      'build',
-      'out',
-      'coverage',
-      '__pycache__',
-      '.next',
-      '.nuxt',
-      '.svelte-kit',
-      'venv',
-      '.venv',
-      'env',
-      '.env',
-      '.data',
-    ]);
+    this.ignoredDirectories = new Set(IGNORED_DIRECTORIES);
 
     // Allowed extensions for text-based files we want to read
     this.allowedExtensions = new Set([
@@ -69,26 +52,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
     ]);
 
     // Blocked extensions for binary files, models, and sensitive content
-    this.blockedExtensions = new Set([
-      // Binary/model files
-      '.bin', '.dat', '.model', '.pth', '.pt', '.ckpt', '.h5', '.pb', '.onnx',
-      '.tflite', '.safetensors', '.gguf', '.ggml', '.npy', '.npz',
-      // System files
-      '.dll', '.so', '.dylib', '.exe', '.app', '.dmg', '.pkg', '.msi',
-      // Media files
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg',
-      '.mp3', '.wav', '.ogg', '.flac', '.mp4', '.avi', '.mov', '.wmv', '.mkv',
-      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.tar',
-      '.gz', '.7z', '.rar', '.iso', '.dmg', '.img', '.vmdk', '.ova',
-      // Cache and temporary files
-      '.cache', '.tmp', '.temp', '.swp', '.swo', '.lock',
-      // Database files
-      '.db', '.sqlite', '.sqlite3', '.mdb', '.accdb', '.dbf',
-      // Virtual machine files
-      '.vdi', '.vhd', '.vhdx', '.qcow2', '.raw',
-      // Font files
-      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt', '.tsbuildinfo'
-    ]);
+    this.blockedExtensions = new Set(BLOCKED_EXTENSIONS);
   }
 
   /**
@@ -109,20 +73,18 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    * Check if a file extension is allowed
    */
   isAllowedExtension(filePath: string): boolean {
-    const name = path.basename(filePath);
-    const match = name.match(/\.[^\.]+$/);
-    const ext = match ? match[0].toLowerCase() : '';
-    
     // If it's in blocked extensions, reject immediately
-    if (this.blockedExtensions.has(ext)) {
+    if (hasBlockedExtension(filePath)) {
       return false;
     }
-    
+
+    const ext = path.extname(filePath).toLowerCase();
+
     // If it has no extension, allow it (could be README, Makefile, etc.)
     if (ext === '') {
       return true;
     }
-    
+
     // Allow if it's in allowed extensions
     return this.allowedExtensions.has(ext);
   }

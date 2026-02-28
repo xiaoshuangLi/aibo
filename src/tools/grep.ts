@@ -3,44 +3,8 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import { glob } from "glob";
-
-const DEFAULT_IGNORE = [
-  "**/node_modules/**",
-  "**/.git/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/coverage/**",
-  "**/out/**",
-  "**/.cache/**",
-  "**/.data/**",
-  "**/.aibo/**",
-  "**/__pycache__/**",
-  "**/.next/**",
-  "**/.nuxt/**",
-  "**/.svelte-kit/**",
-  "**/venv/**",
-  "**/.venv/**",
-  "**/autos/**",
-];
-
-const BLOCKED_EXTENSIONS = new Set([
-  // Binary/model files
-  '.bin', '.dat', '.model', '.pth', '.pt', '.ckpt', '.h5', '.pb', '.onnx',
-  '.tflite', '.safetensors', '.gguf', '.ggml', '.npy', '.npz',
-  // System files
-  '.dll', '.so', '.dylib', '.exe', '.app', '.dmg', '.pkg', '.msi',
-  // Media files
-  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg',
-  '.mp3', '.wav', '.ogg', '.flac', '.mp4', '.avi', '.mov', '.wmv', '.mkv',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.tar',
-  '.gz', '.7z', '.rar', '.iso', '.img', '.vmdk', '.ova',
-  // Cache and temporary files
-  '.cache', '.tmp', '.temp', '.swp', '.swo', '.lock',
-  // Database files
-  '.db', '.sqlite', '.sqlite3', '.mdb', '.accdb', '.dbf',
-  // Font files
-  '.ttf', '.otf', '.woff', '.woff2', '.eot', '.fon', '.fnt', '.tsbuildinfo',
-]);
+import { DEFAULT_IGNORE_PATTERNS } from "@/shared/constants/filesystem";
+import { hasBlockedExtension } from "@/shared/utils/filesystem";
 
 const MAX_RESULTS = 500;
 
@@ -68,7 +32,7 @@ export const grepFilesTool = tool(
 
       const files = await glob(globPattern, {
         cwd: workingDir,
-        ignore: DEFAULT_IGNORE,
+        ignore: DEFAULT_IGNORE_PATTERNS,
         absolute: false,
         dot: true,
         nodir: true,
@@ -80,9 +44,7 @@ export const grepFilesTool = tool(
         if (results.length >= MAX_RESULTS) break;
 
         // Skip binary and non-text files
-        const match = path.basename(file).match(/\.[^\.]+$/);
-        const ext = match ? match[0].toLowerCase() : '';
-        if (BLOCKED_EXTENSIONS.has(ext)) continue;
+        if (hasBlockedExtension(file)) continue;
 
         const absolutePath = path.join(workingDir, file);
         let content: string;
