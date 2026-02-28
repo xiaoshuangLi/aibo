@@ -322,6 +322,7 @@ AIBO_LARK_INTERACTIVE_TEMPLATE_ID=AAq0xxxxxxxxxxx
    - **群 chat_id**：在群设置中添加机器人后，可在事件日志或 API 调试工具中获取。
 6. **获取互动卡片模板 ID（可选）**：
    - 访问 [飞书卡片搭建工具](https://open.feishu.cn/tool/cardkit)，创建或选择一个互动卡片模板。
+   - ⚠️ **重要**：卡片模板中必须添加支持 `title` 和 `content` 两个变量，AIBO 将通过这两个变量动态填充消息标题和内容。
    - 复制模板 ID，填入 `AIBO_LARK_INTERACTIVE_TEMPLATE_ID`。
 
 > **启动模式说明**：当 `AIBO_LARK_APP_ID`、`AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 命令将自动以飞书模式启动。可通过命令行参数覆盖：

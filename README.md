@@ -116,6 +116,8 @@ npm test
 | `AIBO_LARK_INTERACTIVE_TEMPLATE_ID` | ❌ | 飞书互动卡片模板 ID |
 
 > 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --interaction=console` 或 `aibo --interaction=lark` 显式指定模式。
+>
+> 📖 详细配置步骤（含飞书卡片搭建说明）请参阅 **[docs/env.md — Lark 飞书配置](docs/env.md#lark-飞书配置)**。
 
 ## 交互模式架构
 
