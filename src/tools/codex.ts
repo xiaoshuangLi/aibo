@@ -35,6 +35,19 @@ function handleCodexExecutionError(
 ): string {
   const err = error as any;
 
+  // Handle abort/interrupt (must check before SIGTERM, as abort also sends SIGTERM)
+  if (err.code === 'ABORT_ERR' || err.name === 'AbortError') {
+    return JSON.stringify({
+      success: false,
+      interrupted: true,
+      error: "Command interrupted",
+      message: "Codex execution was interrupted by user. The user may provide feedback in the next message.",
+      stdout: err.stdout || "",
+      stderr: err.stderr || "",
+      prompt,
+    }, null, 2);
+  }
+
   if (err.signal === "SIGTERM") {
     return JSON.stringify({
       success: false,
@@ -84,6 +97,7 @@ function createCodexExecuteTool(session?: Session) {
         timeout,
         cwd: cwd || process.cwd(),
         env: process.env,
+        signal: session?.abortController?.signal,
       });
 
       // Stream stdout in real-time while the command is running
@@ -127,6 +141,10 @@ Requires the 'codex' command to be installed locally (https://github.com/openai/
  *
  * @returns Promise<Array<any>> - 包含 Codex CLI 工具的数组，或空数组（如果命令不可用）
  */
+// Session-less instance exported for testing purposes only.
+// In production use getCodexTools(session) to get a session-aware instance.
+export const codexExecuteTool = createCodexExecuteTool();
+
 export default async function getCodexTools(session?: Session) {
   if (!isCodexAvailable()) {
     return [];

@@ -35,6 +35,19 @@ function handleGeminiExecutionError(
 ): string {
   const err = error as any;
 
+  // Handle abort/interrupt (must check before SIGTERM, as abort also sends SIGTERM)
+  if (err.code === 'ABORT_ERR' || err.name === 'AbortError') {
+    return JSON.stringify({
+      success: false,
+      interrupted: true,
+      error: "Command interrupted",
+      message: "Gemini execution was interrupted by user. The user may provide feedback in the next message.",
+      stdout: err.stdout || "",
+      stderr: err.stderr || "",
+      prompt,
+    }, null, 2);
+  }
+
   if (err.signal === "SIGTERM") {
     return JSON.stringify({
       success: false,
@@ -84,6 +97,7 @@ function createGeminiExecuteTool(session?: Session) {
         timeout,
         cwd: cwd || process.cwd(),
         env: process.env,
+        signal: session?.abortController?.signal,
       });
 
       // Stream stdout in real-time while the command is running
@@ -127,6 +141,10 @@ Requires the 'gemini' command to be installed locally (https://github.com/google
  *
  * @returns Promise<Array<any>> - 包含 Gemini CLI 工具的数组，或空数组（如果命令不可用）
  */
+// Session-less instance exported for testing purposes only.
+// In production use getGeminiTools(session) to get a session-aware instance.
+export const geminiExecuteTool = createGeminiExecuteTool();
+
 export default async function getGeminiTools(session?: Session) {
   if (!isGeminiAvailable()) {
     return [];

@@ -89,7 +89,20 @@ const merge = (main: string = '') => (...args: string[]): string => {
  */
 function handleBashExecutionError(error: unknown, command: string, timeout: number): string {
   const err = error as any;
-  
+
+  // Handle abort/interrupt (must check before SIGTERM, as abort also sends SIGTERM)
+  if (err.code === 'ABORT_ERR' || err.name === 'AbortError') {
+    return JSON.stringify({
+      success: false,
+      interrupted: true,
+      error: "Command interrupted",
+      message: "Command execution was interrupted by user. The user may provide feedback in the next message.",
+      stdout: err.stdout || "",
+      stderr: err.stderr || "",
+      command: command,
+    }, null, 2);
+  }
+
   // Handle timeout specifically
   if (err.signal === "SIGTERM") {
     return JSON.stringify({
@@ -122,6 +135,7 @@ function createExecuteBashTool(session?: Session) {
       timeout: timeout,
       cwd: cwd || process.cwd(),
       env: process.env,
+      signal: session?.abortController?.signal,
     });
 
     try {
@@ -165,6 +179,10 @@ Default timeout is 2 minutes — increase for long-running commands like npm ins
  * 
  * @returns Promise<Array<any>> - 包含 Bash 工具的数组
  */
+// Session-less instance exported for testing purposes only.
+// In production use getBashTools(session) to get a session-aware instance.
+export const executeBashTool = createExecuteBashTool();
+
 export default async function getBashTools(session?: Session) {
   return [createExecuteBashTool(session)];
 }
