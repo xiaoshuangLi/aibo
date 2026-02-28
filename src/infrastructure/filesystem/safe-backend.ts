@@ -350,36 +350,31 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async write(filePath: string, content: string): Promise<WriteResult> {
     try {
+      // Resolve relative paths against projectRoot to avoid CWD-based resolution issues
+      // (e.g. on macOS where process.chdir resolves symlinks differently than path.resolve)
+      const resolvedPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(this.projectRoot, filePath);
+
       // Security checks
-      if (!this.isWithinProjectRoot(filePath)) {
+      if (!this.isWithinProjectRoot(resolvedPath)) {
         return {
           error: `Access denied: ${filePath} is outside project root`
         };
       }
 
-      if (!this.isWithinDepthLimit(filePath)) {
+      if (!this.isWithinDepthLimit(resolvedPath)) {
         return {
           error: `Access denied: ${filePath} exceeds maximum depth limit of ${this.maxDepth}`
         };
       }
 
-      if (!this.isAllowedExtension(filePath)) {
+      if (!this.isAllowedExtension(resolvedPath)) {
         return {
           error: `Access denied: ${filePath} has a blocked file extension`
         };
       }
-
-      // Use the parent class's resolvePath method indirectly by calling super.read
-      // which will trigger the path resolution, or use our own path resolution
-      const resolvedPath = path.resolve(this.projectRoot, filePath);
       
-      // Ensure the resolved path is still within project root (double-check)
-      if (!this.isWithinProjectRoot(resolvedPath)) {
-        return {
-          error: `Access denied: resolved path ${resolvedPath} is outside project root`
-        };
-      }
-
       // Ensure parent directory exists using fs.promises
       await fs.promises.mkdir(path.dirname(resolvedPath), { recursive: true });
 
