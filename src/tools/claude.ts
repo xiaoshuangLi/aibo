@@ -2,7 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
-import { emitToolProgress } from "@/core/agent/tool-progress";
+import { Session } from "@/core/agent";
 
 const execFileAsync = promisify(execFile);
 
@@ -67,7 +67,8 @@ function handleClaudeExecutionError(
  * 2. 命令超时：执行时间超过指定超时，返回包含 "Command timeout" 错误的 JSON
  * 3. 命令执行失败：返回包含错误代码和消息的 JSON
  */
-export const claudeExecuteTool = tool(
+function createClaudeExecuteTool(session?: Session) {
+  return tool(
   async ({ prompt, timeout = 300000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
     const execArgs = ["-p", prompt, ...args];
@@ -81,7 +82,7 @@ export const claudeExecuteTool = tool(
 
       // Stream stdout in real-time while the command is running
       (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        emitToolProgress('claude_execute', data.toString());
+        session?.logToolProgress('claude_execute', data.toString());
       });
 
       const { stdout, stderr } = await promise;
@@ -110,6 +111,7 @@ Requires the 'claude' command to be installed locally.`,
     }),
   }
 );
+}
 
 /**
  * 异步获取 Claude CLI 工具的方法
@@ -119,10 +121,10 @@ Requires the 'claude' command to be installed locally.`,
  *
  * @returns Promise<Array<any>> - 包含 Claude CLI 工具的数组，或空数组（如果命令不可用）
  */
-export default async function getClaudeTools() {
+export default async function getClaudeTools(session?: Session) {
   if (!isClaudeAvailable()) {
     return [];
   }
 
-  return [claudeExecuteTool];
+  return [createClaudeExecuteTool(session)];
 }

@@ -3,7 +3,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { emitToolProgress } from "@/core/agent/tool-progress";
+import { Session } from "@/core/agent";
 
 const execAsync = promisify(exec);
 
@@ -113,7 +113,8 @@ function handleBashExecutionError(error: unknown, command: string, timeout: numb
   }, null, 2);
 }
 
-export const executeBashTool = tool(
+function createExecuteBashTool(session?: Session) {
+  return tool(
   async ({ command, timeout = 120000, cwd }) => {
     const records: string[] = [];
 
@@ -127,7 +128,7 @@ export const executeBashTool = tool(
       promise.child.stdout?.on?.('data', (data) => {
         const chunk = data.toString();
         records.push(chunk);
-        emitToolProgress('execute_bash', chunk);
+        session?.logToolProgress('execute_bash', chunk);
       });
 
       // 执行命令
@@ -157,12 +158,13 @@ Default timeout is 2 minutes — increase for long-running commands like npm ins
     }),
   }
 );
+}
 
 /**
  * 异步获取 Bash 工具的方法
  * 
  * @returns Promise<Array<any>> - 包含 Bash 工具的数组
  */
-export default async function getBashTools() {
-  return [executeBashTool];
+export default async function getBashTools(session?: Session) {
+  return [createExecuteBashTool(session)];
 }

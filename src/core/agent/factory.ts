@@ -159,7 +159,7 @@ export async function createAIAgent(session?: Session) {
   }
 
   // 异步获取工具
-  const tools = await getTools();
+  const tools = await getTools(session);
 
   // 创建 LangChain 工具重试中间件
   const toolRetryMiddleware = createLangChainToolRetryMiddleware();

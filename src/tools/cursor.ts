@@ -2,7 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
-import { emitToolProgress } from "@/core/agent/tool-progress";
+import { Session } from "@/core/agent";
 
 const execFileAsync = promisify(execFile);
 
@@ -67,49 +67,51 @@ function handleCursorExecutionError(
  * 2. 命令超时：执行时间超过指定超时，返回包含 "Command timeout" 错误的 JSON
  * 3. 命令执行失败：返回包含错误代码和消息的 JSON
  */
-export const cursorExecuteTool = tool(
-  async ({ prompt, timeout = 300000, cwd, args = [] }) => {
-    // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["--ai", prompt, ...args];
+function createCursorExecuteTool(session?: Session) {
+  return tool(
+    async ({ prompt, timeout = 300000, cwd, args = [] }) => {
+      // Use execFile with a separate args array to prevent command injection
+      const execArgs = ["--ai", prompt, ...args];
 
-    try {
-      const promise = execFileAsync("cursor", execArgs, {
-        timeout,
-        cwd: cwd || process.cwd(),
-        env: process.env,
-      });
+      try {
+        const promise = execFileAsync("cursor", execArgs, {
+          timeout,
+          cwd: cwd || process.cwd(),
+          env: process.env,
+        });
 
-      // Stream stdout in real-time while the command is running
-      (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        emitToolProgress('cursor_execute', data.toString());
-      });
+        // Stream stdout in real-time while the command is running
+        (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+          session?.logToolProgress('cursor_execute', data.toString());
+        });
 
-      const { stdout, stderr } = await promise;
+        const { stdout, stderr } = await promise;
 
-      return JSON.stringify({
-        success: true,
-        stdout: stdout || "(empty)",
-        stderr: stderr || "(empty)",
-        prompt,
-      }, null, 2);
-    } catch (error) {
-      return handleCursorExecutionError(error, prompt, timeout);
-    }
-  },
-  {
-    name: "cursor_execute",
-    description: `Execute a task or prompt using the Cursor AI CLI (cursor command).
+        return JSON.stringify({
+          success: true,
+          stdout: stdout || "(empty)",
+          stderr: stderr || "(empty)",
+          prompt,
+        }, null, 2);
+      } catch (error) {
+        return handleCursorExecutionError(error, prompt, timeout);
+      }
+    },
+    {
+      name: "cursor_execute",
+      description: `Execute a task or prompt using the Cursor AI CLI (cursor command).
 Sends the prompt to Cursor AI running locally and returns the result.
 Use this to leverage Cursor's AI coding capabilities: writing code, debugging, refactoring, and more.
 Requires the 'cursor' command to be installed locally.`,
-    schema: z.object({
-      prompt: z.string().describe("The task or prompt to send to Cursor AI (e.g., 'fix the bug in src/utils.ts', 'add unit tests for this module')."),
-      timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
-      cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
-      args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the cursor command."),
-    }),
-  }
-);
+      schema: z.object({
+        prompt: z.string().describe("The task or prompt to send to Cursor AI (e.g., 'fix the bug in src/utils.ts', 'add unit tests for this module')."),
+        timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
+        cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
+        args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the cursor command."),
+      }),
+    }
+  );
+}
 
 /**
  * Cursor 打开文件/目录工具
@@ -180,10 +182,10 @@ Requires the 'cursor' command to be installed locally.`,
  *
  * @returns Promise<Array<any>> - 包含 Cursor CLI 工具的数组，或空数组（如果命令不可用）
  */
-export default async function getCursorTools() {
+export default async function getCursorTools(session?: Session) {
   if (!isCursorAvailable()) {
     return [];
   }
 
-  return [cursorExecuteTool, cursorOpenTool];
+  return [createCursorExecuteTool(session), cursorOpenTool];
 }

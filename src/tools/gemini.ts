@@ -2,7 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
-import { emitToolProgress } from "@/core/agent/tool-progress";
+import { Session } from "@/core/agent";
 
 const execFileAsync = promisify(execFile);
 
@@ -73,7 +73,8 @@ function handleGeminiExecutionError(
  * - 多模态任务（代码 + 图像分析）
  * - 需要大上下文窗口的任务（1M token）
  */
-export const geminiExecuteTool = tool(
+function createGeminiExecuteTool(session?: Session) {
+  return tool(
   async ({ prompt, timeout = 300000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
     const execArgs = ["-p", prompt, ...args];
@@ -87,7 +88,7 @@ export const geminiExecuteTool = tool(
 
       // Stream stdout in real-time while the command is running
       (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        emitToolProgress('gemini_execute', data.toString());
+        session?.logToolProgress('gemini_execute', data.toString());
       });
 
       const { stdout, stderr } = await promise;
@@ -116,6 +117,7 @@ Requires the 'gemini' command to be installed locally (https://github.com/google
     }),
   }
 );
+}
 
 /**
  * 异步获取 Gemini CLI 工具的方法
@@ -125,10 +127,10 @@ Requires the 'gemini' command to be installed locally (https://github.com/google
  *
  * @returns Promise<Array<any>> - 包含 Gemini CLI 工具的数组，或空数组（如果命令不可用）
  */
-export default async function getGeminiTools() {
+export default async function getGeminiTools(session?: Session) {
   if (!isGeminiAvailable()) {
     return [];
   }
 
-  return [geminiExecuteTool];
+  return [createGeminiExecuteTool(session)];
 }

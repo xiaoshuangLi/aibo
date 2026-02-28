@@ -12,7 +12,6 @@ import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent';
 import { config } from '@/core/config';
-import { setToolProgressCallback } from '@/core/agent/tool-progress';
 
 /**
  * Configuration options for the session output capture middleware
@@ -73,19 +72,9 @@ export function createSessionOutputCaptureMiddleware(
           }
           session.logToolCall(toolName, argsStr);
         }
-
-        // Register progress callback so long-running tools can stream output
-        if (session && typeof session.logToolProgress === 'function') {
-          setToolProgressCallback((name, chunk) => {
-            session.logToolProgress(name, chunk);
-          });
-        }
         
         // Execute the actual tool call
         const result = await handler(request);
-
-        // Clear progress callback after tool completes
-        setToolProgressCallback(null);
         
         // Log tool call result
         if (session && typeof session.logToolResult === 'function') {
@@ -106,9 +95,6 @@ export function createSessionOutputCaptureMiddleware(
         
         return result;
       } catch (error) {
-        // Clear progress callback on error
-        setToolProgressCallback(null);
-
         // Log tool call error
         if (session && typeof session.logToolResult === 'function') {
           const success = false;

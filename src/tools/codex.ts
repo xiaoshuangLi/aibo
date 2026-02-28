@@ -2,7 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
-import { emitToolProgress } from "@/core/agent/tool-progress";
+import { Session } from "@/core/agent";
 
 const execFileAsync = promisify(execFile);
 
@@ -73,7 +73,8 @@ function handleCodexExecutionError(
  * - 服务端业务逻辑实现
  * - CLI 工具与脚本开发
  */
-export const codexExecuteTool = tool(
+function createCodexExecuteTool(session?: Session) {
+  return tool(
   async ({ prompt, timeout = 300000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
     const execArgs = ["-p", prompt, ...args];
@@ -87,7 +88,7 @@ export const codexExecuteTool = tool(
 
       // Stream stdout in real-time while the command is running
       (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        emitToolProgress('codex_execute', data.toString());
+        session?.logToolProgress('codex_execute', data.toString());
       });
 
       const { stdout, stderr } = await promise;
@@ -116,6 +117,7 @@ Requires the 'codex' command to be installed locally (https://github.com/openai/
     }),
   }
 );
+}
 
 /**
  * 异步获取 Codex CLI 工具的方法
@@ -125,10 +127,10 @@ Requires the 'codex' command to be installed locally (https://github.com/openai/
  *
  * @returns Promise<Array<any>> - 包含 Codex CLI 工具的数组，或空数组（如果命令不可用）
  */
-export default async function getCodexTools() {
+export default async function getCodexTools(session?: Session) {
   if (!isCodexAvailable()) {
     return [];
   }
 
-  return [codexExecuteTool];
+  return [createCodexExecuteTool(session)];
 }
