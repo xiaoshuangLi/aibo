@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { parseInteractionModeFromArgs } from '@/cli/program';
+import { parseInteractionModeFromArgs } from '@/cli/utils';
 
 /**
  * Application configuration module that loads and validates environment variables.
