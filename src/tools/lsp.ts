@@ -922,12 +922,12 @@ export const updateDocumentTool = tool(
 
       const absolutePath = validateFileExists(file_path);
 
-      // 将新内容写入磁盘
-      fs.writeFileSync(absolutePath, new_content, 'utf-8');
-
-      // 通知 LSP 服务器文件已更改
+      // 通知 LSP 服务器文件已更改（文件必须已通过 open_document 打开，否则抛出错误）
       const client = await LspClientManager.getClient(rootDir);
       await client.updateDocument(file_path, new_content);
+
+      // 仅在 LSP 通知成功后才将新内容写入磁盘，避免 LSP 未打开时损坏文件
+      fs.writeFileSync(absolutePath, new_content, 'utf-8');
 
       log('debug', `Document updated: ${file_path}`);
 
