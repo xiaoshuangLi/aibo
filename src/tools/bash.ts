@@ -3,6 +3,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { emitToolProgress } from "@/core/agent/tool-progress";
 
 const execAsync = promisify(exec);
 
@@ -124,7 +125,9 @@ export const executeBashTool = tool(
 
     try {
       promise.child.stdout?.on?.('data', (data) => {
-        records.push(data);
+        const chunk = data.toString();
+        records.push(chunk);
+        emitToolProgress('execute_bash', chunk);
       });
 
       // 执行命令

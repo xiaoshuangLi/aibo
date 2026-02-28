@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
+import { emitToolProgress } from "@/core/agent/tool-progress";
 
 const execFileAsync = promisify(execFile);
 
@@ -78,11 +79,18 @@ export const geminiExecuteTool = tool(
     const execArgs = ["-p", prompt, ...args];
 
     try {
-      const { stdout, stderr } = await execFileAsync("gemini", execArgs, {
+      const promise = execFileAsync("gemini", execArgs, {
         timeout,
         cwd: cwd || process.cwd(),
         env: process.env,
       });
+
+      // Stream stdout in real-time while the command is running
+      (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+        emitToolProgress('gemini_execute', data.toString());
+      });
+
+      const { stdout, stderr } = await promise;
 
       return JSON.stringify({
         success: true,
