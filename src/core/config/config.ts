@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { parseInteractionModeFromArgs } from '@/cli/utils';
+import { parseInteractionModeFromArgs, parseLarkTypeFromArgs } from '@/cli/utils';
 
 /**
  * Application configuration module that loads and validates environment variables.
@@ -48,7 +48,25 @@ function resolveInteractionMode(): 'console' | 'lark' {
 }
 
 /**
- * Schema definition for required and optional environment variables.
+ * Determines the lark interaction type from CLI args.
+ *
+ * Only effective when the interaction mode is `lark`.
+ * Priority order:
+ * 1. `aibo interact --type user_chat|group_chat` subcommand option
+ * 2. Default: user_chat type
+ *
+ * @returns {'user_chat' | 'group_chat'} The resolved lark type
+ */
+function resolveLarkType(): 'user_chat' | 'group_chat' {
+  const cliType = parseLarkTypeFromArgs();
+  if (cliType !== null) {
+    return cliType;
+  }
+  return 'user_chat';
+}
+
+
+/**
  * 
  * Validates the following environment variables (all prefixed with AIBO_):
  * - AIBO_API_KEY: Unified API key for any model provider (required for cloud providers;
@@ -108,6 +126,9 @@ const env = envSchema.parse(process.env);
 
 // Resolve the actual interaction mode considering CLI args and env vars
 const resolvedInteractionMode = resolveInteractionMode();
+
+// Resolve the lark interaction type from CLI args
+const resolvedLarkType = resolveLarkType();
 
 /**
  * Validated application configuration object.
@@ -177,5 +198,6 @@ export const config = {
   },
   interaction: {
     mode: resolvedInteractionMode,
+    larkType: resolvedLarkType,
   },
 };

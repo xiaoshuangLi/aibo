@@ -50,6 +50,15 @@ describe('createProgram', () => {
     expect(helpInfo).toContain('console|lark');
   });
 
+  it('interact command has --type option', () => {
+    const program = createProgram();
+    const interact = program.commands.find((c) => c.name() === 'interact')!;
+    expect(interact).toBeDefined();
+    const helpInfo = interact.helpInformation();
+    expect(helpInfo).toContain('--type');
+    expect(helpInfo).toContain('user_chat|group_chat');
+  });
+
   it('always registers a default action handler', () => {
     const program = createProgram();
     expect((program as any)._actionHandler).toBeDefined();
