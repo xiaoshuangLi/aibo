@@ -12,7 +12,7 @@
  * 3. 如果群聊存在，直接复用
  * 4. 如果不存在，创建群聊（描述中包含 【`${cwd}`】）→ 更新群公告
  *
- * @module lark-chat-service
+ * @module chat
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';

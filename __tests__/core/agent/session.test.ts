@@ -11,7 +11,7 @@ const mockAdapter = {
 } as unknown as Adapter;
 
 // Mock createConsoleThreadId
-jest.mock('@/core/utils/interactive-logic', () => ({
+jest.mock('@/core/utils/interactive', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('test-thread-id')
 }));
 

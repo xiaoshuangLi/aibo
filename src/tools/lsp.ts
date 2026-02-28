@@ -10,8 +10,8 @@ import { z } from 'zod';
 import {
   LspClientManager,
   LspClientConfig
-} from '../infrastructure/code-analysis/lsp-client';
-import { log, setLogLevel, LoggingLevel } from '../infrastructure/code-analysis/lsp-logging';
+} from '../infrastructure/code-analysis/client';
+import { log, setLogLevel, LoggingLevel } from '../infrastructure/code-analysis/logging';
 import * as fs from 'fs';
 import * as path from 'path';
 

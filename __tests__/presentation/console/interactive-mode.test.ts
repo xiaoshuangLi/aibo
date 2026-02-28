@@ -1,14 +1,14 @@
-import { onLine, gracefulShutdown, setupExitHandlers } from '@/presentation/console/interactive-mode';
+import { onLine, gracefulShutdown, setupExitHandlers } from '@/presentation/console/interactive';
 import { Session } from '@/core/agent/session';
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
+import { TerminalAdapter } from '@/presentation/console/adapter';
 
 // Mock dependencies
 jest.mock('@/core/agent/session');
-jest.mock('@/presentation/console/terminal-adapter');
-jest.mock('@/presentation/console/user-input-handler', () => ({
+jest.mock('@/presentation/console/adapter');
+jest.mock('@/presentation/console/input', () => ({
   handleUserInput: jest.fn()
 }));
-jest.mock('@/presentation/console/command-handlers', () => ({
+jest.mock('@/presentation/console/commander', () => ({
   createHandleInternalCommand: jest.fn().mockReturnValue(jest.fn())
 }));
 

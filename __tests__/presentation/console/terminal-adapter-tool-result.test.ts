@@ -1,8 +1,8 @@
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
+import { TerminalAdapter } from '@/presentation/console/adapter';
 import { OutputEvent } from '@/core/agent/adapter';
 
 // Mock the styled functions
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {
     toolCall: jest.fn().mockReturnValue('tool call output'),
     toolResult: jest.fn().mockReturnValue('tool result output'),
@@ -166,7 +166,7 @@ describe('TerminalAdapter - handleToolResult Branch Coverage', () => {
         specialKeyword: { keyword: '干活' }
       }
     }));
-    jest.doMock('@/presentation/styling/output-styler', () => ({
+    jest.doMock('@/presentation/styling/styler', () => ({
       styled: {
         toolCall: jest.fn().mockReturnValue('tool call output'),
         toolResult: jest.fn().mockReturnValue('tool result output'),
@@ -179,7 +179,7 @@ describe('TerminalAdapter - handleToolResult Branch Coverage', () => {
         })
       }
     }));
-    const { TerminalAdapter: VerboseAdapter } = require('@/presentation/console/terminal-adapter');
+    const { TerminalAdapter: VerboseAdapter } = require('@/presentation/console/adapter');
     const verboseAdapter = new VerboseAdapter();
     const verboseConsoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     

@@ -41,7 +41,7 @@ describe('createModel', () => {
   test('creates ChatOpenAI for gpt-4o (default)', () => {
     process.env.AIBO_API_KEY = 'sk-test';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     const model = createModel();
@@ -53,7 +53,7 @@ describe('createModel', () => {
   test('creates ChatAnthropic for claude- prefix', () => {
     process.env.AIBO_API_KEY = 'sk-ant-test';
     process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatAnthropic } = require('@langchain/anthropic');
 
     const model = createModel();
@@ -67,7 +67,7 @@ describe('createModel', () => {
   test('creates ChatGoogleGenerativeAI for gemini- prefix', () => {
     process.env.AIBO_API_KEY = 'AIzaSy-test';
     process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 
     const model = createModel();
@@ -81,7 +81,7 @@ describe('createModel', () => {
   test('creates ChatMistralAI for mistral- prefix', () => {
     process.env.AIBO_API_KEY = 'mistral-test';
     process.env.AIBO_MODEL_NAME = 'mistral-large-latest';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatMistralAI } = require('@langchain/mistralai');
 
     const model = createModel();
@@ -94,7 +94,7 @@ describe('createModel', () => {
 
   test('creates ChatMistralAI for mixtral- prefix', () => {
     process.env.AIBO_MODEL_NAME = 'mixtral-8x7b-instruct';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatMistralAI } = require('@langchain/mistralai');
 
     createModel();
@@ -104,7 +104,7 @@ describe('createModel', () => {
 
   test('creates ChatMistralAI for codestral- prefix', () => {
     process.env.AIBO_MODEL_NAME = 'codestral-latest';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatMistralAI } = require('@langchain/mistralai');
 
     createModel();
@@ -118,7 +118,7 @@ describe('createModel', () => {
     process.env.AIBO_API_KEY = 'gsk-test';
     process.env.AIBO_MODEL_NAME = 'llama-3.3-70b-versatile';
     process.env.AIBO_MODEL_PROVIDER = 'groq';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatGroq } = require('@langchain/groq');
 
     const model = createModel();
@@ -132,7 +132,7 @@ describe('createModel', () => {
   test('creates ChatOllama when AIBO_MODEL_PROVIDER=ollama (default baseUrl)', () => {
     process.env.AIBO_MODEL_NAME = 'llama3';
     process.env.AIBO_MODEL_PROVIDER = 'ollama';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOllama } = require('@langchain/ollama');
 
     const model = createModel();
@@ -147,7 +147,7 @@ describe('createModel', () => {
     process.env.AIBO_MODEL_NAME = 'llama3';
     process.env.AIBO_MODEL_PROVIDER = 'ollama';
     process.env.AIBO_BASE_URL = 'http://myserver:11434';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOllama } = require('@langchain/ollama');
 
     createModel();
@@ -161,7 +161,7 @@ describe('createModel', () => {
     process.env.AIBO_MODEL_NAME = 'my-deployment';
     process.env.AIBO_MODEL_PROVIDER = 'azure';
     process.env.AIBO_AZURE_API_VERSION = '2024-05-01-preview';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { AzureChatOpenAI } = require('@langchain/openai');
 
     const model = createModel();
@@ -181,7 +181,7 @@ describe('createModel', () => {
     process.env.AIBO_API_KEY = 'gsk-test';
     process.env.AIBO_MODEL_NAME = 'mistral-saba-v1';
     process.env.AIBO_MODEL_PROVIDER = 'groq';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatGroq } = require('@langchain/groq');
 
     createModel();
@@ -194,7 +194,7 @@ describe('createModel', () => {
   test('passes AIBO_API_KEY to ChatOpenAI', () => {
     process.env.AIBO_API_KEY = 'sk-unified-key';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
@@ -205,7 +205,7 @@ describe('createModel', () => {
   test('passes AIBO_BASE_URL as configuration.baseURL to ChatOpenAI', () => {
     process.env.AIBO_BASE_URL = 'https://custom-endpoint.example.com/v1';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
@@ -217,7 +217,7 @@ describe('createModel', () => {
 
   test('no configuration.baseURL when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
@@ -231,7 +231,7 @@ describe('createModel', () => {
   test('AIBO_OPENAI_API_KEY works as fallback when AIBO_API_KEY is not set', () => {
     process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
@@ -242,7 +242,7 @@ describe('createModel', () => {
   test('AIBO_OPENAI_BASE_URL works as fallback when AIBO_BASE_URL is not set', () => {
     process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();
@@ -256,7 +256,7 @@ describe('createModel', () => {
     process.env.AIBO_API_KEY = 'sk-new-key';
     process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
-    const { createModel } = require('@/core/agent/model-factory');
+    const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
 
     createModel();

@@ -1,4 +1,4 @@
-import { formatToolCallArgs, getToolCallTitle } from '@/presentation/lark/tool-call-formatter';
+import { formatToolCallArgs, getToolCallTitle } from '@/presentation/lark/call-formatter';
 
 describe('Tool Call Formatter Comprehensive Tests', () => {
   // Test formatTaskToolCall function

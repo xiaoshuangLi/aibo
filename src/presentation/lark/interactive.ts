@@ -6,17 +6,17 @@
  * 负责初始化Lark适配器并启动交互循环。
  * 通过 Session 对象进行所有 I/O 操作，保持原有的事件驱动架构。
  * 
- * @module lark-interactive-mode
+ * @module interactive
  */
 
-import { LarkAdapter } from '@/presentation/lark/adapter';
-import { LarkChatService } from '@/presentation/lark/chat-service';
-import { Session } from '@/core/agent/session';
-import { createAIAgent } from '@/core/agent/factory';
+import { LarkAdapter } from './adapter';
+import { LarkChatService } from './chat';
+import { Session } from '@/core/agent';
+import { createAIAgent } from '@/core/agent';
 import { config } from '@/core/config';
-import { processStreamChunks } from '@/core/utils/stream-handler';
-import { createHandleInternalCommand } from '@/presentation/lark/command-handlers';
-import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
+import { processStreamChunks } from '@/core/utils';
+import { createHandleInternalCommand } from './commander';
+import { LspClientManager } from '@/infrastructure/code-analysis';
 
 // 全局会话和代理实例
 let currentSession: Session | null = null;

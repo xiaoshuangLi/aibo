@@ -1,11 +1,11 @@
 import { config } from '@/core/config';
-import { styled } from '@/presentation/styling/output-styler';
-import { createConsoleThreadId } from '@/core/utils/interactive-logic';
-import { SessionManager } from '@/infrastructure/session/manager';
-import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
-import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
-import { handleUserInput } from '@/presentation/console/user-input-handler';
-import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
+import { styled } from '@/presentation/styling';
+import { createConsoleThreadId } from '@/core/utils';
+import { SessionManager } from '@/infrastructure/session';
+import { getAllKnowledge, addKnowledge } from '@/shared/utils';
+import { createVoiceRecognition } from '@/features/voice-input';
+import { handleUserInput } from './input';
+import { LspClientManager } from '@/infrastructure/code-analysis';
 
 /**
  * Command Handlers module that provides internal command processing functionality.
@@ -14,7 +14,7 @@ import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
  * such as /help, /clear, /pwd, /ls, /verbose, /new, /voice, and /exit commands.
  * Each command has its own dedicated handler function with proper error handling.
  * 
- * @module command-handlers
+ * @module commander
  */
 
 // ==================== 内部命令处理器辅助函数 ====================

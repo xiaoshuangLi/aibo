@@ -1,4 +1,4 @@
-import { styled } from '@/presentation/styling/output-styler';
+import { styled } from '@/presentation/styling/styler';
 
 describe('Output Styler - Branch Coverage', () => {
   describe('toolResult - task result failure', () => {

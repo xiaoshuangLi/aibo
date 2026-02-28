@@ -7,7 +7,7 @@ jest.mock('fs');
 jest.mock('path');
 
 // Mock createConsoleThreadId function
-jest.mock('@/core/utils/interactive-logic', () => ({
+jest.mock('@/core/utils/interactive', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('session-1234567890')
 }));
 

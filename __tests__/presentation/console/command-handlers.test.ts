@@ -6,9 +6,9 @@ import {
   handleUnknownCommand,
   handleExitCommand,
   createHandleInternalCommand,
-} from '@/presentation/console/command-handlers';
+} from '@/presentation/console/commander';
 import * as library from '@/shared/utils/library';
-import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
+import { LspClientManager } from '@/infrastructure/code-analysis/client';
 
 // Mock dependencies
 jest.mock('@/core/config', () => ({
@@ -18,14 +18,14 @@ jest.mock('@/core/config', () => ({
   },
 }));
 
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {
     system: (msg: string) => msg,
     error: (msg: string) => msg,
   },
 }));
 
-jest.mock('@/core/utils/interactive-logic', () => ({
+jest.mock('@/core/utils/interactive', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('test-thread-id'),
 }));
 
@@ -43,19 +43,19 @@ jest.mock('@/shared/utils/library', () => ({
   addKnowledge: jest.fn(),
 }));
 
-jest.mock('@/infrastructure/code-analysis/lsp-client', () => ({
+jest.mock('@/infrastructure/code-analysis/client', () => ({
   LspClientManager: {
     shutdownAll: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
-jest.mock('@/features/voice-input/voice-recognition', () => ({
+jest.mock('@/features/voice-input/recognition', () => ({
   createVoiceRecognition: jest.fn().mockReturnValue({
     canRecord: jest.fn().mockReturnValue(false),
   }),
 }));
 
-jest.mock('@/presentation/console/user-input-handler', () => ({
+jest.mock('@/presentation/console/input', () => ({
   handleUserInput: jest.fn(),
 }));
 

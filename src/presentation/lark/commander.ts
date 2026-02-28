@@ -1,10 +1,10 @@
 import { config } from '@/core/config';
-import { styled } from '@/presentation/styling/output-styler';
-import { SessionManager } from '@/infrastructure/session/manager';
+import { styled } from '@/presentation/styling';
+import { SessionManager } from '@/infrastructure/session';
 import { executeBashTool } from '@/tools/bash';
-import { getRestartCommand } from '@/shared/utils/restart-helper';
-import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
-import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
+import { getRestartCommand } from '@/shared/utils';
+import { getAllKnowledge, addKnowledge } from '@/shared/utils';
+import { LspClientManager } from '@/infrastructure/code-analysis';
 
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
@@ -13,7 +13,7 @@ import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
  * such as /help, /verbose, /new, /abort and /exit commands.
  * Each command has its own dedicated handler function with proper error handling.
  * 
- * @module lark-command-handlers
+ * @module commander
  */
 
 // ==================== 内部命令处理器辅助函数 ====================
@@ -578,7 +578,7 @@ export async function handleUnknownCommand(command: string): Promise<boolean> {
 export async function handleShowFilesCommand(session: any): Promise<boolean> {
   try {
     // 动态导入 FileDiffVisualizer
-    const { FileDiffVisualizer } = await import('./file-diff-visualizer');
+    const { FileDiffVisualizer } = await import('./diff');
     const visualizer = new FileDiffVisualizer(process.cwd());
     
     const result = await visualizer.getChangedFiles();
@@ -645,7 +645,7 @@ ${result.files.map((file: { path: string; emoji: string; status: string }) =>
  */
 export async function handleShowDiffCommand(session: any): Promise<boolean> {
   try {
-    const { FileDiffVisualizer } = await import('./file-diff-visualizer');
+    const { FileDiffVisualizer } = await import('./diff');
     const visualizer = new FileDiffVisualizer(process.cwd());
     
     const result = await visualizer.getAllFilesDiff();
@@ -819,7 +819,7 @@ export async function handleShowDiffCommand(session: any): Promise<boolean> {
  */
 export async function handleDiffCommand(session: any, filePath: string): Promise<boolean> {
   try {
-    const { FileDiffVisualizer } = await import('./file-diff-visualizer');
+    const { FileDiffVisualizer } = await import('./diff');
     const visualizer = new FileDiffVisualizer(process.cwd());
     
     const result = await visualizer.getFileDiff(filePath);
@@ -889,7 +889,7 @@ export async function handleDiffCommand(session: any, filePath: string): Promise
  */
 export async function handleRevertCommand(session: any, filePath: string): Promise<boolean> {
   try {
-    const { FileDiffVisualizer } = await import('./file-diff-visualizer');
+    const { FileDiffVisualizer } = await import('./diff');
     const visualizer = new FileDiffVisualizer(process.cwd());
     
     const result = await visualizer.revertFile(filePath);
@@ -939,7 +939,7 @@ export async function handleRevertCommand(session: any, filePath: string): Promi
  */
 export async function handleStageCommand(session: any, filePath: string): Promise<boolean> {
   try {
-    const { FileDiffVisualizer } = await import('./file-diff-visualizer');
+    const { FileDiffVisualizer } = await import('./diff');
     const visualizer = new FileDiffVisualizer(process.cwd());
     
     const result = await visualizer.stageFile(filePath);

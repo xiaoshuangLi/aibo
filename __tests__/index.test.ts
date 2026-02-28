@@ -16,14 +16,14 @@ jest.mock('deepagents', () => ({
 }));
 
 // Mock createVoiceRecognition
-jest.mock('../src/features/voice-input/voice-recognition', () => ({
+jest.mock('../src/features/voice-input/recognition', () => ({
   createVoiceRecognition: jest.fn(),
 }));
 
 import { config } from '@/core/config';
-import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
+import { createVoiceRecognition } from '@/features/voice-input/recognition';
 import { Session } from '@/core/agent/session';
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
+import { TerminalAdapter } from '@/presentation/console/adapter';
 
 // Mock process.exit to prevent Jest from crashing
 const originalProcessExit = process.exit;
@@ -138,7 +138,7 @@ jest.mock('readline', () => ({
 }));
 
 // Mock UserInputHandler functions
-jest.mock('../src/presentation/console/user-input-handler', () => ({
+jest.mock('../src/presentation/console/input', () => ({
   handleUserInput: jest.fn(),
 }));
 
@@ -323,7 +323,7 @@ describe('index module comprehensive tests', () => {
         recognizeSpeech: jest.fn().mockResolvedValue('Hello world'),
       }));
       
-      const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
+      const handleUserInputMock = require('../src/presentation/console/input').handleUserInput as jest.Mock;
       handleUserInputMock.mockResolvedValue(undefined);
       
       const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
@@ -345,7 +345,7 @@ describe('index module comprehensive tests', () => {
       
       expect(result).toBe(true);
       // Should not call handleUserInput when canRecord returns false
-      expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
+      expect(require('../src/presentation/console/input').handleUserInput).not.toHaveBeenCalled();
     });
 
     test('handles /voice command when no speech is recognized', async () => {
@@ -360,7 +360,7 @@ describe('index module comprehensive tests', () => {
       
       expect(result).toBe(true);
       // Should not call handleUserInput when recognizeSpeech returns null
-      expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
+      expect(require('../src/presentation/console/input').handleUserInput).not.toHaveBeenCalled();
     });
 
     test('handles /voice command with speech recognition error', async () => {
@@ -375,7 +375,7 @@ describe('index module comprehensive tests', () => {
       
       expect(result).toBe(true);
       // Should not call handleUserInput when recognizeSpeech throws error
-      expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
+      expect(require('../src/presentation/console/input').handleUserInput).not.toHaveBeenCalled();
     });
 
     test('handles exit commands', async () => {
@@ -584,7 +584,7 @@ describe('index module - simple coverage tests', () => {
       await lineHandler('/help');
     }
     
-    expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
+    expect(require('../src/presentation/console/input').handleUserInput).not.toHaveBeenCalled();
   });
 
   test('startInteractiveMode covers line event - normal input', async () => {
@@ -598,7 +598,7 @@ describe('index module - simple coverage tests', () => {
       await lineHandler('hello world');
     }
     
-    expect(require('../src/presentation/console/user-input-handler').handleUserInput).toHaveBeenCalled();
+    expect(require('../src/presentation/console/input').handleUserInput).toHaveBeenCalled();
   });
 
   test('startInteractiveMode covers line event - empty input', async () => {
@@ -616,7 +616,7 @@ describe('index module - simple coverage tests', () => {
     }
     
     // handleUserInput should not be called for empty input
-    expect(require('../src/presentation/console/user-input-handler').handleUserInput).not.toHaveBeenCalled();
+    expect(require('../src/presentation/console/input').handleUserInput).not.toHaveBeenCalled();
   });
 
   // test('main function error handling coverage', async () => {
@@ -757,7 +757,7 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
+    const handleUserInputMock = require('../src/presentation/console/input').handleUserInput as jest.Mock;
     handleUserInputMock.mockClear();
     
     // First start recording
@@ -766,7 +766,7 @@ describe('voice input shortcuts', () => {
     
     // Then stop recording
     const onVoiceInputComplete = (text: string) => mockRl.write(text);
-    const onExecuteCommand = (command: string) => require('../src/presentation/console/user-input-handler').handleUserInput(command, mockSession, mockAgent);
+    const onExecuteCommand = (command: string) => require('../src/presentation/console/input').handleUserInput(command, mockSession, mockAgent);
     await index.stopRecord(mockSession, '', onVoiceInputComplete, onExecuteCommand);
     
     // Verify voice recording stopped and processed with handleUserInput
@@ -790,7 +790,7 @@ describe('voice input shortcuts', () => {
     };
     (createVoiceRecognition as jest.Mock).mockReturnValue(mockTencentASR);
     
-    const handleUserInputMock = require('../src/presentation/console/user-input-handler').handleUserInput as jest.Mock;
+    const handleUserInputMock = require('../src/presentation/console/input').handleUserInput as jest.Mock;
     handleUserInputMock.mockClear();
     mockRl.write.mockClear();
     
@@ -800,7 +800,7 @@ describe('voice input shortcuts', () => {
     
     // Then stop recording
     const onVoiceInputComplete = (text: string) => mockRl.write(text);
-    const onExecuteCommand = (command: string) => require('../src/presentation/console/user-input-handler').handleUserInput(command, mockSession, mockAgent);
+    const onExecuteCommand = (command: string) => require('../src/presentation/console/input').handleUserInput(command, mockSession, mockAgent);
     await index.stopRecord(mockSession, 'Hello world', onVoiceInputComplete, onExecuteCommand);
     
     // Verify voice recording stopped and written to readline
@@ -829,7 +829,7 @@ describe('voice input shortcuts', () => {
     
     // Then stop recording
     const onVoiceInputComplete = (text: string) => mockRl.write(text);
-    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/input").handleUserInput(command, mockSession, mockAgent);
     await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and no input was processed
@@ -854,7 +854,7 @@ describe('voice input shortcuts', () => {
     
     // Then stop recording
     const onVoiceInputComplete = (text: string) => mockRl.write(text);
-    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/input").handleUserInput(command, mockSession, mockAgent);
     await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and no input was processed
@@ -879,7 +879,7 @@ describe('voice input shortcuts', () => {
     
     // Then stop recording
     const onVoiceInputComplete = (text: string) => mockRl.write(text);
-    const onExecuteCommand = (command: string) => require("../src/presentation/console/user-input-handler").handleUserInput(command, mockSession, mockAgent);
+    const onExecuteCommand = (command: string) => require("../src/presentation/console/input").handleUserInput(command, mockSession, mockAgent);
     await index.stopRecord(mockSession, "", onVoiceInputComplete, onExecuteCommand);
     
     // Verify recording was stopped and error was shown

@@ -1,4 +1,4 @@
-import { TencentWSA, createTencentWSA } from '../../../src/infrastructure/tencent-cloud/wsa-service';
+import { TencentWSA, createTencentWSA } from '../../../src/infrastructure/tencent-cloud/wsa';
 
 // Mock the tencent SDK to avoid real API calls
 jest.mock('tencentcloud-sdk-nodejs/tencentcloud/services/wsa/v20250508/wsa_client', () => ({

@@ -6,7 +6,7 @@
  * 为 LARK 飞书适配器提供工具结果的智能格式化功能，
  * 根据不同的工具类型提供针对性的展示格式。
  * 
- * @module tool-result-formatter
+ * @module result-formatter
  */
 
 import { inferLanguageType, isErrorContent } from './shared';

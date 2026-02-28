@@ -1,5 +1,5 @@
-import { createVoiceRecognition, VoiceRecognition } from '@/features/voice-input/voice-recognition';
-import { Session } from '@/core/agent/session';
+import { createVoiceRecognition, VoiceRecognition } from './recognition';
+import { Session } from '@/core/agent';
 import { config } from '@/core/config';
 
 // Keyboard event handler state

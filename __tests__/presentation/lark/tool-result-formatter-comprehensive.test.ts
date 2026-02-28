@@ -5,7 +5,7 @@ import {
   formatWebFetchResult,
   formatThinkResult,
   formatTaskManagementResult
-} from '@/presentation/lark/tool-result-formatter';
+} from '@/presentation/lark/result-formatter';
 
 describe('Tool Result Formatter - Comprehensive Tests', () => {
   

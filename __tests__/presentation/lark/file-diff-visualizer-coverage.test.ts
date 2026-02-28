@@ -2,7 +2,7 @@
  * Coverage gap tests for FileDiffVisualizer
  * Targets the specific missing branches identified in coverage analysis
  */
-import { FileDiffVisualizer } from '@/presentation/lark/file-diff-visualizer';
+import { FileDiffVisualizer } from '@/presentation/lark/diff';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
 

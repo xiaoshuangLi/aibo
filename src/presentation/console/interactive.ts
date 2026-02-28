@@ -1,12 +1,12 @@
 import readline from 'readline';
 import { config } from '@/core/config';
-import { createAIAgent } from '@/core/agent/factory';
-import { createHandleInternalCommand } from '@/presentation/console/command-handlers';
-import { createKeypressHandler } from '@/features/voice-input/manager';
-import { handleUserInput } from '@/presentation/console/user-input-handler';
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
-import { Session } from '@/core/agent/session';
-import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { createAIAgent } from '@/core/agent';
+import { createHandleInternalCommand } from './commander';
+import { createKeypressHandler } from '@/features/voice-input';
+import { handleUserInput } from './input';
+import { TerminalAdapter } from './adapter';
+import { Session } from '@/core/agent';
+import { createConsoleThreadId } from '@/core/utils';
 
 /**
  * Interactive Mode module that orchestrates the main interactive conversation interface.
@@ -15,7 +15,7 @@ import { createConsoleThreadId } from '@/core/utils/interactive-logic';
  * command processing, voice input integration, and session management. It coordinates
  * between various subsystems to provide a seamless interactive experience.
  * 
- * @module interactive-mode
+ * @module interactive
  */
 
 /**

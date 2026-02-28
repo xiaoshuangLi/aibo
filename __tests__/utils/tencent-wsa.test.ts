@@ -1,4 +1,4 @@
-import { TencentWSA, createTencentWSA } from '@/infrastructure/tencent-cloud/wsa-service';
+import { TencentWSA, createTencentWSA } from '@/infrastructure/tencent-cloud/wsa';
 
 describe('Tencent WSA', () => {
   it('should throw error when config is missing', () => {

@@ -5,7 +5,7 @@
  * 
  * 提供各种类型的控制台输出格式化函数，用于不同场景的用户界面显示。
  * 
- * @module output-styler
+ * @module styler
  */
 
 import { config } from '@/core/config';

@@ -1,16 +1,16 @@
 import { config } from '@/core/config';
 import { MemorySaver } from "@langchain/langgraph";
-import { createModel } from '@/core/agent/model-factory';
+import { createModel } from './model';
 import { createDeepAgent } from 'deepagents';
-import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/filesystem-checkpointer';
-import getTools from '@/tools/index';
-import { SYSTEM_PROMPT } from '@/shared/constants/system-prompts';
-import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/loader';
-import { findSkillsDirectories } from '@/core/utils/find-skills-directories';
-import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-backend';
+import { FilesystemCheckpointer } from '@/infrastructure/checkpoint';
+import getTools from '@/tools';
+import { SYSTEM_PROMPT } from '@/shared/constants';
+import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents';
+import { findSkillsDirectories } from '@/core/utils';
+import { SafeFilesystemBackend } from '@/infrastructure/filesystem';
 import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/utils';
-import { Session } from '@/core/agent/session';
-import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-template';
+import { Session } from './session';
+import { SubAgentPromptTemplate } from '@/infrastructure/prompt';
 
 /**
  * AI Agent Factory module that provides DeepAgents integration with LangChain.

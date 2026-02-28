@@ -6,7 +6,7 @@
  * 为 LARK 飞书适配器提供工具调用参数的智能格式化功能，
  * 根据不同的工具类型和参数结构提供针对性的展示格式。
  * 
- * @module tool-call-formatter
+ * @module call-formatter
  */
 
 import { 

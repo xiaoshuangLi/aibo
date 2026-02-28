@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { createConsoleThreadId } from '@/core/utils';
 
 /**
  * 知识项接口定义

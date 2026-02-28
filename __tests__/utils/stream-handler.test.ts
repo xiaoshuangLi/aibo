@@ -6,11 +6,11 @@ import {
   handleTodos, 
   processStreamChunks,
   StreamState 
-} from '@/core/utils/stream-handler';
+} from '@/core/utils/stream';
 import { HumanMessage } from "langchain";
 
 // Mock dependencies (stream-handler no longer uses styled directly)
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {}
 }));
 

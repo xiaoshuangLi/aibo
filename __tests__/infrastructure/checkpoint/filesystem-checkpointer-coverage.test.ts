@@ -1,4 +1,4 @@
-import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/filesystem-checkpointer';
+import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/checkpointer';
 import * as fs from 'fs';
 import * as path from 'path';
 

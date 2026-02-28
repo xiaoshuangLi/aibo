@@ -1,6 +1,6 @@
 import { config } from '@/core/config';
 import { SessionManager } from '@/infrastructure/session/manager';
-import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
+import { LspClientManager } from '@/infrastructure/code-analysis/client';
 import {
   handleHelpCommand,
   handleVerboseCommand,
@@ -16,7 +16,7 @@ import {
   handleRevertCommand,
   handleStageCommand,
   createHandleInternalCommand
-} from '@/presentation/lark/command-handlers';
+} from '@/presentation/lark/commander';
 
 // Mock console.log to prevent actual output during tests
 const originalConsoleLog = console.log;
@@ -29,7 +29,7 @@ const mockProcessExit = jest.fn();
 process.exit = mockProcessExit as any;
 
 // Mock styled system
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {
     system: jest.fn((msg) => msg),
     error: jest.fn((msg) => msg)
@@ -72,17 +72,17 @@ const mockFileDiffVisualizerInstance = {
 };
 
 // Mock the dynamic import for file-diff-visualizer
-jest.mock('@/presentation/lark/file-diff-visualizer', () => ({
+jest.mock('@/presentation/lark/diff', () => ({
   FileDiffVisualizer: jest.fn().mockImplementation(() => mockFileDiffVisualizerInstance)
 }));
 
 // Also mock the relative import used in command-handlers.ts
-jest.mock('./file-diff-visualizer', () => ({
+jest.mock('./diff', () => ({
   FileDiffVisualizer: jest.fn().mockImplementation(() => mockFileDiffVisualizerInstance)
 }), { virtual: true });
 
 // Mock getRestartCommand
-jest.mock('@/shared/utils/restart-helper', () => ({
+jest.mock('@/shared/utils/restart', () => ({
   getRestartCommand: jest.fn()
 }));
 
@@ -100,7 +100,7 @@ jest.mock('child_process', () => ({
 }));
 
 // Mock LspClientManager
-jest.mock('@/infrastructure/code-analysis/lsp-client', () => ({
+jest.mock('@/infrastructure/code-analysis/client', () => ({
   LspClientManager: {
     shutdownAll: jest.fn().mockResolvedValue(undefined),
   }
@@ -375,7 +375,7 @@ describe('Lark Command Handlers', () => {
     };
     
     // Mock the getRestartCommand
-    const originalGetRestartCommand = require('@/shared/utils/restart-helper').getRestartCommand;
+    const originalGetRestartCommand = require('@/shared/utils/restart').getRestartCommand;
     const mockGetRestartCommand = jest.fn();
     
     // Mock spawn
@@ -390,7 +390,7 @@ describe('Lark Command Handlers', () => {
         executeBashTool: mockExecuteBashTool
       }));
       
-      jest.mock('@/shared/utils/restart-helper', () => ({
+      jest.mock('@/shared/utils/restart', () => ({
         getRestartCommand: mockGetRestartCommand
       }));
       
@@ -411,7 +411,7 @@ describe('Lark Command Handlers', () => {
       );
       
       // Mock restart command
-      (require('@/shared/utils/restart-helper').getRestartCommand as jest.Mock).mockReturnValue({
+      (require('@/shared/utils/restart').getRestartCommand as jest.Mock).mockReturnValue({
         restartCommand: 'node',
         restartArgs: ['dist/index.js']
       });

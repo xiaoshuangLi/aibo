@@ -46,7 +46,7 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
 }));
 
 // Mock styled
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {
     assistant: jest.fn((text) => `Assistant: ${text}`),
     system: jest.fn((msg) => msg),

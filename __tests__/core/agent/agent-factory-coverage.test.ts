@@ -32,13 +32,13 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       ])
     }));
 
-    jest.doMock('@/core/utils/langchain-tool-retry-middleware', () => ({
+    jest.doMock('@/core/utils/retry', () => ({
       createLangChainToolRetryMiddleware: jest.fn().mockReturnValue({
         name: 'test-middleware', wrapToolCall: jest.fn()
       })
     }));
 
-    jest.doMock('@/core/utils/session-output-capture-middleware', () => ({
+    jest.doMock('@/core/utils/capture', () => ({
       createSessionOutputCaptureMiddleware: jest.fn().mockReturnValue({
         name: 'capture-middleware', wrapToolCall: jest.fn()
       })
@@ -49,7 +49,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       getDefaultGeneralPurposeSubAgent: jest.fn().mockReturnValue({ name: 'general-purpose' })
     }));
 
-    jest.doMock('@/core/utils/find-skills-directories', () => ({
+    jest.doMock('@/core/utils/skills', () => ({
       findSkillsDirectories: jest.fn().mockReturnValue([])
     }));
 
@@ -65,7 +65,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       MemorySaver: jest.fn().mockImplementation(() => ({}))
     }));
 
-    jest.doMock('@/infrastructure/checkpoint/filesystem-checkpointer', () => ({
+    jest.doMock('@/infrastructure/checkpoint/checkpointer', () => ({
       FilesystemCheckpointer: jest.fn().mockImplementation(() => ({}))
     }));
   };
@@ -78,7 +78,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
     setupMocks('filesystem');
     
     const { createAIAgent } = require('@/core/agent/factory');
-    const { FilesystemCheckpointer } = require('@/infrastructure/checkpoint/filesystem-checkpointer');
+    const { FilesystemCheckpointer } = require('@/infrastructure/checkpoint/checkpointer');
     
     await createAIAgent();
     
@@ -106,7 +106,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
     setupMocks('memory');
     
     const { createAIAgent } = require('@/core/agent/factory');
-    const { createSessionOutputCaptureMiddleware } = require('@/core/utils/session-output-capture-middleware');
+    const { createSessionOutputCaptureMiddleware } = require('@/core/utils/capture');
     
     const mockSession = {
       logToolCall: jest.fn(),

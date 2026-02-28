@@ -9,8 +9,8 @@
  * @module VoiceRecognition
  */
 
-import { AudioRecorder } from '@/infrastructure/audio/recorder';
-import { TencentAsrService, TencentAsrConfig } from '@/infrastructure/tencent-cloud/asr-service';
+import { AudioRecorder } from '@/infrastructure/audio';
+import { TencentAsrService, TencentAsrConfig } from '@/infrastructure/tencent-cloud';
 
 /**
  * 语音识别配置

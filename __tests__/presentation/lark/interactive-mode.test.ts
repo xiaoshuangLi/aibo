@@ -5,8 +5,8 @@ import {
   handleUserMessage,
   shouldExitInteractiveMode,
   isEmptyInput
-} from '@/presentation/lark/interactive-mode';
-import { createHandleInternalCommand } from '@/presentation/lark/command-handlers';
+} from '@/presentation/lark/interactive';
+import { createHandleInternalCommand } from '@/presentation/lark/commander';
 
 // Mock console methods
 const originalConsoleLog = console.log;
@@ -40,12 +40,12 @@ jest.mock('@/core/agent/factory', () => ({
 }));
 
 // Mock stream handler
-jest.mock('@/core/utils/stream-handler', () => ({
+jest.mock('@/core/utils/stream', () => ({
   processStreamChunks: jest.fn()
 }));
 
 // Mock command handlers
-jest.mock('@/presentation/lark/command-handlers', () => ({
+jest.mock('@/presentation/lark/commander', () => ({
   createHandleInternalCommand: jest.fn()
 }));
 
@@ -114,7 +114,7 @@ describe('Lark Interactive Mode', () => {
       );
       
       // Mock processStreamChunks
-      require('@/core/utils/stream-handler').processStreamChunks.mockResolvedValue(undefined);
+      require('@/core/utils/stream').processStreamChunks.mockResolvedValue(undefined);
     });
 
     it('should end session and return when exit command is detected', async () => {
@@ -152,7 +152,7 @@ describe('Lark Interactive Mode', () => {
           modelKwargs: { enable_thinking: true }
         })
       );
-      expect(require('@/core/utils/stream-handler').processStreamChunks).toHaveBeenCalled();
+      expect(require('@/core/utils/stream').processStreamChunks).toHaveBeenCalled();
     });
 
     // it('should handle errors during message processing', async () => {
@@ -161,8 +161,8 @@ describe('Lark Interactive Mode', () => {
     //   mockAgent.stream.mockRejectedValue(testError);
     //   
     //   // Mock processStreamChunks to throw the error
-    //   const originalProcessStreamChunks = require('@/core/utils/stream-handler').processStreamChunks;
-    //   jest.spyOn(require('@/core/utils/stream-handler'), 'processStreamChunks').mockRejectedValue(testError);
+    //   const originalProcessStreamChunks = require('@/core/utils/stream').processStreamChunks;
+    //   jest.spyOn(require('@/core/utils/stream'), 'processStreamChunks').mockRejectedValue(testError);
     //   
     //   // The function should handle the error internally and not throw
     //   await expect(handleUserMessage(testMessage, mockSession, mockAgent)).resolves.toBeUndefined();
@@ -186,7 +186,7 @@ describe('Lark Interactive Mode', () => {
       // Simulate the race condition: while processing, a concurrent new message
       // replaces session.abortController with its own controller
       const concurrentAbortController = new AbortController();
-      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+      require('@/core/utils/stream').processStreamChunks.mockImplementation(async () => {
         // Simulate concurrent new message replacing the abort controller
         mockSession.abortController = concurrentAbortController;
       });
@@ -199,7 +199,7 @@ describe('Lark Interactive Mode', () => {
 
     it('should not reset isRunning when controller was replaced by a concurrent new message', async () => {
       const concurrentAbortController = new AbortController();
-      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+      require('@/core/utils/stream').processStreamChunks.mockImplementation(async () => {
         // Simulate concurrent new message taking over the session
         mockSession.abortController = concurrentAbortController;
         mockSession.isRunning = true;

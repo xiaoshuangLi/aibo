@@ -4,7 +4,7 @@ import {
   formatDefaultToolCall,
   formatWebFetchToolCall,
   formatThinkToolCall
-} from '@/presentation/lark/tool-call-formatter';
+} from '@/presentation/lark/call-formatter';
 
 describe('Tool Call Formatter - Branch Coverage', () => {
   describe('formatFilesystemToolCall - uncovered branches', () => {

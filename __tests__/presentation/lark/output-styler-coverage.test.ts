@@ -1,4 +1,4 @@
-import { styled, createTemplateMessage } from '@/presentation/lark/output-styler';
+import { styled, createTemplateMessage } from '@/presentation/lark/styler';
 
 // Module-level mock with template ID set
 jest.mock('@/core/config', () => ({
@@ -20,7 +20,7 @@ describe('Lark Output Styler - Additional Coverage', () => {
           }
         }
       }));
-      const { createTemplateMessage: ctm } = require('@/presentation/lark/output-styler');
+      const { createTemplateMessage: ctm } = require('@/presentation/lark/styler');
       const result = ctm('My Title', 'My Content');
       expect(result).toBe('My Title\nMy Content');
     });
@@ -29,7 +29,7 @@ describe('Lark Output Styler - Additional Coverage', () => {
       jest.doMock('@/core/config', () => ({
         config: { lark: { interactiveTemplateId: '' } }
       }));
-      const { createTemplateMessage: ctm } = require('@/presentation/lark/output-styler');
+      const { createTemplateMessage: ctm } = require('@/presentation/lark/styler');
       const result = ctm('', 'Only Content');
       expect(result).toBe('Only Content');
     });

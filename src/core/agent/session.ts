@@ -9,9 +9,9 @@
  */
 
 import { Adapter } from './adapter';
-import { createConsoleThreadId } from '@/core/utils/interactive-logic';
+import { createConsoleThreadId } from '@/core/utils';
 import { config } from '@/core/config';
-import { SessionManager } from '@/infrastructure/session/manager';
+import { SessionManager } from '@/infrastructure/session';
 
 export interface SessionOptions {
   threadId?: string;

@@ -1,13 +1,13 @@
-import { handleUserInput } from '@/presentation/console/user-input-handler';
+import { handleUserInput } from '@/presentation/console/input';
 import { Session } from '@/core/agent/session';
 
 // Mock dependencies
-jest.mock('@/core/utils/interactive-logic', () => ({
+jest.mock('@/core/utils/interactive', () => ({
   shouldExitInteractiveMode: jest.fn(),
   isEmptyInput: jest.fn(),
 }));
 
-jest.mock('@/core/utils/stream-handler', () => ({
+jest.mock('@/core/utils/stream', () => ({
   processStreamChunks: jest.fn(),
 }));
 
@@ -29,9 +29,9 @@ describe('UserInputHandler - Comprehensive Tests', () => {
     };
     
     // Reset mocks
-    require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReset();
-    require('@/core/utils/interactive-logic').isEmptyInput.mockReset();
-    require('@/core/utils/stream-handler').processStreamChunks.mockReset();
+    require('@/core/utils/interactive').shouldExitInteractiveMode.mockReset();
+    require('@/core/utils/interactive').isEmptyInput.mockReset();
+    require('@/core/utils/stream').processStreamChunks.mockReset();
   });
 
   afterEach(() => {
@@ -40,7 +40,7 @@ describe('UserInputHandler - Comprehensive Tests', () => {
 
   describe('exit command handling', () => {
     it('should handle exit commands properly', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(true);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(true);
       
       await handleUserInput('exit', mockSession, mockAgent);
       
@@ -52,8 +52,8 @@ describe('UserInputHandler - Comprehensive Tests', () => {
 
   describe('empty input handling', () => {
     it('should handle empty inputs', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(true);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(true);
       
       await handleUserInput('', mockSession, mockAgent);
       
@@ -63,8 +63,8 @@ describe('UserInputHandler - Comprehensive Tests', () => {
     });
 
     it('should handle whitespace-only inputs', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(true);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(true);
       
       await handleUserInput('   ', mockSession, mockAgent);
       
@@ -74,12 +74,12 @@ describe('UserInputHandler - Comprehensive Tests', () => {
 
   describe('valid input processing', () => {
     it('should process valid user input correctly', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(false);
       
       const mockStream = {};
       mockAgent.stream.mockReturnValue(mockStream);
-      require('@/core/utils/stream-handler').processStreamChunks.mockResolvedValue('final response');
+      require('@/core/utils/stream').processStreamChunks.mockResolvedValue('final response');
       
       await handleUserInput('Hello, how are you?', mockSession, mockAgent);
       
@@ -93,7 +93,7 @@ describe('UserInputHandler - Comprehensive Tests', () => {
       );
       
       // Verify processStreamChunks was called
-      expect(require('@/core/utils/stream-handler').processStreamChunks).toHaveBeenCalledWith(
+      expect(require('@/core/utils/stream').processStreamChunks).toHaveBeenCalledWith(
         mockStream,
         expect.objectContaining({
           fullResponse: '',
@@ -111,8 +111,8 @@ describe('UserInputHandler - Comprehensive Tests', () => {
 
   describe('error handling', () => {
     it('should handle errors gracefully and reset state', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(false);
       
       mockAgent.stream.mockImplementation(() => {
         throw new Error('Stream error');
@@ -128,11 +128,11 @@ describe('UserInputHandler - Comprehensive Tests', () => {
 
   describe('session state management', () => {
     it('should manage session state correctly during execution', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(false);
       
       mockAgent.stream.mockResolvedValue({});
-      require('@/core/utils/stream-handler').processStreamChunks.mockResolvedValue('response');
+      require('@/core/utils/stream').processStreamChunks.mockResolvedValue('response');
       
       await handleUserInput('test', mockSession, mockAgent);
       
@@ -145,12 +145,12 @@ describe('UserInputHandler - Comprehensive Tests', () => {
     });
 
     it('should not overwrite abortController set by a concurrent new message', async () => {
-      require('@/core/utils/interactive-logic').shouldExitInteractiveMode.mockReturnValue(false);
-      require('@/core/utils/interactive-logic').isEmptyInput.mockReturnValue(false);
+      require('@/core/utils/interactive').shouldExitInteractiveMode.mockReturnValue(false);
+      require('@/core/utils/interactive').isEmptyInput.mockReturnValue(false);
 
       const concurrentAbortController = new AbortController();
       // Simulate the race condition: a concurrent new message replaces the controller mid-processing
-      require('@/core/utils/stream-handler').processStreamChunks.mockImplementation(async () => {
+      require('@/core/utils/stream').processStreamChunks.mockImplementation(async () => {
         mockSession.abortController = concurrentAbortController;
       });
 

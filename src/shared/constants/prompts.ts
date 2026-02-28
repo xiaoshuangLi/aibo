@@ -5,7 +5,7 @@ import { config } from '@/core/config';
  * Enhanced system prompt constants for AIBO autonomous programming AI
  * Contains both English and Chinese versions as separate constants.
  * 
- * @file system-prompts.ts
+ * @file prompts.ts
  * @author AIBO Team
  * @description Constants for system prompts used by the AI assistant
  */

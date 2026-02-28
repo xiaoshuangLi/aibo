@@ -7,7 +7,7 @@ import {
 
 import { 
   formatToolCallArgs
-} from '@/presentation/lark/tool-call-formatter';
+} from '@/presentation/lark/call-formatter';
 
 describe('Tool Call Formatter', () => {
   describe('escapeLarkIndentation', () => {

@@ -1,4 +1,4 @@
-import { createLangChainToolRetryMiddleware, createCustomLangChainToolRetryMiddleware, enhancedErrorHandler } from '@/core/utils/langchain-tool-retry-middleware';
+import { createLangChainToolRetryMiddleware, createCustomLangChainToolRetryMiddleware, enhancedErrorHandler } from '@/core/utils/retry';
 
 describe('LangChainToolRetryMiddleware - Coverage Tests', () => {
   it('should create middleware successfully with default configuration', () => {

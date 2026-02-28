@@ -28,7 +28,7 @@ import { ChatOllama } from '@langchain/ollama';
  * - ollama    : llama3, qwen2, mistral            (set AIBO_MODEL_PROVIDER=ollama)
  * - azure     : your-deployment-name              (set AIBO_MODEL_PROVIDER=azure)
  *
- * @module model-factory
+ * @module model
  */
 
 /** Detect provider from model name prefix when no explicit provider is set. */

@@ -5,7 +5,7 @@
  * 
  * 负责从流数据块中提取消息和待办事项，支持多种数据格式。
  * 
- * @module message-processor
+ * @module messages
  */
 
 /**

@@ -7,7 +7,7 @@ import {
   notice,
   warning,
   logError,
-} from '../../../src/infrastructure/code-analysis/lsp-logging';
+} from '../../../src/infrastructure/code-analysis/logging';
 
 describe('lsp-logging', () => {
   let consoleSpy: jest.SpyInstance;

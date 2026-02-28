@@ -1,4 +1,4 @@
-import { extractMessagesAndTodos } from '@/core/utils/message-processor';
+import { extractMessagesAndTodos } from '@/core/utils/messages';
 
 describe('Message Processor', () => {
   describe('extractMessagesAndTodos', () => {

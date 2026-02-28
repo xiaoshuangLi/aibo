@@ -2,7 +2,7 @@ import {
   shouldExitInteractiveMode, 
   isEmptyInput, 
   formatAgentResponse 
-} from '@/core/utils/interactive-logic';
+} from '@/core/utils/interactive';
 
 describe('Interactive Logic Utils', () => {
   describe('shouldExitInteractiveMode', () => {

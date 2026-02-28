@@ -36,7 +36,7 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
   LoggerLevel: { info: 'info' }
 }));
 
-jest.mock('@/presentation/lark/output-styler', () => ({
+jest.mock('@/presentation/lark/styler', () => ({
   styled: {
     assistant: jest.fn((text) => `Assistant: ${text}`),
     system: jest.fn((msg) => msg),

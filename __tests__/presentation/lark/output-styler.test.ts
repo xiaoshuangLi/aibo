@@ -1,4 +1,4 @@
-import { styled } from '@/presentation/lark/output-styler';
+import { styled } from '@/presentation/lark/styler';
 
 // Mock config
 jest.mock('@/core/config', () => ({

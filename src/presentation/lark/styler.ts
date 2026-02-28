@@ -15,7 +15,7 @@
  */
 
 import { config } from '@/core/config';
-import { OutputStyler } from '@/presentation/styling/output-styler';
+import { OutputStyler } from '@/presentation/styling';
 import { 
   processLarkText,
   isJsonContent,
@@ -25,11 +25,11 @@ import {
 import { 
   formatToolResultByType,
   formatStructuredResult
-} from './tool-result-formatter';
+} from './result-formatter';
 import { 
   getToolCallTitle,
   formatToolCallArgs
-} from './tool-call-formatter';
+} from './call-formatter';
 
 /**
  * 创建飞书模板消息

@@ -5,12 +5,12 @@
  * 
  * 负责处理AI代理的流式响应，包括工具调用、工具结果、AI内容和待办事项的处理。
  * 
- * @module stream-handler
+ * @module stream
  */
 
 import { HumanMessage } from "langchain";
-import { structuredLog } from '@/shared/utils/logging';
-import { extractMessagesAndTodos, MessagesAndTodos } from '@/core/utils/message-processor';
+import { structuredLog } from '@/shared/utils';
+import { extractMessagesAndTodos, MessagesAndTodos } from './messages';
 
 /**
  * 流状态接口

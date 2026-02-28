@@ -8,7 +8,7 @@ import {
   getToolType, 
   formatToolResultByType,
   formatStructuredResult
-} from '@/presentation/lark/tool-result-formatter';
+} from '@/presentation/lark/result-formatter';
 
 describe('Tool Result Formatter', () => {
 

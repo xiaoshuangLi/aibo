@@ -6,12 +6,12 @@
  * 这是 DefaultAdapter 的具体实现，专门用于终端环境。
  * 所有原来的终端输出逻辑都移到这里，核心模块不再直接依赖终端 API。
  * 
- * @module terminal-adapter
+ * @module adapter
  */
 
 import readline from 'readline';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
-import { styled } from '@/presentation/styling/output-styler';
+import { styled } from '@/presentation/styling';
 import { config } from '@/core/config';
 
 export class TerminalAdapter extends DefaultAdapter {

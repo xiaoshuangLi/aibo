@@ -1,4 +1,4 @@
-import { VoiceRecognition } from '@/features/voice-input/voice-recognition';
+import { VoiceRecognition } from '@/features/voice-input/recognition';
 
 // Mock the recorder module to simulate different scenarios
 jest.mock('node-record-lpcm16', () => {

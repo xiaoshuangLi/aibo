@@ -1,6 +1,6 @@
-import { createAIAgent } from '@/core/agent/factory';
-import { startInteractiveMode } from '@/presentation/console/interactive-mode';
-import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
+import { createAIAgent } from '@/core/agent';
+import { startInteractiveMode } from '@/presentation/console';
+import { startLarkInteractiveMode } from '@/presentation/lark';
 import { isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { config } from '@/core/config';
 

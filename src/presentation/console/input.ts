@@ -6,15 +6,15 @@
  * 负责处理用户输入、启动输入循环和显示提示符。
  * 通过 Session 对象进行所有 I/O 操作，保持原有的事件驱动架构。
  * 
- * @module user-input-handler
+ * @module input
  */
 
-import { shouldExitInteractiveMode, isEmptyInput } from '@/core/utils/interactive-logic';
-import { StreamState } from '@/core/utils/stream-handler';
-import { Session } from '@/core/agent/session';
+import { shouldExitInteractiveMode, isEmptyInput } from '@/core/utils';
+import { StreamState } from '@/core/utils';
+import { Session } from '@/core/agent';
 
 // Import processStreamChunks from StreamHandler to avoid circular dependency
-import { processStreamChunks } from '@/core/utils/stream-handler';
+import { processStreamChunks } from '@/core/utils';
 
 /**
  * 处理用户输入

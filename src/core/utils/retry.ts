@@ -4,7 +4,7 @@
  * This module provides integration of LangChain's official toolRetryMiddleware
  * with the DeepAgents framework used in this project.
  * 
- * @module langchain-tool-retry-middleware
+ * @module retry
  */
 
 import { toolRetryMiddleware } from 'langchain';

@@ -5,12 +5,12 @@
  * It provides comprehensive logging and monitoring of agent behavior by calling appropriate
  * session methods for different types of events.
  * 
- * @module session-output-capture-middleware
+ * @module capture
  */
 
 import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
-import { Session } from '@/core/agent/session';
+import { Session } from '@/core/agent';
 import { config } from '@/core/config';
 
 /**

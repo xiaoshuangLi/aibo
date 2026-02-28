@@ -1,4 +1,4 @@
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
+import { TerminalAdapter } from '@/presentation/console/adapter';
 import { OutputEvent } from '@/core/agent/adapter';
 import * as readline from 'readline';
 

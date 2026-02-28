@@ -6,7 +6,7 @@ import {
   formatKnowledgeResult,
   formatWebFetchResult,
   formatThinkResult
-} from '@/presentation/lark/tool-result-formatter';
+} from '@/presentation/lark/result-formatter';
 
 describe('Tool Result Formatter - Branch Coverage', () => {
   describe('formatFilesystemResult - string results', () => {

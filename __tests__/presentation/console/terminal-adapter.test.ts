@@ -1,10 +1,10 @@
-import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
+import { TerminalAdapter } from '@/presentation/console/adapter';
 import { OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import * as readline from 'readline';
 import { config } from '@/core/config';
 
 // Mock the styled functions
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {
     toolCall: jest.fn().mockReturnValue('tool call output'),
     toolResult: jest.fn().mockReturnValue('tool result output'),

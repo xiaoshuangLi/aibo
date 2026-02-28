@@ -1,4 +1,4 @@
-import { isRunningInTsNode, getRestartCommand } from '@/shared/utils/restart-helper';
+import { isRunningInTsNode, getRestartCommand } from '@/shared/utils/restart';
 
 describe('Restart Helper', () => {
   describe('isRunningInTsNode', () => {

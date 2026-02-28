@@ -12,9 +12,9 @@
 import * as lark from '@larksuiteoapi/node-sdk';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import { config } from '@/core/config';
-import { SessionManager } from '@/infrastructure/session/manager';
+import { SessionManager } from '@/infrastructure/session';
 
-import { styled } from './output-styler';
+import { styled } from './styler';
 
 // 飞书配置类型
 interface LarkConfig {

@@ -1,4 +1,4 @@
-import { formatToolCallArgs } from '@/presentation/lark/tool-call-formatter';
+import { formatToolCallArgs } from '@/presentation/lark/call-formatter';
 
 describe('Tool Call Formatter Final Coverage Tests', () => {
   it('should handle task tool with complex object in additional parameters', () => {

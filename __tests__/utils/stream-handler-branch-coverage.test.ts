@@ -3,9 +3,9 @@ import {
   handleTextToolResult,
   handleAIContent,
   StreamState
-} from '@/core/utils/stream-handler';
+} from '@/core/utils/stream';
 
-jest.mock('@/presentation/styling/output-styler', () => ({
+jest.mock('@/presentation/styling/styler', () => ({
   styled: {}
 }));
 
