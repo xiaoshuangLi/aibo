@@ -1,6 +1,7 @@
 import { config } from '@/core/config';
 import { SessionManager } from '@/infrastructure/session/manager';
 import { LspClientManager } from '@/infrastructure/code-analysis/client';
+import * as childProcess from 'child_process';
 import {
   handleHelpCommand,
   handleVerboseCommand,
@@ -55,11 +56,10 @@ jest.mock('@/infrastructure/session/manager', () => {
   };
 });
 
-// Mock executeBashTool
-jest.mock('@/tools/bash', () => ({
-  executeBashTool: {
-    invoke: jest.fn()
-  }
+// Mock child_process (spawn for restart - exec is spied per test in handleRebotCommand)
+jest.mock('child_process', () => ({
+  ...jest.requireActual('child_process'),
+  spawn: jest.fn(() => ({ on: jest.fn(), unref: jest.fn() }))
 }));
 
 // Mock FileDiffVisualizer
@@ -368,63 +368,42 @@ describe('Lark Command Handlers', () => {
   });
 
   describe('handleRebotCommand', () => {
-    // Mock the executeBashTool
-    const originalExecuteBashTool = require('@/tools/bash').executeBashTool;
-    const mockExecuteBashTool = {
-      invoke: jest.fn()
-    };
-    
     // Mock the getRestartCommand
-    const originalGetRestartCommand = require('@/shared/utils/restart').getRestartCommand;
     const mockGetRestartCommand = jest.fn();
-    
-    // Mock spawn
-    const mockSpawn = jest.fn(() => ({
-      on: jest.fn(),
-      unref: jest.fn()
-    }));
-    
+
     beforeEach(() => {
-      // Mock the imports
-      jest.mock('@/tools/bash', () => ({
-        executeBashTool: mockExecuteBashTool
-      }));
-      
+      // Assign fresh jest.fn() for exec on the mocked child_process module
+      (require('child_process') as any).exec = jest.fn();
       jest.mock('@/shared/utils/restart', () => ({
         getRestartCommand: mockGetRestartCommand
       }));
-      
-      // Mock child_process.spawn
-      jest.mock('child_process', () => ({
-        spawn: mockSpawn
-      }));
     });
-    
+
     afterEach(() => {
       jest.clearAllMocks();
     });
-    
+
     it('should handle successful build and restart', async () => {
-      // Mock successful build result
-      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockResolvedValue(
-        JSON.stringify({ success: true, stdout: 'Build successful', stderr: '' })
-      );
-      
+      // Mock exec to call callback with success (no error)
+      (require('child_process').exec as jest.Mock).mockImplementation((_cmd: string, _opts: any, callback: Function) => {
+        callback(null, 'Build successful', '');
+      });
+
       // Mock restart command
       (require('@/shared/utils/restart').getRestartCommand as jest.Mock).mockReturnValue({
         restartCommand: 'node',
         restartArgs: ['dist/index.js']
       });
-      
+
       const mockSession = {
         adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
       };
-      
+
       const result = await handleRebotCommand(mockSession as any);
-      
+
       expect(result).toBe(true);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建成功！'));
@@ -444,30 +423,26 @@ describe('Lark Command Handlers', () => {
       // 验证重启前已创建新会话，确保新进程以全新上下文启动
       expect(SessionManager.getInstance().clearCurrentSession).toHaveBeenCalled();
       // 在测试环境中，spawn 会被调用但不会实际执行
-      expect(require('child_process').spawn).toHaveBeenCalled();
+      expect(childProcess.spawn).toHaveBeenCalled();
     });
-    
+
     it('should handle build failure gracefully', async () => {
-      // Mock failed build result
-      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockResolvedValue(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Build error', 
-          message: 'Compilation failed',
-          stdout: '',
-          stderr: 'Error details'
-        })
-      );
-      
+      // Mock exec to call callback with an error (build failed)
+      const buildError: any = new Error('Compilation failed');
+      buildError.code = 1;
+      (require('child_process').exec as jest.Mock).mockImplementation((_cmd: string, _opts: any, callback: Function) => {
+        callback(buildError, '', 'Error details');
+      });
+
       const mockSession = {
         adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
       };
-      
+
       const result = await handleRebotCommand(mockSession as any);
-      
+
       expect(result).toBe(false);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('构建失败'));
@@ -485,20 +460,22 @@ describe('Lark Command Handlers', () => {
       );
       expect(mockSession.end).not.toHaveBeenCalled();
     });
-    
+
     it('should handle execution errors gracefully', async () => {
-      // Mock execution error
-      (require('@/tools/bash').executeBashTool.invoke as jest.Mock).mockRejectedValue(new Error('Execution failed'));
-      
+      // Mock exec to throw synchronously (simulate unexpected error)
+      (require('child_process').exec as jest.Mock).mockImplementation(() => {
+        throw new Error('Execution failed');
+      });
+
       const mockSession = {
         adapter: {
           emit: jest.fn()
         },
         end: jest.fn()
       };
-      
+
       const result = await handleRebotCommand(mockSession as any);
-      
+
       expect(result).toBe(false);
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('正在执行项目构建'));
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('执行构建时发生错误'));

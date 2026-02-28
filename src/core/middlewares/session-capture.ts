@@ -58,10 +58,11 @@ export function createSessionOutputCaptureMiddleware(
       // console.log('🔍 SessionOutputCaptureMiddleware: wrapToolCall called');
       // console.log('wrapToolCall', request, handler);
 
+      const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
+
       try {
         // Log tool call start
         if (session && typeof session.logToolCall === 'function') {
-          const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
           let argsStr: string = '{}';
           try {
             const args = request.toolCall.args ?? {};
@@ -89,7 +90,6 @@ export function createSessionOutputCaptureMiddleware(
               preview = String(result.content);
             }
           }
-          const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
           session.logToolResult(toolName, success, preview);
         }
         
@@ -100,7 +100,6 @@ export function createSessionOutputCaptureMiddleware(
           const success = false;
           const errorMessage = (error as Error).message || 'Unknown error';
           const preview: string = String(errorMessage);
-          const toolName = (request.tool?.name as string | undefined) ?? 'unknown_tool';
           session.logToolResult(toolName, success, preview);
         }
         

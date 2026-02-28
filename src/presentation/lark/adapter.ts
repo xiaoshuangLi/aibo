@@ -38,6 +38,13 @@ export class LarkAdapter extends DefaultAdapter {
   private messageQueue: Array<{ content: string; chatId: string }> = [];
   private isProcessingQueue = false;
 
+  // 工具进度流缓冲区（用于批量发送实时进度消息）
+  private progressBuffer: string = '';
+  private progressToolName: string = '';
+  private progressFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly PROGRESS_FLUSH_INTERVAL = 3000; // 3 秒
+  private static readonly PROGRESS_FLUSH_SIZE = 800;      // 超过 800 字符立即发送
+
   constructor(chatId?: string) {
     super();
     
@@ -106,6 +113,7 @@ export class LarkAdapter extends DefaultAdapter {
     this.on('sessionEnd', this.handleSessionEnd.bind(this));
     this.on('commandExecuted', this.handleCommandExecuted.bind(this));
     this.on('rawText', this.handleRawText.bind(this));
+    this.on('toolProgress', this.handleToolProgress.bind(this));
   }
 
   /**
@@ -303,6 +311,12 @@ export class LarkAdapter extends DefaultAdapter {
     }
     
     this.isDestroyed = true;
+
+    // Clear any pending progress flush timer
+    if (this.progressFlushTimer) {
+      clearTimeout(this.progressFlushTimer);
+      this.progressFlushTimer = null;
+    }
     
     // 中断当前操作
     if (this.abortController) {
@@ -336,6 +350,9 @@ export class LarkAdapter extends DefaultAdapter {
 
   private async handleToolResult(data: any): Promise<void> {
     if (!data?.name) return;
+
+    // Flush any buffered progress output before showing the final result
+    await this.flushProgressBuffer();
     
     // 如果已经有 preview 字段，直接使用（向后兼容）
     if (data.preview !== undefined) {
@@ -523,5 +540,51 @@ export class LarkAdapter extends DefaultAdapter {
     if (data?.text) {
       await this.sendMessage(data.text);
     }
+  }
+
+  /**
+   * 处理工具执行过程中的实时输出
+   * 使用缓冲机制防止消息频率过高：
+   * - 超过 PROGRESS_FLUSH_SIZE 字符时立即发送
+   * - 否则等待 PROGRESS_FLUSH_INTERVAL 毫秒后批量发送
+   */
+  private async handleToolProgress(data: { toolName: string; chunk: string }): Promise<void> {
+    if (!data?.chunk) return;
+
+    this.progressToolName = data.toolName;
+    this.progressBuffer += data.chunk;
+
+    if (this.progressBuffer.length >= LarkAdapter.PROGRESS_FLUSH_SIZE) {
+      await this.flushProgressBuffer();
+    } else {
+      this.scheduleProgressFlush();
+    }
+  }
+
+  private scheduleProgressFlush(): void {
+    if (this.progressFlushTimer) return;
+    this.progressFlushTimer = setTimeout(async () => {
+      this.progressFlushTimer = null;
+      await this.flushProgressBuffer();
+    }, LarkAdapter.PROGRESS_FLUSH_INTERVAL);
+  }
+
+  private async flushProgressBuffer(): Promise<void> {
+    if (!this.progressBuffer.trim()) {
+      this.progressBuffer = '';
+      return;
+    }
+
+    if (this.progressFlushTimer) {
+      clearTimeout(this.progressFlushTimer);
+      this.progressFlushTimer = null;
+    }
+
+    const content = this.progressBuffer;
+    this.progressBuffer = '';
+
+    const title = `⏳ ${this.progressToolName} 进行中`;
+    const message = `${title}\n\`\`\`\n${content}\n\`\`\``;
+    await this.sendMessage(message);
   }
 }

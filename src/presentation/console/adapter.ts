@@ -55,6 +55,7 @@ export class TerminalAdapter extends DefaultAdapter {
     this.on('sessionEnd', this.handleSessionEnd.bind(this));
     this.on('commandExecuted', this.handleCommandExecuted.bind(this));
     this.on('rawText', this.handleRawText.bind(this));
+    this.on('toolProgress', this.handleToolProgress.bind(this));
   }
 
   private setupProcessHandlers(): void {
@@ -273,6 +274,11 @@ export class TerminalAdapter extends DefaultAdapter {
     if (data?.text) {
       console.log(data.text);
     }
+  }
+
+  private handleToolProgress(data: { toolName: string; chunk: string }): void {
+    if (!data?.chunk) return;
+    process.stdout.write(data.chunk);
   }
 
   showPrompt(prompt: string = "\n👤 你: "): void {

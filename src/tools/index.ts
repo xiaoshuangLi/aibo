@@ -14,13 +14,19 @@ import getEditFileTools from '@/tools/edit-file';
 import getThinkTools from '@/tools/think';
 import getWriteFileTools from '@/tools/write-file';
 import getTodoTools from '@/tools/todo';
+import getClaudeTools from '@/tools/claude';
+import getCursorTools from '@/tools/cursor';
+import getGeminiTools from '@/tools/gemini';
+import getCodexTools from '@/tools/codex';
+import { Session } from '@/core/agent';
 
 /**
  * 异步获取所有工具的方法
  * 
+ * @param session - 可选的会话对象，传递给需要报告进度的工具
  * @returns Promise<Array<any>> - 包含所有工具的数组
  */
-export default async function getTools() {
+export default async function getTools(session?: Session) {
   const [
     bashTools,
     utilsTools,
@@ -38,8 +44,12 @@ export default async function getTools() {
     thinkTools,
     writeFileTools,
     todoTools,
+    claudeTools,
+    cursorTools,
+    geminiTools,
+    codexTools,
   ] = await Promise.all([
-    getBashTools(),
+    getBashTools(session),
     getUtilsTools(),
     getGithubFetchTools(),
     getTencentWsaTools(),
@@ -55,6 +65,10 @@ export default async function getTools() {
     getThinkTools(),
     getWriteFileTools(),
     getTodoTools(),
+    getClaudeTools(session),
+    getCursorTools(session),
+    getGeminiTools(session),
+    getCodexTools(session),
   ]);
   
   return [
@@ -74,5 +88,9 @@ export default async function getTools() {
     ...thinkTools,
     ...writeFileTools,
     ...todoTools,
+    ...claudeTools,
+    ...cursorTools,
+    ...geminiTools,
+    ...codexTools,
   ];
 }

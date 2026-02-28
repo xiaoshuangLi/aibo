@@ -129,6 +129,17 @@ export class Session {
   }
 
   /**
+   * 记录工具执行过程中的实时输出
+   */
+  logToolProgress(toolName: string, chunk: string): void {
+    this.adapter.emit({
+      type: 'toolProgress',
+      data: { toolName, chunk },
+      timestamp: Date.now()
+    });
+  }
+
+  /**
    * 记录工具调用
    */
   logToolCall(name: string, args: any): void {
