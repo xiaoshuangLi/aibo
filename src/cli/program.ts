@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { runInteract } from '@/cli/interact';
+import { config } from '@/core/config/config';
 
 /**
  * Central Commander.js module for the aibo CLI.
@@ -19,14 +20,15 @@ import { runInteract } from '@/cli/interact';
  *
  * Registers all first-class subcommands (`init`, `interact`) with their
  * respective handler functions, so that `--help` shows complete documentation
- * and callers can simply invoke `createProgram(main).parseAsync(process.argv)`
+ * and callers can simply invoke `createProgram().parseAsync(process.argv)`
  * to dispatch.
  *
- * @param defaultAction - Optional async function to run when no subcommand is
- *   given (i.e. `aibo` with no arguments / only root-level flags).
+ * When no subcommand is given, `runInteract` is started using the interaction
+ * mode resolved from CLI flags and environment variables.
+ *
  * @returns Configured Commander {@link Command} instance
  */
-export function createProgram(defaultAction?: () => Promise<unknown>): Command {
+export function createProgram(): Command {
   const program = new Command('aibo');
 
   program
@@ -35,15 +37,13 @@ export function createProgram(defaultAction?: () => Promise<unknown>): Command {
     .option('--interaction <mode>', 'Set interaction mode (console|lark)')
     .option('-i, --interactive', 'Enable interactive console mode');
 
-  if (defaultAction) {
-    program.action(async () => {
-      if (isAiboInitRequired()) {
-        printInitRequired();
-        process.exit(1);
-      }
-      await defaultAction();
-    });
-  }
+  program.action(async () => {
+    if (isAiboInitRequired()) {
+      printInitRequired();
+      process.exit(1);
+    }
+    await runInteract(config.interaction.mode);
+  });
 
   program
     .command('init')
