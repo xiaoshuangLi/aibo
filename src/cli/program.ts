@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { runInit } from '@/cli/init';
+import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
 
 /**
  * Central Commander.js module for the aibo CLI.
@@ -79,12 +79,16 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
 /**
  * Creates the root aibo Commander program.
  *
- * Registers all first-class subcommands (currently `init`) so that callers can
- * simply invoke `createProgram().parseAsync(process.argv)` to dispatch.
+ * Registers all first-class subcommands (`init`, `interact`) with their
+ * respective handler functions, so that `--help` shows complete documentation
+ * and callers can simply invoke `createProgram(main).parseAsync(process.argv)`
+ * to dispatch.
  *
+ * @param defaultAction - Optional async function to run when no subcommand is
+ *   given (i.e. `aibo` with no arguments / only root-level flags).
  * @returns Configured Commander {@link Command} instance
  */
-export function createProgram(): Command {
+export function createProgram(defaultAction?: () => Promise<unknown>): Command {
   const program = new Command('aibo');
 
   program
@@ -92,6 +96,16 @@ export function createProgram(): Command {
     .allowUnknownOption()
     .option('--interaction <mode>', 'Set interaction mode (console|lark)')
     .option('-i, --interactive', 'Enable interactive console mode');
+
+  if (defaultAction) {
+    program.action(async () => {
+      if (isAiboInitRequired()) {
+        printInitRequired();
+        process.exit(1);
+      }
+      await defaultAction();
+    });
+  }
 
   program
     .command('init')
@@ -103,7 +117,11 @@ export function createProgram(): Command {
   program
     .command('interact')
     .description('Start interactive mode (console or lark)')
-    .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console');
+    .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console')
+    .action(async (options) => {
+      const { runInteract } = await import('@/cli/interact');
+      await runInteract(options.mode);
+    });
 
   return program;
 }

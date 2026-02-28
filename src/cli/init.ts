@@ -82,6 +82,14 @@ export function isAiboInitRequired(): boolean {
 }
 
 /**
+ * Prints a message telling the user they must run `aibo init` first.
+ */
+export function printInitRequired(): void {
+  console.error('\n❌  No .aibo folder found in the current directory.');
+  console.error('    Please run `aibo init` first to set up this directory.\n');
+}
+
+/**
  * Entry point for `aibo init`.
  *
  * Creates the `.aibo` symlink in the current working directory and prints
