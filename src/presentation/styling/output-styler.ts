@@ -8,7 +8,7 @@
  * @module output-styler
  */
 
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * 样式化输出函数接口

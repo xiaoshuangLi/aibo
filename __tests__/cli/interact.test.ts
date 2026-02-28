@@ -1,6 +1,6 @@
 jest.mock('dotenv', () => ({ config: jest.fn() }));
 
-jest.mock('@/core/agent/agent-factory', () => ({
+jest.mock('@/core/agent/factory', () => ({
   createAIAgent: jest.fn().mockResolvedValue({ mockAgent: true }),
 }));
 
@@ -17,7 +17,7 @@ jest.mock('@/cli/init', () => ({
   printInitRequired: jest.fn(),
 }));
 
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     interaction: { mode: 'console' },
   },
@@ -27,8 +27,8 @@ import { runInteract } from '@/cli/interact';
 import { isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
-import { createAIAgent } from '@/core/agent/agent-factory';
-import { config } from '@/core/config/config';
+import { createAIAgent } from '@/core/agent/factory';
+import { config } from '@/core/config';
 
 const mockProcessExit = jest.spyOn(process, 'exit').mockImplementation(() => {
   throw new Error('process.exit called');

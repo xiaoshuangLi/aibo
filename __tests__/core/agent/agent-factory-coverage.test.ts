@@ -20,7 +20,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   const setupMocks = (checkpointerType: string) => {
     jest.resetModules();
     
-    jest.doMock('@/core/config/config', () => ({
+    jest.doMock('@/core/config', () => ({
       config: { ...baseConfig, langgraph: { recursionLimit: 100, checkpointerType } }
     }));
 
@@ -44,7 +44,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       })
     }));
 
-    jest.doMock('@/infrastructure/agents/agent-loader', () => ({
+    jest.doMock('@/infrastructure/agents/loader', () => ({
       loadSubAgents: jest.fn().mockReturnValue([]),
       getDefaultGeneralPurposeSubAgent: jest.fn().mockReturnValue({ name: 'general-purpose' })
     }));
@@ -57,7 +57,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() })
     }));
 
-    jest.doMock('@/infrastructure/filesystem/safe-filesystem-backend', () => ({
+    jest.doMock('@/infrastructure/filesystem/safe-backend', () => ({
       SafeFilesystemBackend: jest.fn().mockImplementation(() => ({}))
     }));
 
@@ -77,7 +77,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   it('should use FilesystemCheckpointer when checkpointerType is filesystem', async () => {
     setupMocks('filesystem');
     
-    const { createAIAgent } = require('@/core/agent/agent-factory');
+    const { createAIAgent } = require('@/core/agent/factory');
     const { FilesystemCheckpointer } = require('@/infrastructure/checkpoint/filesystem-checkpointer');
     
     await createAIAgent();
@@ -88,7 +88,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   it('should throw error when checkpointerType is sqlite', async () => {
     setupMocks('sqlite');
     
-    const { createAIAgent } = require('@/core/agent/agent-factory');
+    const { createAIAgent } = require('@/core/agent/factory');
     
     await expect(createAIAgent()).rejects.toThrow('SQLite checkpointer is not yet implemented');
   });
@@ -96,7 +96,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   it('should create agent with memory checkpointer (default)', async () => {
     setupMocks('memory');
     
-    const { createAIAgent } = require('@/core/agent/agent-factory');
+    const { createAIAgent } = require('@/core/agent/factory');
     const agent = await createAIAgent();
     
     expect(agent).toBeDefined();
@@ -105,7 +105,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   it('should create agent with session middleware when session is provided', async () => {
     setupMocks('memory');
     
-    const { createAIAgent } = require('@/core/agent/agent-factory');
+    const { createAIAgent } = require('@/core/agent/factory');
     const { createSessionOutputCaptureMiddleware } = require('@/core/utils/session-output-capture-middleware');
     
     const mockSession = {
@@ -124,7 +124,7 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   it('filterSubAgentTools should exclude write-subagent-todos', async () => {
     setupMocks('memory');
     
-    const { createAIAgent } = require('@/core/agent/agent-factory');
+    const { createAIAgent } = require('@/core/agent/factory');
     const { createDeepAgent } = require('deepagents');
     
     await createAIAgent();

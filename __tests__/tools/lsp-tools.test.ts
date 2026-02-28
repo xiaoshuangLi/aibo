@@ -1,5 +1,5 @@
 /**
- * Comprehensive test suite for LSP tools (lsp-tools.ts / lsp-client.ts).
+ * Comprehensive test suite for LSP tools (lsp.ts / lsp-client.ts).
  *
  * Test groups:
  *   1. Tool schema & metadata         – no server required
@@ -44,7 +44,7 @@ import getLspTools, {
   renameSymbolTool,
   setLogLevelTool,
   shutdownLspTool,
-} from '@/tools/lsp-tools';
+} from '@/tools/lsp';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

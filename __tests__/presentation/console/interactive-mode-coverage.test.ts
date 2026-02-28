@@ -10,7 +10,7 @@ jest.mock('@/presentation/console/user-input-handler', () => ({
 jest.mock('@/presentation/console/command-handlers', () => ({
   createHandleInternalCommand: jest.fn().mockReturnValue(jest.fn())
 }));
-jest.mock('@/features/voice-input/voice-input-manager', () => ({
+jest.mock('@/features/voice-input/manager', () => ({
   createKeypressHandler: jest.fn().mockReturnValue(jest.fn())
 }));
 

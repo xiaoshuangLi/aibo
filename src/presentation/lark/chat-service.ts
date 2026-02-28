@@ -16,7 +16,7 @@
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /** 根据工作目录生成用于标识群聊的描述标记，格式如：【`/path/to/cwd`】 */
 const getChatDescriptionMarker = (cwd: string): string => `【\`${cwd}\`】`;

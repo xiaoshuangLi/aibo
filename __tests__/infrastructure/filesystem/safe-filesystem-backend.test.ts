@@ -1,4 +1,4 @@
-import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-filesystem-backend';
+import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-backend';
 import * as path from 'path';
 import * as fs from 'fs';
 

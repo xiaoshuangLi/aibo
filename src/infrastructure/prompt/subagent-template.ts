@@ -1,6 +1,6 @@
 import * as os from 'os';
 import { SubAgent } from 'deepagents';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * SubAgent Prompt Template Manager

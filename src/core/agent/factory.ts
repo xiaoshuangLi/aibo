@@ -1,16 +1,16 @@
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { MemorySaver } from "@langchain/langgraph";
 import { createModel } from '@/core/agent/model-factory';
 import { createDeepAgent } from 'deepagents';
 import { FilesystemCheckpointer } from '@/infrastructure/checkpoint/filesystem-checkpointer';
 import getTools from '@/tools/index';
 import { SYSTEM_PROMPT } from '@/shared/constants/system-prompts';
-import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/agent-loader';
+import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents/loader';
 import { findSkillsDirectories } from '@/core/utils/find-skills-directories';
-import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-filesystem-backend';
+import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-backend';
 import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/utils';
 import { Session } from '@/core/agent/session';
-import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-prompt-template';
+import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-template';
 
 /**
  * AI Agent Factory module that provides DeepAgents integration with LangChain.
@@ -19,7 +19,7 @@ import { SubAgentPromptTemplate } from '@/infrastructure/prompt/subagent-prompt-
  * integrated with LangChain components. It supports configurable AI models,
  * file system operations, and state persistence through checkpointer mechanisms.
  * 
- * @module agent-factory
+ * @module factory
  */
 
 // ==================== 初始化模型 ====================

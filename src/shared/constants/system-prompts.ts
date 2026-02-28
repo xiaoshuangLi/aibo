@@ -1,5 +1,5 @@
 import * as os from 'os';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * Enhanced system prompt constants for AIBO autonomous programming AI

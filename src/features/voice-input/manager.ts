@@ -1,6 +1,6 @@
 import { createVoiceRecognition, VoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { Session } from '@/core/agent/session';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 // Keyboard event handler state
 let isRecordingShortcutActive = false;

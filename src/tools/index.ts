@@ -5,7 +5,7 @@ import getTencentWsaTools from '@/tools/tencent-wsa';
 import getComposioTools from '@/tools/composio';
 import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
 import getKnowledgeTools from '@/tools/knowledge';
-import getLspTools from '@/tools/lsp-tools';
+import getLspTools from '@/tools/lsp';
 import getGlobTools from '@/tools/glob';
 import getGrepTools from '@/tools/grep';
 import getWebFetchTools from '@/tools/web-fetch';

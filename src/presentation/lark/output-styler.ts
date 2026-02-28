@@ -14,7 +14,7 @@
  * @module lark-template-formatter
  */
 
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { OutputStyler } from '@/presentation/styling/output-styler';
 import { 
   processLarkText,

@@ -10,8 +10,8 @@
 
 import { Adapter } from './adapter';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
-import { config } from '@/core/config/config';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { config } from '@/core/config';
+import { SessionManager } from '@/infrastructure/session/manager';
 
 export interface SessionOptions {
   threadId?: string;

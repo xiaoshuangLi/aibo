@@ -1,5 +1,5 @@
-import { config } from '@/core/config/config';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { config } from '@/core/config';
+import { SessionManager } from '@/infrastructure/session/manager';
 import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 import {
   handleHelpCommand,
@@ -37,7 +37,7 @@ jest.mock('@/presentation/styling/output-styler', () => ({
 }));
 
 // Mock SessionManager
-jest.mock('@/infrastructure/session/session-manager', () => {
+jest.mock('@/infrastructure/session/manager', () => {
   const instance = {
     clearCurrentSession: jest.fn(() => 'new-session-id'),
     getCurrentSessionMetadata: jest.fn(() => ({
@@ -1027,7 +1027,7 @@ describe('Lark Command Handlers', () => {
       const library = require('@/shared/utils/library');
       (library.getAllKnowledge as jest.Mock).mockReturnValue([]);
       // Ensure SessionManager mock returns predictable value
-      const { SessionManager: SM } = require('@/infrastructure/session/session-manager');
+      const { SessionManager: SM } = require('@/infrastructure/session/manager');
       SM.getInstance.mockReturnValue({
         clearCurrentSession: jest.fn().mockReturnValue('new-session-id'),
         getCurrentSessionMetadata: jest.fn().mockReturnValue(null),

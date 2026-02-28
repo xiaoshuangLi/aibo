@@ -1,4 +1,4 @@
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 describe('Config Branch Coverage Tests', () => {
   test('should have valid config structure', () => {

@@ -11,7 +11,7 @@ import * as library from '@/shared/utils/library';
 import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';
 
 // Mock dependencies
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     output: { verbose: false },
     model: { name: 'gpt-4o' },
@@ -29,7 +29,7 @@ jest.mock('@/core/utils/interactive-logic', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('test-thread-id'),
 }));
 
-jest.mock('@/infrastructure/session/session-manager', () => ({
+jest.mock('@/infrastructure/session/manager', () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
       clearCurrentSession: jest.fn().mockReturnValue('new-thread-123'),
@@ -75,7 +75,7 @@ afterEach(() => {
   // Re-apply default return values after reset
   (library.getAllKnowledge as jest.Mock).mockReturnValue([]);
   (LspClientManager.shutdownAll as jest.Mock).mockResolvedValue(undefined);
-  const { SessionManager } = require('@/infrastructure/session/session-manager');
+  const { SessionManager } = require('@/infrastructure/session/manager');
   SessionManager.getInstance.mockReturnValue({
     clearCurrentSession: jest.fn().mockReturnValue('new-thread-123'),
     generateSessionMetadata: jest.fn(),

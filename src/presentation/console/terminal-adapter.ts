@@ -12,7 +12,7 @@
 import readline from 'readline';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import { styled } from '@/presentation/styling/output-styler';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 export class TerminalAdapter extends DefaultAdapter {
   private _rl: readline.Interface | null = null;

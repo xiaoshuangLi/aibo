@@ -1,7 +1,7 @@
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
 import { OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import * as readline from 'readline';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 // Mock the styled functions
 jest.mock('@/presentation/styling/output-styler', () => ({
@@ -22,7 +22,7 @@ jest.mock('@/presentation/styling/output-styler', () => ({
 }));
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     output: {
       verbose: false

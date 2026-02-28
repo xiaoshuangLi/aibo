@@ -1,5 +1,5 @@
 import { Session } from '@/core/agent/session';
-import { createAIAgent } from '@/core/agent/agent-factory';
+import { createAIAgent } from '@/core/agent/factory';
 import {
   startLarkInteractiveMode,
   handleUserMessage,
@@ -25,7 +25,7 @@ process.on = mockProcessOn;
 process.exit = mockProcessExit as any;
 
 // Mock LarkAdapter
-jest.mock('@/presentation/lark/lark-adapter', () => {
+jest.mock('@/presentation/lark/adapter', () => {
   return {
     LarkAdapter: jest.fn().mockImplementation(() => ({
       setUserMessageCallback: jest.fn(),
@@ -35,7 +35,7 @@ jest.mock('@/presentation/lark/lark-adapter', () => {
 });
 
 // Mock agent factory
-jest.mock('@/core/agent/agent-factory', () => ({
+jest.mock('@/core/agent/factory', () => ({
   createAIAgent: jest.fn()
 }));
 
@@ -237,7 +237,7 @@ describe('Lark Interactive Mode', () => {
   describe('startLarkInteractiveMode', () => {
     it('should initialize Lark adapter and start interactive mode', async () => {
       // Just test that the function doesn't throw an error
-      const LarkAdapterMock = require('@/presentation/lark/lark-adapter').LarkAdapter;
+      const LarkAdapterMock = require('@/presentation/lark/adapter').LarkAdapter;
       LarkAdapterMock.mockImplementation(() => ({
         setUserMessageCallback: jest.fn()
       }));
@@ -248,7 +248,7 @@ describe('Lark Interactive Mode', () => {
     });
 
     it('should handle startup errors and exit with code 1', async () => {
-      const LarkAdapterMock = require('@/presentation/lark/lark-adapter').LarkAdapter;
+      const LarkAdapterMock = require('@/presentation/lark/adapter').LarkAdapter;
       LarkAdapterMock.mockImplementation(() => {
         throw new Error('Lark initialization failed');
       });

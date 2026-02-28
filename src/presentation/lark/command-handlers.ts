@@ -1,6 +1,6 @@
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { styled } from '@/presentation/styling/output-styler';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 import { executeBashTool } from '@/tools/bash';
 import { getRestartCommand } from '@/shared/utils/restart-helper';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';

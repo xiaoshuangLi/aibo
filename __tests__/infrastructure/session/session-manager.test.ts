@@ -1,4 +1,4 @@
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 import * as fs from 'fs';
 import * as path from 'path';
 

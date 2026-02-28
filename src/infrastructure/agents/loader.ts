@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SubAgent } from 'deepagents';
 import * as yaml from 'js-yaml';
-import { SubAgentPromptTemplate } from '../prompt/subagent-prompt-template';
+import { SubAgentPromptTemplate } from '../prompt/subagent-template';
 
 /**
  * Agent Loader module for loading subagent configurations from Markdown files.
@@ -11,7 +11,7 @@ import { SubAgentPromptTemplate } from '../prompt/subagent-prompt-template';
  * located in the agents directory and convert them into SubAgent configurations
  * compatible with DeepAgents framework.
  * 
- * @module agent-loader
+ * @module loader
  */
 
 /**

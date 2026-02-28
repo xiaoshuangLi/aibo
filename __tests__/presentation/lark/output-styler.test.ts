@@ -1,7 +1,7 @@
 import { styled } from '@/presentation/lark/output-styler';
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     lark: {
       interactiveTemplateId: 'test-template-id'

@@ -1,6 +1,6 @@
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { Composio } from "@composio/core";
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * 异步获取 Composio 工具的方法

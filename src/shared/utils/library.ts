@@ -1,4 +1,4 @@
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 
 /**
  * 知识项接口定义

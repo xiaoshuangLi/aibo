@@ -14,7 +14,7 @@ jest.mock('tencentcloud-sdk-nodejs/tencentcloud/common/credential', () => ({
 jest.mock('tencentcloud-sdk-nodejs/tencentcloud/common/interface', () => ({}));
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     tencentCloud: {
       appId: '',

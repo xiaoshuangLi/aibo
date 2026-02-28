@@ -1,7 +1,7 @@
 import { styled } from '@/presentation/styling/output-styler';
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     output: {
       verbose: false

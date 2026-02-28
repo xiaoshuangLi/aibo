@@ -1,7 +1,7 @@
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { styled } from '@/presentation/styling/output-styler';
 import { createConsoleThreadId } from '@/core/utils/interactive-logic';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils/library';
 import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { handleUserInput } from '@/presentation/console/user-input-handler';

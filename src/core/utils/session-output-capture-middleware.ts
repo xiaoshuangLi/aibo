@@ -11,7 +11,7 @@
 import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent/session';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * Configuration options for the session output capture middleware

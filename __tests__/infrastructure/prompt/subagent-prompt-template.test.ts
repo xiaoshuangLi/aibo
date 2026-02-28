@@ -1,4 +1,4 @@
-import { SubAgentPromptTemplate, createReinforcedSubAgentPrompt } from '../../../src/infrastructure/prompt/subagent-prompt-template';
+import { SubAgentPromptTemplate, createReinforcedSubAgentPrompt } from '../../../src/infrastructure/prompt/subagent-template';
 
 describe('SubAgentPromptTemplate', () => {
   let template: SubAgentPromptTemplate;

@@ -9,11 +9,11 @@
  * @module lark-interactive-mode
  */
 
-import { LarkAdapter } from '@/presentation/lark/lark-adapter';
+import { LarkAdapter } from '@/presentation/lark/adapter';
 import { LarkChatService } from '@/presentation/lark/chat-service';
 import { Session } from '@/core/agent/session';
-import { createAIAgent } from '@/core/agent/agent-factory';
-import { config } from '@/core/config/config';
+import { createAIAgent } from '@/core/agent/factory';
+import { config } from '@/core/config';
 import { processStreamChunks } from '@/core/utils/stream-handler';
 import { createHandleInternalCommand } from '@/presentation/lark/command-handlers';
 import { LspClientManager } from '@/infrastructure/code-analysis/lsp-client';

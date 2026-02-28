@@ -18,7 +18,7 @@ jest.mock('@/presentation/styling/output-styler', () => ({
 }));
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     output: { verbose: false },
     specialKeyword: { keyword: '干活' }
@@ -160,7 +160,7 @@ describe('TerminalAdapter - handleToolResult Branch Coverage', () => {
   it('should handle verbose mode in toolResult preview', async () => {
     // Test verbose=true path
     jest.resetModules();
-    jest.doMock('@/core/config/config', () => ({
+    jest.doMock('@/core/config', () => ({
       config: {
         output: { verbose: true },
         specialKeyword: { keyword: '干活' }

@@ -1,4 +1,4 @@
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { ChatOpenAI, AzureChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';

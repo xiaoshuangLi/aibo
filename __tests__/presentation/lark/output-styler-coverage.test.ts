@@ -1,7 +1,7 @@
 import { styled, createTemplateMessage } from '@/presentation/lark/output-styler';
 
 // Module-level mock with template ID set
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     lark: {
       interactiveTemplateId: 'template-123'
@@ -13,7 +13,7 @@ describe('Lark Output Styler - Additional Coverage', () => {
   describe('createTemplateMessage without templateId', () => {
     it('should return plain text when templateId is missing', () => {
       jest.resetModules();
-      jest.doMock('@/core/config/config', () => ({
+      jest.doMock('@/core/config', () => ({
         config: {
           lark: {
             interactiveTemplateId: undefined
@@ -26,7 +26,7 @@ describe('Lark Output Styler - Additional Coverage', () => {
     });
 
     it('should filter out empty title when templateId is missing', () => {
-      jest.doMock('@/core/config/config', () => ({
+      jest.doMock('@/core/config', () => ({
         config: { lark: { interactiveTemplateId: '' } }
       }));
       const { createTemplateMessage: ctm } = require('@/presentation/lark/output-styler');

@@ -1,5 +1,5 @@
-import { LarkAdapter } from '@/presentation/lark/lark-adapter';
-import { config } from '@/core/config/config';
+import { LarkAdapter } from '@/presentation/lark/adapter';
+import { config } from '@/core/config';
 
 // Mock console methods
 const originalConsoleLog = console.log;

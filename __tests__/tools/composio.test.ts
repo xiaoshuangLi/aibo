@@ -14,7 +14,7 @@ jest.mock('@langchain/mcp-adapters', () => ({
   })),
 }));
 
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     composio: { apiKey: 'test-key', externalUserId: 'user-123' },
   },

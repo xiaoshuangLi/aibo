@@ -1,8 +1,8 @@
 import readline from 'readline';
-import { config } from '@/core/config/config';
-import { createAIAgent } from '@/core/agent/agent-factory';
+import { config } from '@/core/config';
+import { createAIAgent } from '@/core/agent/factory';
 import { createHandleInternalCommand } from '@/presentation/console/command-handlers';
-import { createKeypressHandler } from '@/features/voice-input/voice-input-manager';
+import { createKeypressHandler } from '@/features/voice-input/manager';
 import { handleUserInput } from '@/presentation/console/user-input-handler';
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
 import { Session } from '@/core/agent/session';

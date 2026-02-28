@@ -6,13 +6,13 @@
  * 这是 DefaultAdapter 的具体实现，专门用于飞书环境。
  * 所有原来的终端输出逻辑都移到这里，核心模块不再直接依赖飞书 API。
  * 
- * @module lark-adapter
+ * @module adapter
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
-import { config } from '@/core/config/config';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { config } from '@/core/config';
+import { SessionManager } from '@/infrastructure/session/manager';
 
 import { styled } from './output-styler';
 

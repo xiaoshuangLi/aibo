@@ -1,8 +1,8 @@
-import { createAIAgent } from '@/core/agent/agent-factory';
+import { createAIAgent } from '@/core/agent/factory';
 import { startInteractiveMode } from '@/presentation/console/interactive-mode';
 import { startLarkInteractiveMode } from '@/presentation/lark/interactive-mode';
 import { isAiboInitRequired, printInitRequired } from '@/cli/init';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 /**
  * CLI interact command handler for aibo.

@@ -20,7 +20,7 @@ jest.mock('../src/features/voice-input/voice-recognition', () => ({
   createVoiceRecognition: jest.fn(),
 }));
 
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { createVoiceRecognition } from '@/features/voice-input/voice-recognition';
 import { Session } from '@/core/agent/session';
 import { TerminalAdapter } from '@/presentation/console/terminal-adapter';
@@ -157,7 +157,7 @@ jest.mock('deepagents', () => ({
   FilesystemBackend: jest.fn().mockImplementation(() => ({})),
 }));
 
-jest.mock('../src/core/config/config', () => ({
+jest.mock('../src/core/config', () => ({
   config: {
     model: {
       apiKey: 'test-api-key',
