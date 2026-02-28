@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
+import { runInteract } from '@/cli/interact';
 
 /**
  * Central Commander.js module for the aibo CLI.
@@ -56,7 +57,6 @@ export function createProgram(defaultAction?: () => Promise<unknown>): Command {
     .description('Start interactive mode (console or lark)')
     .option('--mode <mode>', 'Set interaction mode (console|lark)', 'console')
     .action(async (options) => {
-      const { runInteract } = await import('@/cli/interact');
       await runInteract(options.mode);
     });
 
