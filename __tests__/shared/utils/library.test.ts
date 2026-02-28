@@ -1,8 +1,8 @@
 import * as library from '@/shared/utils/library';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 
 // Mock the SessionManager to isolate library function tests
-jest.mock('@/infrastructure/session/session-manager');
+jest.mock('@/infrastructure/session/manager');
 
 describe('Library Knowledge Functions', () => {
   let mockSessionManager: jest.Mocked<SessionManager>;

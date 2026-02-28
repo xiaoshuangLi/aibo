@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createTencentWSA } from '@/infrastructure/tencent-cloud/wsa-service';
+import { createTencentWSA } from '@/infrastructure/tencent-cloud';
 
 /**
  * 腾讯云WSA网络搜索工具模块

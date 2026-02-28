@@ -3,14 +3,8 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import { glob } from "glob";
-
-const DEFAULT_IGNORE = [
-  "**/node_modules/**",
-  "**/.git/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/coverage/**",
-];
+import { DEFAULT_IGNORE_PATTERNS } from "@/shared/constants/filesystem";
+import { hasBlockedExtension } from "@/shared/utils/filesystem";
 
 const MAX_RESULTS = 500;
 
@@ -38,7 +32,7 @@ export const grepFilesTool = tool(
 
       const files = await glob(globPattern, {
         cwd: workingDir,
-        ignore: DEFAULT_IGNORE,
+        ignore: DEFAULT_IGNORE_PATTERNS,
         absolute: false,
         dot: true,
         nodir: true,
@@ -48,6 +42,9 @@ export const grepFilesTool = tool(
 
       for (const file of files) {
         if (results.length >= MAX_RESULTS) break;
+
+        // Skip binary and non-text files
+        if (hasBlockedExtension(file)) continue;
 
         const absolutePath = path.join(workingDir, file);
         let content: string;

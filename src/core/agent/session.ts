@@ -9,9 +9,9 @@
  */
 
 import { Adapter } from './adapter';
-import { createConsoleThreadId } from '@/core/utils/interactive-logic';
-import { config } from '@/core/config/config';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { createConsoleThreadId } from '@/core/utils';
+import { config } from '@/core/config';
+import { SessionManager } from '@/infrastructure/session';
 
 export interface SessionOptions {
   threadId?: string;
@@ -19,7 +19,7 @@ export interface SessionOptions {
 }
 
 export class Session {
-  public readonly threadId: string;
+  public threadId: string;
   public isRunning: boolean = false;
   public abortController: AbortController | null = null;
   private adapter: Adapter;
@@ -40,7 +40,7 @@ export class Session {
       this.threadId = sessionManager.getCurrentSessionId();
     }
     
-    this.modelInfo = options.modelInfo || config.openai.modelName;
+    this.modelInfo = options.modelInfo || config.model.name;
     
     // 设置中止信号
     this.abortController = new AbortController();
@@ -126,6 +126,17 @@ export class Session {
    */
   getVoiceASR(): any | null {
     return this.voiceASR;
+  }
+
+  /**
+   * 记录工具执行过程中的实时输出
+   */
+  logToolProgress(toolName: string, chunk: string): void {
+    this.adapter.emit({
+      type: 'toolProgress',
+      data: { toolName, chunk },
+      timestamp: Date.now()
+    });
   }
 
   /**

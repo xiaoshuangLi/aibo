@@ -3,6 +3,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { Session } from "@/core/agent";
 
 const execAsync = promisify(exec);
 
@@ -88,7 +89,20 @@ const merge = (main: string = '') => (...args: string[]): string => {
  */
 function handleBashExecutionError(error: unknown, command: string, timeout: number): string {
   const err = error as any;
-  
+
+  // Handle abort/interrupt (must check before SIGTERM, as abort also sends SIGTERM)
+  if (err.code === 'ABORT_ERR' || err.name === 'AbortError') {
+    return JSON.stringify({
+      success: false,
+      interrupted: true,
+      error: "Command interrupted",
+      message: "Command execution was interrupted by user. The user may provide feedback in the next message.",
+      stdout: err.stdout || "",
+      stderr: err.stderr || "",
+      command: command,
+    }, null, 2);
+  }
+
   // Handle timeout specifically
   if (err.signal === "SIGTERM") {
     return JSON.stringify({
@@ -112,7 +126,8 @@ function handleBashExecutionError(error: unknown, command: string, timeout: numb
   }, null, 2);
 }
 
-export const executeBashTool = tool(
+function createExecuteBashTool(session?: Session) {
+  return tool(
   async ({ command, timeout = 120000, cwd }) => {
     const records: string[] = [];
 
@@ -120,11 +135,14 @@ export const executeBashTool = tool(
       timeout: timeout,
       cwd: cwd || process.cwd(),
       env: process.env,
+      signal: session?.abortController?.signal,
     });
 
     try {
       promise.child.stdout?.on?.('data', (data) => {
-        records.push(data);
+        const chunk = data.toString();
+        records.push(chunk);
+        session?.logToolProgress('execute_bash', chunk);
       });
 
       // 执行命令
@@ -154,12 +172,13 @@ Default timeout is 2 minutes — increase for long-running commands like npm ins
     }),
   }
 );
+}
 
 /**
  * 异步获取 Bash 工具的方法
  * 
  * @returns Promise<Array<any>> - 包含 Bash 工具的数组
  */
-export default async function getBashTools() {
-  return [executeBashTool];
+export default async function getBashTools(session?: Session) {
+  return [createExecuteBashTool(session)];
 }

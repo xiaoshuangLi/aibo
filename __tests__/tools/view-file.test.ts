@@ -44,7 +44,8 @@ describe('viewFileTool', () => {
     });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
-    expect(parsed.content).toBe('line2\nline3');
+    // Content is returned with line numbers prefixed (e.g. '2\tline2')
+    expect(parsed.content).toBe('2\tline2\n3\tline3');
     expect(parsed.start_line).toBe(2);
     expect(parsed.end_line).toBe(3);
   });
@@ -84,6 +85,18 @@ describe('viewFileTool', () => {
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('FILE_NOT_FOUND');
+  });
+
+  test('should prefix content lines with right-aligned line numbers', async () => {
+    const result = await viewFileTool.invoke({
+      file_path: testFile,
+      start_line: 1,
+      end_line: 3,
+    });
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    // Each line is prefixed with its 1-based line number and a tab
+    expect(parsed.content).toBe('1\tline1\n2\tline2\n3\tline3');
   });
 
   test('should return FILE_TOO_LARGE error for files exceeding 10 MB', async () => {

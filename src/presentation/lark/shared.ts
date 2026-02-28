@@ -297,7 +297,7 @@ export const isJsonContent = (content: string): boolean => {
  */
 export const getToolType = (name: string): string => {
   // 文件系统工具
-  if (['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'].includes(name)) {
+  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'glob_files', 'grep', 'grep_files'].includes(name)) {
     return 'filesystem';
   }
   // 系统/Bash工具
@@ -307,6 +307,14 @@ export const getToolType = (name: string): string => {
   // GitHub工具
   if (name === 'WebFetchFromGithub') {
     return 'github';
+  }
+  // 网页获取工具
+  if (name === 'web_fetch') {
+    return 'web';
+  }
+  // 思考工具
+  if (name === 'think') {
+    return 'thinking';
   }
   // 代码分析工具
   if (name === 'hybrid_code_reader') {
@@ -321,7 +329,7 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (name === 'write-subagent-todos' || name === 'write_todos' || name === 'task') {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
     return 'task_management';
   }
   // Composio工具

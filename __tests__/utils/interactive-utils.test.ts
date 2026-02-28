@@ -12,12 +12,12 @@ import {
 import { Session } from '@/core/agent/session';
 
 import { HumanMessage } from 'langchain';
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 import { structuredLog } from '@/shared/utils/logging';
 import { shouldExitInteractiveMode, isEmptyInput } from '@/core/utils';
 
 // ===== 模拟外部依赖 =====
-jest.mock('../../src/core/config/config', () => ({
+jest.mock('../../src/core/config', () => ({
   config: {
     output: {
       verbose: false,
@@ -379,8 +379,8 @@ describe('Edge Cases for 100% Coverage', () => {
     });
 
     it('should use longer truncation limits in verbose mode', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = true;
       
       try {
         const session = createMockSession();
@@ -391,13 +391,13 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleJsonToolResult(result, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should use shorter truncation limits in non-verbose mode', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = false;
       
       try {
         const session = createMockSession();
@@ -408,13 +408,13 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleJsonToolResult(result, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle stderr in verbose mode', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = true;
       
       try {
         const session = createMockSession();
@@ -425,13 +425,13 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleJsonToolResult(result, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle invalid JSON in catch block', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = true;
       
       try {
         const session = createMockSession();
@@ -441,15 +441,15 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleJsonToolResult(invalidJson, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
   });
 
   describe('handleTextToolResult', () => {
     it('should handle text tool result in verbose mode', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = true;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = true;
       
       try {
         const session = createMockSession();
@@ -459,13 +459,13 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleTextToolResult(longResult, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle text tool result with failure indicators', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = false;
       
       try {
         const session = createMockSession();
@@ -475,13 +475,13 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleTextToolResult(result, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 
     it('should handle text tool result in non-verbose mode', async () => {
-      const originalConfig = { ...require('../../src/core/config/config').config };
-      require('../../src/core/config/config').config.output.verbose = false;
+      const originalConfig = { ...require('../../src/core/config').config };
+      require('../../src/core/config').config.output.verbose = false;
       
       try {
         const session = createMockSession();
@@ -491,7 +491,7 @@ describe('Edge Cases for 100% Coverage', () => {
         await handleTextToolResult(longResult, lastToolCall, session);
         expect(session.adapter.emit).toHaveBeenCalled();
       } finally {
-        require('../../src/core/config/config').config.output.verbose = originalConfig.output.verbose;
+        require('../../src/core/config').config.output.verbose = originalConfig.output.verbose;
       }
     });
 

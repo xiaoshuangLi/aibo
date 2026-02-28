@@ -15,11 +15,13 @@ The fundamental difference from "just writing code" is **verification at every s
 ```
 Task received
      ↓
+PLAN TODOS: Break into subtasks with todo_write (status: not_started)
+     ↓
 EXPLORE: What does existing similar code look like?
      ↓  
 PLAN: Which files change? What are the cross-file impacts?
      ↓
-IMPLEMENT: Write/edit the code
+IMPLEMENT: Write/edit the code  ← update todo status to in_progress first
      ↓
 BUILD: Does it compile? → NO → Fix errors → repeat BUILD
      ↓ YES
@@ -27,10 +29,40 @@ TEST: Do tests pass? → NO → Fix failures → repeat TEST
      ↓ YES
 VERIFY: Does it actually solve the problem?
      ↓ YES
-CLEANUP: Remove debug code, temp files
+CLEANUP: Remove debug code, temp files  ← mark todo completed
      ↓
 DONE ✅
 ```
+
+## 📝 Phase 0: PLAN TODOS
+
+**For any task that requires 3+ steps, create a personal todo list BEFORE doing anything else.**
+
+```typescript
+// At the start of a complex task:
+todo_write({
+  todos: [
+    { content: "Explore existing code and understand context", status: "not_started", priority: "high" },
+    { content: "Implement feature X in src/services/user-service.ts", status: "not_started", priority: "high" },
+    { content: "Add/update tests for feature X", status: "not_started", priority: "medium" },
+    { content: "Run build and fix any TypeScript errors", status: "not_started", priority: "high" },
+    { content: "Run tests and fix any failures", status: "not_started", priority: "high" },
+    { content: "Verify feature X works end-to-end", status: "not_started", priority: "medium" },
+  ]
+})
+
+// Before starting each task:
+todo_write({ todos: [{ id: "1", content: "...", status: "in_progress" }] })
+
+// After completing each task:
+todo_write({ todos: [{ id: "1", content: "...", status: "completed" }] })
+```
+
+**Why this matters**: A todo list prevents "I forgot to update the barrel export" bugs,
+shows users what you're doing, and ensures nothing is skipped during a long session.
+
+> ⚠️ This is the `todo_write`/`todo_read` tool — for YOUR personal task tracking.
+> For delegating to specialized subagents, use `write-subagent-todos` instead.
 
 ## 🔍 Phase 1: EXPLORE
 
@@ -286,3 +318,27 @@ Before declaring done:
 | Report "done" with test failures | Task is not done | Fix failures; task is done when tests pass |
 | Edit without reading the file first | Wrong indentation, duplicate code, context blindness | Always view_file before edit_file |
 | `grep_files` once, assume complete | May miss dynamic code, aliases, re-exports | Check multiple times with different queries |
+
+## 🧹 Context Management During Long Tasks
+
+Long coding sessions accumulate token history and cause two problems: **slowdown** and **goal drift**.
+
+### Save Key Decisions to the Knowledge Base
+After every major decision or milestone, save it:
+```typescript
+add_knowledge({
+  content: "Decided to use JWT auth (not sessions) because the app is API-first",
+  title: "Auth Architecture Decision",
+  keywords: ["auth", "JWT", "architecture"]
+})
+```
+
+### Use /compact Between Major Sub-Tasks
+When you finish a phase and the session has grown large:
+```
+/compact
+```
+This clears the heavy message history (speeds up responses) while keeping the knowledge base intact.
+After compacting, restate your goal so the AI stays on track.
+
+> 📖 See the **context-management** skill for the full workflow.

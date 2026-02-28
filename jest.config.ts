@@ -20,6 +20,5 @@ export default {
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
     '!src/**/*.d.ts',
-    '!src/infrastructure/browser/puppeteer-utils.ts',
   ],
 };
