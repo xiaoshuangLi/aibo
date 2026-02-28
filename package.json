@@ -1,5 +1,5 @@
 {
-  "name": "aibo",
+  "name": "@boay/aibo",
   "version": "1.0.0",
   "description": "AI bot with DeepAgents",
   "main": "dist/index.js",
