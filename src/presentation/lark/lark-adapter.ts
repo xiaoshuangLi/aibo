@@ -135,8 +135,21 @@ export class LarkAdapter extends DefaultAdapter {
   private async handleUserMessage(data: any): Promise<void> {
     try {
       const { message } = data;
-      const { chat_id: chatId, content } = message;
-      
+      const { chat_id: msgChatId, chat_type: chatType, content } = message;
+
+      // 消息过滤：
+      // - 有 chatId 时，只处理相同群聊的消息
+      // - 无 chatId 时，只处理直接发给机器人的私信（p2p）消息
+      if (this.chatId !== null) {
+        if (msgChatId !== this.chatId) {
+          return;
+        }
+      } else {
+        if (chatType !== 'p2p') {
+          return;
+        }
+      }
+
       // 解析消息内容
       let messageContent = '';
       try {
@@ -161,7 +174,7 @@ export class LarkAdapter extends DefaultAdapter {
         this.userMessageCallback(messageContent);
       } else {
         // 如果没有回调，将消息加入队列
-        this.messageQueue.push({ content: messageContent, chatId });
+        this.messageQueue.push({ content: messageContent, chatId: msgChatId });
         this.processMessageQueue();
       }
     } catch (error) {

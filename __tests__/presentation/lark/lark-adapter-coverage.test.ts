@@ -85,6 +85,7 @@ describe('LarkAdapter - Additional Coverage', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: JSON.stringify({ text: 'Hello from WebSocket' })
         }
       };
