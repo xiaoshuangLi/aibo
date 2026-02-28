@@ -242,6 +242,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: JSON.stringify({ text: 'Hello World' })
         }
       };
@@ -259,6 +260,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: 'Plain text message'
         }
       };
@@ -276,6 +278,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: ''
         }
       };
@@ -299,6 +302,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: 'New message'
         }
       };
@@ -321,6 +325,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: JSON.stringify({ text: 'Queued message' })
         }
       };
@@ -345,6 +350,7 @@ describe('LarkAdapter', () => {
       const testData = {
         message: {
           chat_id: 'test-chat-id',
+          chat_type: 'p2p',
           content: 'invalid json {'
         }
       };
@@ -353,6 +359,80 @@ describe('LarkAdapter', () => {
       
       expect(callback).toHaveBeenCalledWith('invalid json {');
       expect(mockConsoleError).not.toHaveBeenCalled(); // Should not log error for this case
+    });
+
+    // --- message filtering tests ---
+
+    it('without chatId: should ignore group messages (chat_type !== p2p)', async () => {
+      const adapter = new LarkAdapter(); // no chatId → p2p-only mode
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'some-group-id',
+          chat_type: 'group',
+          content: JSON.stringify({ text: 'group message' })
+        }
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('without chatId: should accept p2p messages', async () => {
+      const adapter = new LarkAdapter(); // no chatId → p2p-only mode
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'dm-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: 'direct message' })
+        }
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(callback).toHaveBeenCalledWith('direct message');
+    });
+
+    it('with chatId: should ignore messages from a different group', async () => {
+      const adapter = new LarkAdapter('my-group-id');
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'other-group-id',
+          chat_type: 'group',
+          content: JSON.stringify({ text: 'wrong group message' })
+        }
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('with chatId: should accept messages from the matching group', async () => {
+      const adapter = new LarkAdapter('my-group-id');
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'my-group-id',
+          chat_type: 'group',
+          content: JSON.stringify({ text: 'correct group message' })
+        }
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(callback).toHaveBeenCalledWith('correct group message');
     });
   });
 
