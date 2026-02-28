@@ -50,12 +50,14 @@ npm run build
 - 配置选项说明
 - 高级用法示例
 - 常见问题解答 (FAQ)
+- MCP 工具集成说明（如适用，参见 `docs/mcp.md`）
 
 ## 6. 项目结构 (Project Structure)
 ```
 project-root/
 ├── src/                    # 源代码目录
 ├── __tests__/             # 测试文件目录
+├── docs/                  # 文档目录（env.md、mcp.md 等）
 ├── features/              # 功能文档目录
 ├── templates/             # 模板文件目录
 ├── scripts/               # 脚本工具目录
