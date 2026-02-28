@@ -35,6 +35,39 @@ const backend = new SafeFilesystemBackend({
 let cachedAgent: ReturnType<typeof createDeepAgent>;
 
 /**
+ * 当检测到本地安装了 claude 或 cursor CLI 工具时，生成优先使用这些工具的提示词补充。
+ *
+ * @param hasClaudeTool - 是否检测到 claude_execute 工具
+ * @param hasCursorTool - 是否检测到 cursor_execute 工具
+ * @returns 追加到系统提示词末尾的补充字符串（若均不可用则返回空字符串）
+ */
+export function buildCodingAgentHint(hasClaudeTool: boolean, hasCursorTool: boolean): string {
+  const available: string[] = [];
+  if (hasClaudeTool) available.push('`claude_execute` (Claude Code CLI)');
+  if (hasCursorTool) available.push('`cursor_execute` (Cursor AI CLI)');
+
+  if (available.length === 0) {
+    return '';
+  }
+
+  const toolList = available.join(' and ');
+  return `
+
+## 🤖 PRIORITY: Use Local AI Coding Agents
+
+The following local AI coding agent CLI tool(s) are available on this system: ${toolList}.
+
+**When handling any coding task — including writing code, fixing bugs, refactoring, adding tests, explaining code, or making multi-file changes — you MUST prefer delegating the work to these tools over implementing the changes yourself.**
+
+Guidelines:
+- Use ${toolList} as your primary coding executor for implementation tasks.
+- Pass a clear, complete task description as the \`prompt\` argument so the agent can act autonomously.
+- Set \`cwd\` to the relevant project directory so the agent operates in the right context.
+- After the agent finishes, review its output and verify the result before reporting back.
+- Only fall back to direct file manipulation tools (edit_file, write_file, execute_bash, etc.) when the coding agent tool is unavailable or has already failed.`;
+}
+
+/**
  * 创建检查点器实例
  * 根据配置动态创建不同类型的检查点器
  */
@@ -139,10 +172,15 @@ function filterSubAgentTools(tools: any[]): any[] {
     ? subAgentsWithDefaults 
     : [getDefaultGeneralPurposeSubAgent()];
 
+  // Build coding-agent priority hint when claude/cursor CLI tools are available
+  const hasClaudeTool = tools.some(t => t.name === 'claude_execute');
+  const hasCursorTool = tools.some(t => t.name === 'cursor_execute');
+  const systemPrompt = SYSTEM_PROMPT + buildCodingAgentHint(hasClaudeTool, hasCursorTool);
+
   cachedAgent = createDeepAgent({
     model,
     backend,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     checkpointer: createCheckpointer(),
     tools,
     skills: allSkillsDirs,
