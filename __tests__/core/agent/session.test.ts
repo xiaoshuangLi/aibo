@@ -1,6 +1,6 @@
 import { Session } from '@/core/agent/session';
 import { Adapter } from '@/core/agent/adapter';
-import { SessionManager } from '@/infrastructure/session/session-manager';
+import { SessionManager } from '@/infrastructure/session/manager';
 
 // Mock Adapter
 const mockAdapter = {
@@ -11,12 +11,12 @@ const mockAdapter = {
 } as unknown as Adapter;
 
 // Mock createConsoleThreadId
-jest.mock('@/core/utils/interactive-logic', () => ({
+jest.mock('@/core/utils/interactive', () => ({
   createConsoleThreadId: jest.fn().mockReturnValue('test-thread-id')
 }));
 
 // Mock SessionManager to return the mocked thread ID
-jest.mock('@/infrastructure/session/session-manager', () => {
+jest.mock('@/infrastructure/session/manager', () => {
   const mockSessionManager = {
     getInstance: jest.fn().mockReturnValue({
       getCurrentSessionId: jest.fn().mockReturnValue('test-thread-id')
@@ -26,7 +26,7 @@ jest.mock('@/infrastructure/session/session-manager', () => {
 });
 
 // Mock config
-jest.mock('@/core/config/config', () => ({
+jest.mock('@/core/config', () => ({
   config: {
     model: {
       name: 'gpt-4o-mini'

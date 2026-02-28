@@ -1,4 +1,4 @@
-import { getTextFromUrl, createBrowser, closeBrowser } from '@/infrastructure/browser/puppeteer-utils';
+import { getTextFromUrl, createBrowser, closeBrowser } from '@/infrastructure/browser/puppeteer';
 import puppeteer from 'puppeteer';
 
 // Mock puppeteer to avoid actual browser launches

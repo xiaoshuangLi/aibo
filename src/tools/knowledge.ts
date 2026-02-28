@@ -7,7 +7,7 @@ import {
   searchKnowledge,
   KnowledgeItem,
   KnowledgeSummary
-} from '@/shared/utils/library';
+} from '@/shared/utils';
 
 /**
  * 添加知识项到知识库工具

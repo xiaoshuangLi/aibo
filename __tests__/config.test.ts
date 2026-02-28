@@ -3,7 +3,7 @@ jest.mock('dotenv', () => ({
   config: jest.fn()
 }));
 
-import { config } from '@/core/config/config';
+import { config } from '@/core/config';
 
 describe('Configuration Module', () => {
   // 保存原始环境变量
@@ -27,7 +27,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_API_KEY = 'sk-test-key';
     
     // 重新导入配置模块
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
     
     expect(testConfig.model.apiKey).toBe('sk-test-key');
     expect(testConfig.model.name).toBe('gpt-4o'); // 默认值
@@ -47,7 +47,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_MEMORY_WINDOW_SIZE = '10';
     process.env.AIBO_VERBOSE_OUTPUT = 'true';
     
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
     
     expect(testConfig.model.apiKey).toBe('sk-custom-key');
     expect(testConfig.model.baseURL).toBe('https://custom-api.example.com/v1');
@@ -63,7 +63,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_MODEL_NAME = 'llama3';
     process.env.AIBO_MODEL_PROVIDER = 'ollama';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.model.apiKey).toBeUndefined();
     expect(testConfig.model.name).toBe('llama3');
@@ -74,14 +74,14 @@ describe('Configuration Module', () => {
     process.env.AIBO_BASE_URL = 'not-a-url';
     
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
   });
 
   test('should accept valid AIBO_BASE_URL', () => {
     process.env.AIBO_BASE_URL = 'https://api.openai.com/v1';
     
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
     
     expect(testConfig.model.baseURL).toBe('https://api.openai.com/v1');
   });
@@ -90,17 +90,17 @@ describe('Configuration Module', () => {
     process.env.AIBO_RECURSION_LIMIT = '0';
     
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
     
     process.env.AIBO_RECURSION_LIMIT = '-100';
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
     
     process.env.AIBO_RECURSION_LIMIT = 'abc';
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
   });
 
@@ -108,7 +108,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_MEMORY_WINDOW_SIZE = '0';
     
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
   });
 
@@ -116,24 +116,24 @@ describe('Configuration Module', () => {
     process.env.AIBO_CHECKPOINTER_TYPE = 'invalid';
     
     expect(() => {
-      require('../src/core/config/config');
+      require('../src/core/config');
     }).toThrow();
     
     process.env.AIBO_CHECKPOINTER_TYPE = 'memory';
-    const { config: testConfig1 } = require('../src/core/config/config');
+    const { config: testConfig1 } = require('../src/core/config');
     expect(testConfig1.langgraph.checkpointerType).toBe('memory');
     
     // 重置模块缓存
     jest.resetModules();
     process.env.AIBO_CHECKPOINTER_TYPE = 'sqlite';
-    const { config: testConfig2 } = require('../src/core/config/config');
+    const { config: testConfig2 } = require('../src/core/config');
     expect(testConfig2.langgraph.checkpointerType).toBe('sqlite');
   });
 
   test('should use default 魅魔 persona when AIBO_PERSONA is not set', () => {
     delete process.env.AIBO_PERSONA;
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.persona.style).toContain('魅魔');
   });
@@ -141,7 +141,7 @@ describe('Configuration Module', () => {
   test('should use custom persona when AIBO_PERSONA is provided', () => {
     process.env.AIBO_PERSONA = '你是一个严肃的助手，回答简洁直接。';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.persona.style).toBe('你是一个严肃的助手，回答简洁直接。');
   });
@@ -149,7 +149,7 @@ describe('Configuration Module', () => {
   test('AIBO_OPENAI_API_KEY is accepted as backward-compatible alias for AIBO_API_KEY', () => {
     process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.model.apiKey).toBe('sk-legacy-key');
   });
@@ -158,7 +158,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_API_KEY = 'sk-new-key';
     process.env.AIBO_OPENAI_API_KEY = 'sk-legacy-key';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.model.apiKey).toBe('sk-new-key');
   });
@@ -166,7 +166,7 @@ describe('Configuration Module', () => {
   test('AIBO_OPENAI_BASE_URL is accepted as backward-compatible alias for AIBO_BASE_URL', () => {
     process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.model.baseURL).toBe('https://legacy-endpoint.example.com/v1');
   });
@@ -175,7 +175,7 @@ describe('Configuration Module', () => {
     process.env.AIBO_BASE_URL = 'https://new-endpoint.example.com/v1';
     process.env.AIBO_OPENAI_BASE_URL = 'https://legacy-endpoint.example.com/v1';
 
-    const { config: testConfig } = require('../src/core/config/config');
+    const { config: testConfig } = require('../src/core/config');
 
     expect(testConfig.model.baseURL).toBe('https://new-endpoint.example.com/v1');
   });

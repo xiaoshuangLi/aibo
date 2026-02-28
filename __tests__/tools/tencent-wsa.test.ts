@@ -1,7 +1,7 @@
 import { tencentWsaSearchTool } from '@/tools/tencent-wsa';
-import * as wsaService from '@/infrastructure/tencent-cloud/wsa-service';
+import * as wsaService from '@/infrastructure/tencent-cloud/wsa';
 
-jest.mock('@/infrastructure/tencent-cloud/wsa-service');
+jest.mock('@/infrastructure/tencent-cloud/wsa');
 
 describe('Tencent WSA Search Tool', () => {
   beforeEach(() => {
