@@ -56,7 +56,7 @@ describe('createProgram', () => {
     expect(interact).toBeDefined();
     const helpInfo = interact.helpInformation();
     expect(helpInfo).toContain('--type');
-    expect(helpInfo).toContain('user|chat');
+    expect(helpInfo).toContain('user_chat|group_chat');
   });
 
   it('always registers a default action handler', () => {

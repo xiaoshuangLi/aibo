@@ -34,8 +34,8 @@ export async function startLarkInteractiveMode(): Promise<void> {
 
     // chat 模式：获取或创建与当前工作目录绑定的群聊
     let chatId: string | undefined;
-    if (larkType === 'chat') {
-      console.log('💬 chat 模式：正在获取或创建群聊...');
+    if (larkType === 'group_chat') {
+      console.log('💬 group_chat 模式：正在获取或创建群聊...');
       const chatService = new LarkChatService();
       chatId = await chatService.getOrCreateChat();
     }

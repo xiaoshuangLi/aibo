@@ -52,17 +52,17 @@ function resolveInteractionMode(): 'console' | 'lark' {
  *
  * Only effective when the interaction mode is `lark`.
  * Priority order:
- * 1. `aibo interact --type user|chat` subcommand option
- * 2. Default: user type
+ * 1. `aibo interact --type user_chat|group_chat` subcommand option
+ * 2. Default: user_chat type
  *
- * @returns {'user' | 'chat'} The resolved lark type
+ * @returns {'user_chat' | 'group_chat'} The resolved lark type
  */
-function resolveLarkType(): 'user' | 'chat' {
+function resolveLarkType(): 'user_chat' | 'group_chat' {
   const cliType = parseLarkTypeFromArgs();
   if (cliType !== null) {
     return cliType;
   }
-  return 'user';
+  return 'user_chat';
 }
 
 

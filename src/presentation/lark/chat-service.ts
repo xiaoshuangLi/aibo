@@ -80,11 +80,11 @@ export class LarkChatService {
    * 查找名称匹配 cwd 的标签，若不存在则创建并返回其 id。
    */
   private async findOrCreateTag(cwd: string): Promise<string> {
-    // 查询标签列表，按名称过滤
+    // 通过绑定关系侧查不到"按名称列举"的 SDK 方法，先用 request 查询列表
     const listResp = await this.client.request({
       method: 'GET',
-      url: '/open-apis/tenant/v2/tags',
-      params: { name: cwd, tag_type: TAG_ENTITY_TYPE },
+      url: '/open-apis/im/v2/tags',
+      params: { name: cwd },
     });
 
     const tags: Array<{ id: string; name: string }> = listResp?.data?.items ?? [];
@@ -94,13 +94,14 @@ export class LarkChatService {
       return existing.id;
     }
 
-    // 创建新标签
-    const createResp = await this.client.request({
-      method: 'POST',
-      url: '/open-apis/tenant/v2/tags',
+    // 使用 SDK 创建新标签
+    const createResp = await (this.client.im.v2.tag as any).create({
       data: {
-        name: cwd,
-        tag_type: TAG_ENTITY_TYPE,
+        create_tag: {
+          tag_type: 'tenant',
+          name: cwd,
+          i18n_names: [{ locale: 'zh_cn', name: cwd }],
+        },
       },
     });
 
@@ -117,9 +118,7 @@ export class LarkChatService {
    * 通过标签 id 查询绑定的群聊，返回第一个绑定的 chat_id，或 null。
    */
   private async findChatByTag(tagId: string): Promise<string | null> {
-    const resp = await this.client.request({
-      method: 'GET',
-      url: '/open-apis/tenant/v2/tag_relationships/search',
+    const resp = await (this.client.im.v2.bizEntityTagRelation as any).get({
       params: { tag_id: tagId, entity_type: TAG_ENTITY_TYPE },
     });
 
@@ -178,9 +177,7 @@ export class LarkChatService {
    * 将标签绑定到群聊。
    */
   private async bindTagToChat(tagId: string, chatId: string): Promise<void> {
-    await this.client.request({
-      method: 'POST',
-      url: '/open-apis/tenant/v2/tag_relationships',
+    await (this.client.im.v2.bizEntityTagRelation as any).create({
       data: {
         tag_id: tagId,
         entity_id: chatId,

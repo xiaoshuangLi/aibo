@@ -44,27 +44,27 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
 /**
  * Parses the `aibo interact --type` subcommand option from process.argv.
  *
- * Only meaningful when `--mode=lark`. Returns `'chat'` when the user passes
- * `--type=chat`, `'user'` for `--type=user` (or any other value), and `null`
- * when the `interact` subcommand is not present.
+ * Only meaningful when `--mode=lark`. Returns `'group_chat'` when the user
+ * passes `--type=group_chat`, `'user_chat'` for `--type=user_chat` (or any
+ * other value), and `null` when the `interact` subcommand is not present.
  *
- * @returns {'user' | 'chat' | null} The lark interaction type, or null if not
- *   invoked via the `interact` subcommand.
+ * @returns {'user_chat' | 'group_chat' | null} The lark interaction type, or
+ *   null if not invoked via the `interact` subcommand.
  */
-export function parseLarkTypeFromArgs(): 'user' | 'chat' | null {
+export function parseLarkTypeFromArgs(): 'user_chat' | 'group_chat' | null {
   if (process.argv[2] !== 'interact') {
     return null;
   }
 
   const subCmd = new Command();
   subCmd
-    .option('--type <type>', 'Set lark interaction type (user|chat)')
+    .option('--type <type>', 'Set lark interaction type (user_chat|group_chat)')
     .allowUnknownOption();
   subCmd.parse(['node', 'interact', ...process.argv.slice(3)]);
   const opts = subCmd.opts();
 
-  if (opts.type === 'chat') {
-    return 'chat';
+  if (opts.type === 'group_chat') {
+    return 'group_chat';
   }
-  return 'user';
+  return 'user_chat';
 }
