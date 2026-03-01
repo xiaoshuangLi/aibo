@@ -329,8 +329,12 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task', 'todo_write', 'todo_read'].includes(name)) {
     return 'task_management';
+  }
+  // AI代理执行工具
+  if (['claude_execute', 'cursor_execute', 'cursor_open', 'gemini_execute', 'codex_execute'].includes(name)) {
+    return 'agent_runner';
   }
   // Composio工具
   if (name.startsWith('COMPOSIO_')) {
