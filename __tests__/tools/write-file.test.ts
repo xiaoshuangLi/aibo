@@ -7,7 +7,7 @@ describe('writeFileTool', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-file-test-'));
+    tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'write-file-test-')));
   });
 
   afterEach(() => {
