@@ -282,8 +282,15 @@ AIBO 没有内置的依赖漏洞扫描或自动更新能力，仅在 `ci-cd` 技
 AIBO 支持通过以下方式扩展：
 
 - `agents/` 目录：添加新 Agent 的 Markdown 文件
-- `skills/` 目录：添加新 Skill 的 Markdown 文件
+- `skills/<name>/SKILL.md`：Skill 的触发条件与工作流描述（**AI 根据此选择是否激活该 Skill**）
+- `skills/<name>/scripts/`：可执行脚本（Python / Bash / Node.js），AI 可调用执行确定性逻辑
+- `skills/<name>/references/`：按需加载的参考文档（API 文档、数据库 Schema 等）
+- `skills/<name>/assets/`：输出时使用的静态资源（模板、图片、字体等），AI 无需读入上下文
 - `mcps/` 目录：添加新 MCP 工具的 JSON 配置文件
+
+Skills 已经采用"渐进式披露（Progressive Disclosure）"三层加载架构：触发元数据 → SKILL.md 正文 → 按需加载的 bundled resources。这意味着 Skills **并非纯文档驱动**——它们可以携带可执行脚本（如 `docx`、`pdf`、`webapp-testing`、`feature-organizer` 等技能）和大量参考资料（如 `mcp-builder`）。
+
+> 📖 关于 Skills 的完整非文档驱动能力及未来扩展方向，详见 **[docs/skills-advanced.md](skills-advanced.md)**
 
 ### 不足
 
@@ -291,13 +298,14 @@ AIBO 支持通过以下方式扩展：
 |------|------|
 | 无插件 API / SDK | 第三方开发者只能通过 Fork 仓库来添加原生 TypeScript 工具，没有稳定的插件 API |
 | MCP 无自动发现 | MCP 工具需要手动创建 JSON 配置，无法从 npm 包或标准目录自动发现已安装的 MCP 服务 |
-| Skills / Agents 仅文档驱动 | Skills 和 Agents 是纯 Markdown 提示词，无法包含可执行逻辑，能力上限受限于 AI 理解能力 |
+| Skills 无 TypeScript 模块支持 | 当前脚本只能是 Python/Bash/Node 命令行程序，Skills 无法直接向主进程注册新的 LangChain 工具 |
 | 无版本管理 | Skills 和 Agents 的 Markdown 文件没有版本号，多人维护时易产生冲突 |
 
 ### 建议
 
 - 发布 `@boay/aibo-sdk`，提供标准的工具注册接口（`registerTool`、`registerAgent`）
 - 支持从 `node_modules` 自动发现带有 `aibo-plugin` 关键词的 npm 包
+- 允许 Skill 目录内包含 `plugin.ts` 入口文件，在启动时动态加载为 LangChain 工具
 
 ---
 
