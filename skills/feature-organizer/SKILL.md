@@ -121,7 +121,26 @@ After compiling the complete change inventory:
 
 **MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-feature-documentation.js` and ensure it passes before proceeding to the next step. If the validation fails, you must adjust your feature documentation based on the feedback and re-run the validation until it passes.
 
-### Step 4: Commit with Proper Structure
+### Step 4: Update README and Documentation
+
+**Objective**: Keep user-facing documentation in sync with the code changes
+
+**Process**:
+1. **Identify user-facing changes**: From the functional change inventory compiled in Step 2, determine which changes affect end users (new features, changed behavior, new environment variables, new CLI tools, new configuration options, removed features, etc.)
+2. **Update `README.md`** if any of the following changed:
+   - New feature capabilities or tools (update the ✨ 功能特性 section)
+   - New or changed environment variables (update the ⚙️ 配置 / Quick Start section and point to docs/env.md)
+   - New or changed CLI usage / interaction modes
+   - Any other user-visible behavior
+3. **Update `docs/` files** for the corresponding topic if any of the following changed:
+   - Environment variables → update `docs/env.md`
+   - MCP tool integration → update `docs/mcp.md`
+   - Any other file in `docs/` that covers the changed functionality
+4. **Skip this step only when** the changes are entirely internal (refactoring, test additions, build config) with zero impact on user-facing behavior or configuration
+
+**CRITICAL REQUIREMENT**: Documentation updates MUST be written in Chinese (中文), consistent with the existing documentation language.
+
+### Step 5: Commit with Proper Structure
 
 **Objective**: Create a clean, well-structured commit
 
@@ -144,6 +163,8 @@ Before completing the feature organization process, ensure:
 - **✅ No changes missed**: Every functional change from Step 2 is reflected in the documentation
 - **✅ Workload documented**: Actual development effort is captured in the workload section
 - **✅ Documentation in Chinese**: **ALL feature documentation content MUST be written in Chinese (中文)**
+- **✅ README updated**: `README.md` reflects any user-facing feature or configuration changes
+- **✅ Docs updated**: All relevant `docs/` files updated when corresponding functionality changes
 - **✅ Sequential numbering**: No gaps or duplicates in feature numbering
 - **✅ Clean commit**: All changes properly staged and committed
 
@@ -164,6 +185,7 @@ The following JavaScript validation scripts are provided to ensure each phase is
 - **Phase 1**: `./skills/feature-organizer/scripts/validate-test-coverage.js` - Validates test execution and coverage
 - **Phase 2**: `./skills/feature-organizer/scripts/validate-requirements-extraction.js` - Validates requirements extraction from code changes
 - **Phase 3**: `./skills/feature-organizer/scripts/validate-feature-documentation.js` - Validates feature documentation structure and content
+- **Step 4** (README & docs update): No automated script — verify manually that README.md and affected `docs/` files reflect the changes
 - **Phase 4**: `./skills/feature-organizer/scripts/validate-commit-structure.js` - Validates commit structure and cleanliness
 
 **IMPORTANT**: Each validation script MUST be executed after its corresponding phase and MUST pass before proceeding to the next phase. The validation scripts provide detailed feedback that should be used to adjust the implementation if needed.
