@@ -261,9 +261,12 @@ export class LarkAdapter extends DefaultAdapter {
       // 飞书支持多行文本，直接发送格式化后的内容
       await create(content);
     } catch (error) {
-      console.error('❌ 发送消息失败:', (error as any).response.data);
-      console.error('📃 发送消息内容:', (error as any).response.config.data);
-      await create('【敏感内容】');
+      const errorData = (error as any).response?.data;
+      console.error('❌ 发送消息失败:', errorData);
+      console.error('📃 发送消息内容:', (error as any).response?.config?.data);
+      const errorJson = JSON.stringify(errorData ?? String(error), null, 2);
+      const errorContent = `\`\`\`json\n${errorJson}\n\`\`\``;
+      await create(styled.system('❌ 发送消息失败', errorContent));
     }
   }
 

@@ -45,25 +45,29 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
   }
 }));
 
-// Mock styled
-jest.mock('@/presentation/styling/styler', () => ({
-  styled: {
-    assistant: jest.fn((text) => `Assistant: ${text}`),
-    system: jest.fn((msg) => msg),
-    error: jest.fn((msg) => msg),
-    hint: jest.fn((msg) => msg),
-    toolCall: jest.fn((name, args) => `Tool: ${name}(${JSON.stringify(args)})`),
-    toolResult: jest.fn((name, success, preview) => `Result: ${name} - ${success ? 'success' : 'failure'} - ${preview}`),
-    thinkingProcess: jest.fn((steps) => `Thinking: ${JSON.stringify(steps)}`),
-    truncated: jest.fn((original, limit) => {
+// Shared styled mock factory - uses function declaration so it's hoisted above jest.mock calls
+function mockStyledFactory() {
+  return {
+    assistant: jest.fn((text: string) => `Assistant: ${text}`),
+    system: jest.fn((title: string, text?: string) => text ? `${title}: ${text}` : title),
+    error: jest.fn((msg: string) => msg),
+    hint: jest.fn((msg: string) => msg),
+    toolCall: jest.fn((name: string, args: any) => `Tool: ${name}(${JSON.stringify(args)})`),
+    toolResult: jest.fn((name: string, success: boolean, preview: string) => `Result: ${name} - ${success ? 'success' : 'failure'} - ${preview}`),
+    thinkingProcess: jest.fn((steps: any) => `Thinking: ${JSON.stringify(steps)}`),
+    truncated: jest.fn((original: any, limit: number) => {
       if (typeof original === 'string') {
         return original.substring(0, limit);
       } else {
         return JSON.stringify(original).substring(0, limit);
       }
     })
-  }
-}));
+  };
+}
+
+// Mock styled
+jest.mock('@/presentation/styling/styler', () => ({ styled: mockStyledFactory() }));
+jest.mock('@/presentation/lark/styler', () => ({ styled: mockStyledFactory() }));
 
 describe('LarkAdapter', () => {
   let originalLarkConfig: any;
@@ -478,9 +482,10 @@ describe('LarkAdapter', () => {
       expect(mockConsoleError).toHaveBeenCalledWith('❌ 发送消息失败:', 'error response data');
       expect(mockConsoleError).toHaveBeenCalledWith('📃 发送消息内容:', 'request config data');
       
-      const secondCallContent = mockLarkClient.im.message.create.mock.calls[1][0].data.content;
-      const secondParsedContent = JSON.parse(secondCallContent);
-      expect(secondParsedContent.text).toBe('【敏感内容】');
+      const { styled: mockedStyled } = require('@/presentation/lark/styler');
+      const expectedJson = JSON.stringify('error response data', null, 2);
+      expect(mockedStyled.system).toHaveBeenCalledWith('❌ 发送消息失败', `\`\`\`json\n${expectedJson}\n\`\`\``);
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(2);
     });
 
     it('should warn when no receiveId is configured', async () => {
