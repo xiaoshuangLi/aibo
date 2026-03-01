@@ -33,7 +33,6 @@ describe('Configuration Module', () => {
     expect(testConfig.model.name).toBe('gpt-4o'); // 默认值
     expect(testConfig.langgraph.recursionLimit).toBe(1000); // 默认值
     expect(testConfig.langgraph.checkpointerType).toBe('memory'); // 默认值
-    expect(testConfig.memory.windowSize).toBe(50); // 默认值
     expect(testConfig.output.verbose).toBe(false); // 默认值
     expect(testConfig.persona.style).toContain('魅魔'); // 默认魅魔人设
   });
@@ -44,7 +43,6 @@ describe('Configuration Module', () => {
     process.env.AIBO_MODEL_NAME = 'gpt-4-turbo';
     process.env.AIBO_RECURSION_LIMIT = '500';
     process.env.AIBO_CHECKPOINTER_TYPE = 'sqlite';
-    process.env.AIBO_MEMORY_WINDOW_SIZE = '10';
     process.env.AIBO_VERBOSE_OUTPUT = 'true';
     
     const { config: testConfig } = require('../src/core/config');
@@ -54,7 +52,6 @@ describe('Configuration Module', () => {
     expect(testConfig.model.name).toBe('gpt-4-turbo');
     expect(testConfig.langgraph.recursionLimit).toBe(500);
     expect(testConfig.langgraph.checkpointerType).toBe('sqlite');
-    expect(testConfig.memory.windowSize).toBe(10);
     expect(testConfig.output.verbose).toBe(true);
   });
 
@@ -99,14 +96,6 @@ describe('Configuration Module', () => {
     }).toThrow();
     
     process.env.AIBO_RECURSION_LIMIT = 'abc';
-    expect(() => {
-      require('../src/core/config');
-    }).toThrow();
-  });
-
-  test('should validate AIBO_MEMORY_WINDOW_SIZE as positive integer', () => {
-    process.env.AIBO_MEMORY_WINDOW_SIZE = '0';
-    
     expect(() => {
       require('../src/core/config');
     }).toThrow();

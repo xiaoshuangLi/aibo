@@ -7,8 +7,6 @@ describe('Config Branch Coverage Tests', () => {
     expect(config.model.name).toBeDefined();
     expect(config.langgraph).toBeDefined();
     expect(config.langgraph.recursionLimit).toBeDefined();
-    expect(config.memory).toBeDefined();
-    expect(config.memory.windowSize).toBeDefined();
   });
 
   test('should handle optional baseURL', () => {

@@ -78,7 +78,6 @@ function resolveLarkType(): 'user_chat' | 'group_chat' {
  * - AIBO_AZURE_API_VERSION: Azure OpenAI API version (only required when using Azure)
  * - AIBO_RECURSION_LIMIT: Maximum recursion depth for LangGraph (defaults to 1000)
  * - AIBO_CHECKPOINTER_TYPE: Type of checkpointing mechanism ('memory' or 'sqlite', defaults to 'memory')
- * - AIBO_MEMORY_WINDOW_SIZE: Size of the conversation memory window (defaults to 50)
  * 
  * @constant {z.ZodObject}
  * @private
@@ -94,7 +93,6 @@ const envSchema = z.object({
   AIBO_AZURE_API_VERSION: z.string().optional(),
   AIBO_RECURSION_LIMIT: z.coerce.number().int().positive().default(1000),
   AIBO_CHECKPOINTER_TYPE: z.enum(['memory', 'sqlite', 'filesystem']).default('memory'),
-  AIBO_MEMORY_WINDOW_SIZE: z.coerce.number().int().positive().default(50),
   AIBO_VERBOSE_OUTPUT: z.coerce.boolean().default(false),
   // Tencent Cloud ASR and WSA Configuration
   AIBO_TENCENTCLOUD_APP_ID: z.string().optional(),
@@ -147,8 +145,6 @@ const resolvedLarkType = resolveLarkType();
  * @property {Object} langgraph - LangGraph-specific configuration
  * @property {number} langgraph.recursionLimit - Maximum recursion depth allowed
  * @property {'memory'|'sqlite'} langgraph.checkpointerType - Type of checkpointing mechanism
- * @property {Object} memory - Memory-related configuration
- * @property {number} memory.windowSize - Size of the conversation memory window
  */
 export const config = {
   model: {
@@ -161,9 +157,6 @@ export const config = {
   langgraph: {
     recursionLimit: env.AIBO_RECURSION_LIMIT,
     checkpointerType: env.AIBO_CHECKPOINTER_TYPE,
-  },
-  memory: {
-    windowSize: env.AIBO_MEMORY_WINDOW_SIZE,
   },
   output: {
     verbose: env.AIBO_VERBOSE_OUTPUT,

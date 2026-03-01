@@ -5,7 +5,6 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
   const baseConfig = {
     model: { apiKey: 'test-key', baseURL: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
     langgraph: { recursionLimit: 100, checkpointerType: 'memory' },
-    memory: { windowSize: 5 },
     output: { verbose: false },
     tencentCloud: {},
     composio: { apiKey: 'test', externalUserId: 'test' },
@@ -212,7 +211,6 @@ describe('buildCodingAgentHint', () => {
       config: {
         model: { apiKey: 'test-key', baseURL: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
         langgraph: { recursionLimit: 100, checkpointerType: 'memory' },
-        memory: { windowSize: 5 },
         output: { verbose: false },
         tencentCloud: {},
         composio: { apiKey: 'test', externalUserId: 'test' },

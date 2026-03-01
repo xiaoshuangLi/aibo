@@ -330,7 +330,6 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 |--------|------|--------|------|
 | `AIBO_RECURSION_LIMIT` | ❌ | `1000` | LangGraph 递归深度上限 |
 | `AIBO_CHECKPOINTER_TYPE` | ❌ | `memory` | 检查点存储类型：`memory` / `sqlite` / `filesystem` |
-| `AIBO_MEMORY_WINDOW_SIZE` | ❌ | `5` | 对话滑动窗口记忆大小 |
 | `AIBO_VERBOSE_OUTPUT` | ❌ | `false` | 是否开启调试输出 |
 | `AIBO_LANGUAGE` | ❌ | `en` | 提示语言：`en` / `zh` |
 | `AIBO_PERSONA` | ❌ | 魅魔人设 | 自定义 AI 人设描述 |
