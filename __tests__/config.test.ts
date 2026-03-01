@@ -33,7 +33,7 @@ describe('Configuration Module', () => {
     expect(testConfig.model.name).toBe('gpt-4o'); // 默认值
     expect(testConfig.langgraph.recursionLimit).toBe(1000); // 默认值
     expect(testConfig.langgraph.checkpointerType).toBe('memory'); // 默认值
-    expect(testConfig.memory.windowSize).toBe(5); // 默认值
+    expect(testConfig.memory.windowSize).toBe(50); // 默认值
     expect(testConfig.output.verbose).toBe(false); // 默认值
     expect(testConfig.persona.style).toContain('魅魔'); // 默认魅魔人设
   });

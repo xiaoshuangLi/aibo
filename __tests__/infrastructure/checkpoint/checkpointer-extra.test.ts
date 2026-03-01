@@ -183,21 +183,21 @@ describe('FilesystemCheckpointer - extra coverage', () => {
     }
   });
 
-  // ── deleteThread: catch block (lines 265-266) ────────────────────────────
+  // ── deleteThread: catch block ────────────────────────────────────────────
 
-  it('rethrows when deleteThread unlink fails', async () => {
-    // First put a checkpoint so the file exists
+  it('rethrows when deleteThread rmSync fails', async () => {
+    // First put a checkpoint so the session directory exists
     const config = { configurable: { thread_id: 'del-err-thread' } };
     await cp.put(config, makeCheckpoint('chk-del'), BASE_META, {});
 
     const fsModule = require('fs');
-    const orig = fsModule.unlinkSync;
-    fsModule.unlinkSync = () => { throw new Error('unlink error'); };
+    const orig = fsModule.rmSync;
+    fsModule.rmSync = () => { throw new Error('rmSync error'); };
 
     try {
-      await expect(cp.deleteThread('del-err-thread')).rejects.toThrow('unlink error');
+      await expect(cp.deleteThread('del-err-thread')).rejects.toThrow('rmSync error');
     } finally {
-      fsModule.unlinkSync = orig;
+      fsModule.rmSync = orig;
     }
   });
 });

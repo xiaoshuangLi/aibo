@@ -129,7 +129,7 @@ describe('FilesystemCheckpointer', () => {
     expect(result?.pendingWrites).toContainEqual([taskId, 'channel2', 'value2']);
   });
 
-  test('deleteThread removes checkpoint file', async () => {
+  test('deleteThread removes entire session directory including history', async () => {
     const config = { configurable: { thread_id: 'test-thread' } };
     const checkpoint = {
       v: 4,
@@ -147,16 +147,16 @@ describe('FilesystemCheckpointer', () => {
     const newVersions = {};
 
     await checkpointer.put(config, checkpoint, metadata, newVersions);
-    
-    // Verify file exists
-    const filePath = path.join(testSessionsDir, 'test-thread', 'session.json');
-    expect(fs.existsSync(filePath)).toBe(true);
-    
+
+    // Verify session directory exists
+    const sessionDir = path.join(testSessionsDir, 'test-thread');
+    expect(fs.existsSync(sessionDir)).toBe(true);
+
     // Delete thread
     await checkpointer.deleteThread('test-thread');
-    
-    // Verify file is deleted
-    expect(fs.existsSync(filePath)).toBe(false);
+
+    // Verify entire directory is deleted
+    expect(fs.existsSync(sessionDir)).toBe(false);
   });
 
   test('list yields checkpoints as async generator', async () => {
@@ -193,5 +193,92 @@ describe('FilesystemCheckpointer', () => {
     expect(checkpoints[0].config.configurable.thread_id).toBe('thread3');
     expect(checkpoints[1].config.configurable.thread_id).toBe('thread2');
     expect(checkpoints[2].config.configurable.thread_id).toBe('thread1');
+  });
+
+  test('put saves versioned history files', async () => {
+    const threadId = 'history-thread';
+    const configs = [
+      { configurable: { thread_id: threadId } },
+      { configurable: { thread_id: threadId } },
+    ];
+    const checkpoints = [
+      {
+        v: 4,
+        id: 'checkpoint-v1',
+        ts: new Date().toISOString(),
+        channel_values: {},
+        channel_versions: {},
+        versions_seen: {}
+      },
+      {
+        v: 4,
+        id: 'checkpoint-v2',
+        ts: new Date().toISOString(),
+        channel_values: {},
+        channel_versions: {},
+        versions_seen: {}
+      }
+    ];
+    const metadata = { source: 'input' as const, step: 0, parents: {} };
+
+    await checkpointer.put(configs[0], checkpoints[0], metadata, {});
+    await checkpointer.put(configs[1], checkpoints[1], metadata, {});
+
+    // Both history files should exist
+    const historyDir = path.join(testSessionsDir, threadId, 'history');
+    expect(fs.existsSync(path.join(historyDir, 'checkpoint-v1.json'))).toBe(true);
+    expect(fs.existsSync(path.join(historyDir, 'checkpoint-v2.json'))).toBe(true);
+
+    // Latest session.json should point to v2
+    const filePath = path.join(testSessionsDir, threadId, 'session.json');
+    const latest = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    expect(latest.checkpoint_id).toBe('checkpoint-v2');
+  });
+
+  test('list with thread_id returns history in reverse order', async () => {
+    const threadId = 'list-history-thread';
+    const cfg = { configurable: { thread_id: threadId } };
+    const meta = { source: 'input' as const, step: 0, parents: {} };
+
+    for (const id of ['ckpt-a', 'ckpt-b', 'ckpt-c']) {
+      await checkpointer.put(cfg, {
+        v: 4, id,
+        ts: new Date().toISOString(),
+        channel_values: {}, channel_versions: {}, versions_seen: {}
+      }, meta, {});
+    }
+
+    const results: any[] = [];
+    for await (const tuple of checkpointer.list({ configurable: { thread_id: threadId } })) {
+      results.push(tuple);
+    }
+
+    // Should return all 3 history entries (newest first by id)
+    expect(results).toHaveLength(3);
+    // Sorted by checkpoint_id descending
+    expect(results[0].checkpoint.id).toBe('ckpt-c');
+    expect(results[1].checkpoint.id).toBe('ckpt-b');
+    expect(results[2].checkpoint.id).toBe('ckpt-a');
+  });
+
+  test('getHistory returns all versioned checkpoints for a thread', async () => {
+    const threadId = 'get-history-thread';
+    const cfg = { configurable: { thread_id: threadId } };
+    const meta = { source: 'input' as const, step: 0, parents: {} };
+
+    await checkpointer.put(cfg, {
+      v: 4, id: 'h-1', ts: new Date().toISOString(),
+      channel_values: {}, channel_versions: {}, versions_seen: {}
+    }, meta, {});
+    await checkpointer.put(cfg, {
+      v: 4, id: 'h-2', ts: new Date().toISOString(),
+      channel_values: {}, channel_versions: {}, versions_seen: {}
+    }, meta, {});
+
+    const history = await checkpointer.getHistory(threadId);
+    expect(history).toHaveLength(2);
+    // Newest first
+    expect(history[0].checkpoint.id).toBe('h-2');
+    expect(history[1].checkpoint.id).toBe('h-1');
   });
 });

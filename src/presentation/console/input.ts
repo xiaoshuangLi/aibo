@@ -12,6 +12,8 @@
 import { shouldExitInteractiveMode, isEmptyInput } from '@/core/utils';
 import { StreamState } from '@/core/utils';
 import { Session } from '@/core/agent';
+import { getConversationSummarizer } from '@/core/agent/factory';
+import { createModel } from '@/core/agent/model';
 
 // Import processStreamChunks from StreamHandler to avoid circular dependency
 import { processStreamChunks } from '@/core/utils';
@@ -83,6 +85,16 @@ export async function handleUserInput(
     );
 
     await processStreamChunks(stream, state, session, input);
+
+    // 对话结束后异步触发摘要压缩（不阻塞用户响应）
+    const summarizer = getConversationSummarizer();
+    if (summarizer) {
+      summarizer.maybeSummarize(session.threadId, createModel()).then(summary => {
+        if (summary) {
+          console.log('\n📝 [Auto-summary] Conversation context has been compacted.');
+        }
+      }).catch((err) => { console.warn('[Summarizer] Failed to compact conversation:', err); });
+    }
   } finally {
     session.isRunning = false;
     // 只有当前控制器未被新消息替换时才重置，避免覆盖并发新会话的控制器

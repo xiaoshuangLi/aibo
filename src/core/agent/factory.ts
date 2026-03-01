@@ -11,6 +11,8 @@ import { SafeFilesystemBackend } from '@/infrastructure/filesystem';
 import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 import { Session } from './session';
 import { SubAgentPromptTemplate } from '@/infrastructure/prompt';
+import { ConversationSummarizer } from '@/infrastructure/session';
+import * as path from 'path';
 
 /**
  * AI Agent Factory module that provides DeepAgents integration with LangChain.
@@ -33,6 +35,9 @@ const backend = new SafeFilesystemBackend({
 
 // 缓存的代理实例
 let cachedAgent: ReturnType<typeof createDeepAgent>;
+
+// 缓存的摘要器实例（仅 filesystem 检查点器时生效）
+let cachedSummarizer: ConversationSummarizer | null = null;
 
 /**
  * 当检测到本地安装了 AI 编程 CLI 工具时，生成优先使用这些工具并按任务类型智能路由的提示词补充。
@@ -105,7 +110,7 @@ ${routingTable}
 }
 
 /**
- * 创建检查点器实例
+ * 创建检查点器实例，并在使用 filesystem 时同步初始化摘要器
  * 根据配置动态创建不同类型的检查点器
  */
 function createCheckpointer() {
@@ -114,13 +119,24 @@ function createCheckpointer() {
   switch (checkpointerType) {
     case 'memory':
       return new MemorySaver();
-    case 'filesystem':
-      return new FilesystemCheckpointer();
+    case 'filesystem': {
+      const sessionsDir = path.join(process.cwd(), '.data', 'sessions');
+      cachedSummarizer = new ConversationSummarizer(sessionsDir, config.memory.windowSize);
+      return new FilesystemCheckpointer(sessionsDir);
+    }
     case 'sqlite':
       throw new Error('SQLite checkpointer is not yet implemented');
     default:
       throw new Error(`Unsupported checkpointer type: ${checkpointerType}`);
   }
+}
+
+/**
+ * 获取当前会话的摘要器实例
+ * 仅在使用 filesystem 检查点器时有效，其他情况返回 null
+ */
+export function getConversationSummarizer(): ConversationSummarizer | null {
+  return cachedSummarizer;
 }
 
 /**

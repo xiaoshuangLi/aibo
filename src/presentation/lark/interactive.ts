@@ -17,6 +17,8 @@ import { config } from '@/core/config';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
+import { getConversationSummarizer } from '@/core/agent/factory';
+import { createModel } from '@/core/agent/model';
 
 // 全局会话和代理实例
 let currentSession: Session | null = null;
@@ -145,6 +147,12 @@ export async function handleUserMessage(
 
     // 处理响应流
     await processStreamChunks(stream, state, session, input);
+
+    // 对话结束后异步触发摘要压缩（不阻塞用户响应）
+    const summarizer = getConversationSummarizer();
+    if (summarizer) {
+      summarizer.maybeSummarize(session.threadId, createModel()).catch((err) => { console.warn('[Summarizer] Failed to compact conversation:', err); });
+    }
     
   } catch (error) {
     console.error('❌ 处理用户消息时出错:', error);
