@@ -143,6 +143,43 @@ await claude_execute({ prompt: "Review the changes made to ...", cwd: projectDir
 
 ---
 
+## 🧠 Extended Thinking for Complex claude_execute Tasks
+
+For complex tasks routed to `claude_execute`, pass `--extended-thinking` via the `args` parameter to unlock Claude Code's deeper reasoning mode. This produces significantly better analysis for architecture, security, and multi-file refactoring:
+
+```typescript
+// Complex tasks — use extended thinking
+claude_execute({
+  prompt: "Review these 5 files for security vulnerabilities in the auth flow...",
+  args: ["--extended-thinking"],
+  cwd: projectDir
+})
+
+claude_execute({
+  prompt: "Refactor the order module to remove circular dependencies across 6 files...",
+  args: ["--extended-thinking"],
+  cwd: projectDir
+})
+
+// Simple tasks — standard mode is fine
+claude_execute({
+  prompt: "Add JSDoc comments to the getUser function in src/services/user.ts",
+  cwd: projectDir
+})
+```
+
+### When to Add `--extended-thinking`
+
+| Use extended thinking | Standard mode |
+|---|---|
+| Refactoring across 5+ files | Adding a single function |
+| Architecture or data model design | Fixing a clear bug |
+| Security vulnerability analysis | Adding comments or docs |
+| Debugging async race conditions | Renaming a variable |
+| Evaluating multiple design approaches | Adding an import |
+
+---
+
 ## 🔍 After Delegation: Verification Steps
 
 After each coding agent responds:
