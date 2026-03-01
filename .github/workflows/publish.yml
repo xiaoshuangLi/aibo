@@ -62,7 +62,7 @@ jobs:
 
       - name: 🚀 Publish to NPM
         if: steps.check_npm.outputs.should_publish == 'true'
-        run: npm run publish
+        run: npm run release
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

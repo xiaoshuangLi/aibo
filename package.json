@@ -27,7 +27,7 @@
     "dev:lark": "AIBO_INTERACTION=lark ts-node -r tsconfig-paths/register src/main.ts",
     "dev:lark-inspect": "AIBO_INTERACTION=lark node --inspect -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "prepare": "husky",
-    "publish": "npm publish --access public"
+    "release": "npm publish --access public"
   },
   "author": "xiaoshuang",
   "license": "ISC",
