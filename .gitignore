@@ -34,3 +34,4 @@ mcps
 .DS_Store
 .tsbuildinfo
 COMMIT_MESSAGE.md
+temp_requirements.txt

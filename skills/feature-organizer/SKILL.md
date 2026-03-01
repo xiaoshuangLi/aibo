@@ -126,10 +126,11 @@ After compiling the complete change inventory:
 **Objective**: Create a clean, well-structured commit
 
 **Process**:
-1. **Stage all changes**: `git add .`
-2. **Create feature file**: Save the generated feature documentation as `features/[###]-[feature-name].md`
-3. **Commit with descriptive message**: Follow conventional commit format
-4. **Verify final state**: Ensure working directory is clean and all changes are committed
+1. **Clean up temp files**: Delete `temp_requirements.txt` if it exists (`rm -f temp_requirements.txt`)
+2. **Stage all changes**: `git add .`
+3. **Create feature file**: Save the generated feature documentation as `features/[###]-[feature-name].md`
+4. **Commit with descriptive message**: Follow conventional commit format
+5. **Verify final state**: Ensure working directory is clean and all changes are committed
 
 **MANDATORY VALIDATION**: After completing this step, you MUST execute the validation script `./skills/feature-organizer/scripts/validate-commit-structure.js` and ensure it passes. If the validation fails, you must adjust your commit structure based on the feedback and re-run the validation until it passes.
 
