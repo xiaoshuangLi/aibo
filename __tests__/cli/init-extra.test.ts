@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { createAiboSymlink, printInitRequired, runInit } from '@/cli/init';
+import { createAiboSymlink, printInitRequired, runInit, AIBO_LINKED_SUBDIRS } from '@/cli/init';
 
 describe('createAiboSymlink - directory removal', () => {
   let tmpDir: string;
@@ -10,6 +10,9 @@ describe('createAiboSymlink - directory removal', () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibo-init-extra-'));
     packageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibo-pkg-extra-'));
+    for (const subdir of AIBO_LINKED_SUBDIRS) {
+      fs.mkdirSync(path.join(packageDir, subdir));
+    }
   });
 
   afterEach(() => {
@@ -17,16 +20,20 @@ describe('createAiboSymlink - directory removal', () => {
     fs.rmSync(packageDir, { recursive: true, force: true });
   });
 
-  it('removes existing real directory (not symlink) before creating symlink', () => {
-    const symlinkPath = path.join(tmpDir, '.aibo');
+  it('removes existing real directory (not symlink) before recreating .aibo', () => {
+    const aiboPath = path.join(tmpDir, '.aibo');
     // Create a real directory (not a symlink) at the .aibo path
-    fs.mkdirSync(symlinkPath);
+    fs.mkdirSync(aiboPath);
 
     createAiboSymlink(tmpDir, packageDir);
 
-    // Now .aibo should be a symlink pointing to packageDir
-    expect(fs.lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
-    expect(fs.realpathSync(symlinkPath)).toBe(fs.realpathSync(packageDir));
+    // .aibo should now be a real directory with sub-symlinks
+    const stat = fs.lstatSync(aiboPath);
+    expect(stat.isDirectory()).toBe(true);
+    expect(stat.isSymbolicLink()).toBe(false);
+    for (const subdir of AIBO_LINKED_SUBDIRS) {
+      expect(fs.lstatSync(path.join(aiboPath, subdir)).isSymbolicLink()).toBe(true);
+    }
   });
 });
 
@@ -58,14 +65,16 @@ describe('runInit', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('creates .aibo symlink and prints instructions', async () => {
+  it('creates .aibo directory and prints instructions', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     try {
       await runInit();
 
-      const symlinkPath = path.join(tmpDir, '.aibo');
-      expect(fs.existsSync(symlinkPath)).toBe(true);
-      expect(fs.lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+      const aiboPath = path.join(tmpDir, '.aibo');
+      expect(fs.existsSync(aiboPath)).toBe(true);
+      const stat = fs.lstatSync(aiboPath);
+      expect(stat.isDirectory()).toBe(true);
+      expect(stat.isSymbolicLink()).toBe(false);
 
       const allLogs = logSpy.mock.calls.map(c => c[0]).join('\n');
       expect(allLogs).toContain('Created .aibo');
@@ -75,9 +84,9 @@ describe('runInit', () => {
     }
   });
 
-  it('prints error but continues when symlink creation fails', async () => {
-    // Make cwd point to a non-writable path by mocking fs.symlinkSync to throw
-    const symlinkSpy = jest.spyOn(fs, 'symlinkSync').mockImplementationOnce(() => {
+  it('prints error but continues when .aibo creation fails', async () => {
+    // Mock fs.mkdirSync to simulate a permission-denied failure for .aibo
+    const mkdirSpy = jest.spyOn(fs, 'mkdirSync').mockImplementationOnce(() => {
       throw new Error('permission denied');
     });
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -86,13 +95,13 @@ describe('runInit', () => {
       await runInit();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create .aibo symlink')
+        expect.stringContaining('Failed to create .aibo')
       );
       // Should still print the README instructions
       const allLogs = logSpy.mock.calls.map(c => c[0]).join('\n');
       expect(allLogs).toContain('README');
     } finally {
-      symlinkSpy.mockRestore();
+      mkdirSpy.mockRestore();
       logSpy.mockRestore();
       errorSpy.mockRestore();
     }
