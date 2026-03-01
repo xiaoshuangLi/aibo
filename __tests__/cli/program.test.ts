@@ -40,6 +40,20 @@ describe('createProgram', () => {
     expect(names).toContain('interact');
   });
 
+  it('root command has --mode option', () => {
+    const program = createProgram();
+    const helpInfo = program.helpInformation();
+    expect(helpInfo).toContain('--mode');
+    expect(helpInfo).toContain('console|lark');
+  });
+
+  it('root command has --type option', () => {
+    const program = createProgram();
+    const helpInfo = program.helpInformation();
+    expect(helpInfo).toContain('--type');
+    expect(helpInfo).toContain('user_chat|group_chat');
+  });
+
   it('interact command has --mode option with default "console"', () => {
     const program = createProgram();
     const interact = program.commands.find((c) => c.name() === 'interact')!;
