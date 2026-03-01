@@ -23,8 +23,8 @@ export function buildSystemPromptFromTools(tools: Array<{ name: string }>): stri
  *   - claude_execute  : 架构分析、代码审查、复杂重构、跨文件分析
  *   - gemini_execute  : 前端 UI 开发、算法实现、需要大上下文的任务
  *   - codex_execute   : 后端 API、数据库、服务端业务逻辑
- *   - cursor_execute  : 通用 AI 辅助编程（无上述专项工具时的首选）
- *   - copilot_execute : shell 命令建议、git 命令建议、gh CLI 命令建议
+ *   - cursor_execute  : 通用 AI 辅助编程（通用任务的优选）
+ *   - copilot_execute : 通用 AI 辅助编程（通用任务的优选）
  *
  * @param hasClaudeTool  - 是否检测到 claude_execute 工具
  * @param hasCursorTool  - 是否检测到 cursor_execute 工具
@@ -51,25 +51,46 @@ export function buildCodingAgentHint(
     return '';
   }
 
-  // Build routing table rows for each available tool
+  const toolList = available.join(', ');
+
+  // When only a single coding tool is available, emit a simpler, more forceful instruction
+  // so the model immediately knows to use that one tool for every coding task.
+  if (available.length === 1) {
+    const singleTool = available[0];
+    return `
+
+## 🤖 PRIORITY: Use the Local AI Coding Agent — ${singleTool}
+
+A local AI coding agent CLI is available on this system: ${singleTool}.
+
+**You MUST use ${singleTool} for EVERY coding task — writing code, fixing bugs, refactoring, adding tests, explaining code, shell commands, or any multi-file change — instead of implementing it yourself.**
+
+### How to use it
+
+1. **Immediately delegate** any coding request to ${singleTool} — do NOT start writing code yourself first.
+2. Pass a **complete, self-contained task description** as the \`prompt\` argument (include file paths, requirements, libraries, tests).
+3. Always set \`cwd\` to the relevant project directory.
+4. After the agent responds, review its output and verify correctness before reporting back.
+5. Only fall back to direct tools (edit_file, write_file, execute_bash) if ${singleTool} is unavailable or has already failed on this specific task.`;
+  }
+
+  // Multiple tools available — build routing table and rules.
   const routingRows: string[] = [];
   if (hasClaudeTool) routingRows.push('| `claude_execute` | Architecture design, code review, complex refactoring, cross-file analysis, debugging |');
   if (hasGeminiTool) routingRows.push('| `gemini_execute` | Frontend UI (React/Vue/HTML/CSS), algorithm implementation, large-context tasks (1M tokens) |');
   if (hasCodexTool) routingRows.push('| `codex_execute`  | Backend API (REST/GraphQL), database/ORM design, server-side business logic, scripts |');
-  if (hasCursorTool) routingRows.push('| `cursor_execute` | General AI-assisted coding when no specialist tool is available; open files in Cursor editor |');
-  if (hasCopilotTool) routingRows.push('| `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase |');
+  if (hasCursorTool) routingRows.push('| `cursor_execute` | General-purpose AI coding: any coding task, file editing, shell commands, codebase search |');
+  if (hasCopilotTool) routingRows.push('| `copilot_execute` | General-purpose AI coding: any coding task, shell & git commands, codebase search, gh CLI |');
 
-  const routingTable = routingRows.length > 0
-    ? `\n| Tool | Best for |\n|------|----------|\n${routingRows.join('\n')}`
-    : '';
+  const routingTable = `\n| Tool | Best for |\n|------|----------|\n${routingRows.join('\n')}`;
 
-  const toolList = available.join(', ');
-
-  // Build dynamic fallback hint (only mention tools that are actually available)
-  const fallbackTools = available.filter(t => t === '`cursor_execute`' || t === '`claude_execute`');
-  const fallbackClause = fallbackTools.length > 0
-    ? `fall back to ${fallbackTools.join(' or ')}`
-    : `fall back to the most general tool available`;
+  // Determine general-purpose fallback tools (in priority order)
+  const generalTools = available.filter(t =>
+    t === '`cursor_execute`' || t === '`copilot_execute`' || t === '`claude_execute`'
+  );
+  const fallbackClause = generalTools.length > 0
+    ? `use ${generalTools[0]} (general-purpose)`
+    : `use the most general tool available from the list`;
 
   return `
 
@@ -77,16 +98,17 @@ export function buildCodingAgentHint(
 
 The following local AI coding agent CLI tool(s) are available on this system: ${toolList}.
 
-**When handling any coding task — writing code, fixing bugs, refactoring, adding tests, explaining code, or multi-file changes — you MUST delegate the work to the appropriate tool below instead of implementing it yourself.**
+**Before writing any code yourself, ALWAYS check the table below and delegate the task to the appropriate coding agent.**
 ${routingTable}
 
 ### Routing rules
 
-1. **Pick the right agent for the task type** using the table above.
-2. If multiple agents could handle the task, prefer the specialist (gemini for frontend, codex for backend, claude for review/architecture).
-3. If none of the specialist agents match, ${fallbackClause}.
-4. Pass a **complete, self-contained task description** as the \`prompt\` argument so the agent can act autonomously.
-5. Always set \`cwd\` to the relevant project directory.
-6. After the agent responds, review its output and verify correctness before reporting back.
-7. Only fall back to direct tools (edit_file, write_file, execute_bash) when the coding agent tool is unavailable or has already failed.`;
+1. **Immediately delegate** any coding task — do NOT start implementing code yourself before trying an available agent.
+2. **Pick the right specialist** for the task type using the table above (gemini → frontend, codex → backend, claude → review/architecture).
+3. **When no specialist matches** the task type or when multiple general-purpose tools are available, ${fallbackClause}.
+4. **Multiple tools are available** — if one agent fails or is rate-limited, automatically retry with the next available tool from the list: ${toolList}.
+5. Pass a **complete, self-contained task description** as the \`prompt\` argument so the agent can act autonomously (include file paths, requirements, libraries, tests).
+6. Always set \`cwd\` to the relevant project directory.
+7. After the agent responds, review its output and verify correctness before reporting back.
+8. Only fall back to direct tools (edit_file, write_file, execute_bash) when ALL coding agent tools are unavailable or have already failed.`;
 }

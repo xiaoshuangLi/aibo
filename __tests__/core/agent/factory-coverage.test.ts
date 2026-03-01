@@ -171,7 +171,7 @@ describe('buildCodingAgentHint', () => {
     expect(hint).not.toContain('claude_execute');
     expect(hint).not.toContain('codex_execute');
     expect(hint).toContain('PRIORITY');
-    expect(hint).toContain('frontend');
+    expect(hint).toContain('EVERY coding task');
   });
 
   it('should include codex hint when only codex is available', () => {
@@ -181,7 +181,7 @@ describe('buildCodingAgentHint', () => {
     expect(hint).not.toContain('claude_execute');
     expect(hint).not.toContain('gemini_execute');
     expect(hint).toContain('PRIORITY');
-    expect(hint).toContain('backend');
+    expect(hint).toContain('EVERY coding task');
   });
 
   it('should include all four agents when all tools are available', () => {
@@ -204,7 +204,7 @@ describe('buildCodingAgentHint', () => {
     expect(hint).not.toContain('codex_execute');
     expect(hint).not.toContain('cursor_execute');
     expect(hint).toContain('PRIORITY');
-    expect(hint).toContain('editing files');
+    expect(hint).toContain('EVERY coding task');
   });
 
   it('should include all five agents when all tools including copilot are available', () => {
