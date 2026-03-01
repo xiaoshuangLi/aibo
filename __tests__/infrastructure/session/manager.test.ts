@@ -961,6 +961,54 @@ describe('SessionManager', () => {
           expect(result.tool_calls[0].tool_name).toBe('test_tool');
           expect(result.performance_summary.total_tool_calls).toBe(1);
         });
+
+        it('should use last AIMessage input_tokens and sum output_tokens for multi-step conversations', () => {
+          // Simulate a multi-step agent conversation where each step re-sends the full
+          // conversation context, causing input_tokens to grow with each call.
+          // input_tokens should NOT be summed (avoids double-counting repeated context);
+          // instead, the last call's input_tokens is used as the total.
+          // output_tokens ARE summed because each call generates unique new tokens.
+          const sessionData = {
+            checkpoint: {
+              ts: '2023-01-01T00:00:00Z',
+              channel_values: {
+                messages: [
+                  { type: 'constructor', id: [null, null, 'HumanMessage'], kwargs: { content: 'Hello' } },
+                  {
+                    type: 'constructor',
+                    id: [null, null, 'AIMessage'],
+                    kwargs: {
+                      content: 'Step 1 response',
+                      id: 'msg-1',
+                      usage_metadata: { input_tokens: 1000, output_tokens: 100 },
+                      response_metadata: { model_name: 'qwen3-max', model_provider: 'alibaba', finish_reason: 'tool_calls' }
+                    }
+                  },
+                  { type: 'constructor', id: [null, null, 'ToolMessage'], kwargs: { content: 'tool result', tool_call_id: 'tc-1' } },
+                  {
+                    type: 'constructor',
+                    id: [null, null, 'AIMessage'],
+                    kwargs: {
+                      content: 'Step 2 response',
+                      id: 'msg-2',
+                      usage_metadata: { input_tokens: 1200, output_tokens: 150 },
+                      response_metadata: { model_name: 'qwen3-max', model_provider: 'alibaba', finish_reason: 'stop' }
+                    }
+                  }
+                ]
+              }
+            },
+            lastUpdated: '2023-01-01T00:00:02Z'
+          };
+
+          const result = (sessionManager as any).extractAIMonitoringMetadata(sessionData, testSessionId);
+
+          // input_tokens should be the LAST AIMessage's input_tokens (1200), not the sum (2200)
+          expect(result.token_usage.input_tokens).toBe(1200);
+          // output_tokens should be the sum of all AIMessage output_tokens (100 + 150 = 250)
+          expect(result.token_usage.output_tokens).toBe(250);
+          expect(result.token_usage.total_tokens).toBe(1200 + 250);
+        });
       });
 
       describe('generateAllSessionsMetadata', () => {

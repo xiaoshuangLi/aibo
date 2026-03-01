@@ -778,7 +778,13 @@ export class SessionManager {
             outputTokens = kwargs.response_metadata.tokenUsage.completionTokens || 0;
           }
           
-          totalInputTokens += inputTokens;
+          // 使用最后一次调用的input_tokens作为总输入Token数
+          // 原因：在多步骤Agent工作流中，每次LLM调用的input_tokens包含完整的上下文历史
+          // （系统提示 + 所有之前的消息），如果对所有调用求和会导致重复计数
+          // 最后一次调用的input_tokens代表最终对话上下文大小，更准确地反映实际使用量
+          if (inputTokens > 0) {
+            totalInputTokens = inputTokens;
+          }
           totalOutputTokens += outputTokens;
           
           // 提取响应内容
