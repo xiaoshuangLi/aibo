@@ -101,7 +101,10 @@ describe('Lark Interactive Mode', () => {
         threadId: 'test-session',
         isRunning: false,
         abortController: null,
-        end: jest.fn()
+        end: jest.fn(),
+        setAbortController: jest.fn((controller: AbortController) => {
+          mockSession.abortController = controller;
+        })
       };
       
       mockAgent = {

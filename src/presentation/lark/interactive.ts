@@ -121,7 +121,7 @@ export async function handleUserMessage(
   
   // 创建新的中断控制器（在 try 外部，以便 finally 能访问并比较）
   const abortController = new AbortController();
-  session.abortController = abortController;
+  session.setAbortController(abortController);
 
   try {
     // 创建流状态
@@ -154,7 +154,7 @@ export async function handleUserMessage(
     // 只有当前控制器未被新消息替换时才重置，避免覆盖并发新会话的控制器
     if (session.abortController === abortController) {
       session.isRunning = false;
-      session.abortController = new AbortController();
+      session.setAbortController(new AbortController());
     }
   }
 }
