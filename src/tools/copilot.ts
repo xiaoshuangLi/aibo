@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isCopilotAvailable(): boolean {
   try {
-    execSync("which copilot", { stdio: "ignore" });
+    execSync("copilot --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;

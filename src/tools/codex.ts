@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isCodexAvailable(): boolean {
   try {
-    execSync("which codex", { stdio: "ignore" });
+    execSync("codex --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;

@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isGeminiAvailable(): boolean {
   try {
-    execSync("which gemini", { stdio: "ignore" });
+    execSync("gemini --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;
