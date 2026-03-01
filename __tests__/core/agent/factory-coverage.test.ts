@@ -195,6 +195,29 @@ describe('buildCodingAgentHint', () => {
     expect(hint).toContain('Routing rules');
   });
 
+  it('should include copilot hint when only copilot is available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    const hint = buildCodingAgentHint(false, false, false, false, true);
+    expect(hint).toContain('copilot_execute');
+    expect(hint).not.toContain('claude_execute');
+    expect(hint).not.toContain('gemini_execute');
+    expect(hint).not.toContain('codex_execute');
+    expect(hint).not.toContain('cursor_execute');
+    expect(hint).toContain('PRIORITY');
+    expect(hint).toContain('Shell');
+  });
+
+  it('should include all five agents when all tools including copilot are available', () => {
+    const { buildCodingAgentHint } = require('@/core/agent/factory');
+    const hint = buildCodingAgentHint(true, true, true, true, true);
+    expect(hint).toContain('claude_execute');
+    expect(hint).toContain('cursor_execute');
+    expect(hint).toContain('gemini_execute');
+    expect(hint).toContain('codex_execute');
+    expect(hint).toContain('copilot_execute');
+    expect(hint).toContain('PRIORITY');
+  });
+
   it('should include routing table when multiple tools are available', () => {
     const { buildCodingAgentHint } = require('@/core/agent/factory');
     const hint = buildCodingAgentHint(true, false, true, true);

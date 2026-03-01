@@ -25,6 +25,7 @@ Available executors (check which tools exist):
   gemini_execute  → Gemini CLI       (frontend UI, algorithms, large context)
   codex_execute   → Codex CLI        (backend API, database, server logic)
   cursor_execute  → Cursor CLI       (general coding fallback)
+  copilot_execute → GitHub Copilot CLI (shell/git/gh command suggestions)
 ```
 
 If none are available, fall back to direct tools (edit_file, execute_bash, etc.) and note this limitation.
@@ -132,10 +133,11 @@ flowchart TD
 Break the feature into **atomic tasks (≤5 min each)**, grouped into execution batches by dependency.
 
 **Executor selection guide:**
-- `Claude`  → Architecture decisions, code review, cross-file refactoring
-- `Gemini`  → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
-- `Codex`   → Backend API, database, server-side logic, scripts
-- `Cursor`  → General coding fallback
+- `Claude`   → Architecture decisions, code review, cross-file refactoring
+- `Gemini`   → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
+- `Codex`    → Backend API, database, server-side logic, scripts
+- `Cursor`   → General coding fallback
+- `Copilot`  → Shell command, git operation, or gh CLI command suggestions
 
 ```markdown
 # <Feature Name> — Tasks
@@ -275,6 +277,7 @@ After all batches complete:
 | `gemini_execute` not available | Use `claude_execute` for frontend tasks |
 | `codex_execute` not available | Use `claude_execute` for backend tasks |
 | `cursor_execute` not available | Use `claude_execute` for general tasks |
+| `copilot_execute` not available | Use `execute_bash` for shell/git/gh commands directly |
 | All CLI tools unavailable | Implement directly using edit_file + execute_bash |
 | Agent returns an error | Retry once with a clearer prompt; then fall back to next option |
 

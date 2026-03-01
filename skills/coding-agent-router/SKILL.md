@@ -21,6 +21,7 @@ The core principle: **match the task type to the agent's strength**, then delega
 | **Gemini CLI** | `gemini_execute` | Frontend UI components (React/Vue/HTML/CSS), algorithm implementation, tasks needing 1M token context, multimodal (image + code) | Database schema design |
 | **OpenAI Codex** | `codex_execute` | Backend API (REST/GraphQL), database/ORM, server-side logic, CLI tools, scripts, data pipelines | UI component styling |
 | **Cursor** | `cursor_execute` | General AI-assisted coding when no specialist tool is available; opening files in the Cursor editor | — |
+| **GitHub Copilot** | `copilot_execute` | Shell command suggestions, git operation suggestions, gh CLI command suggestions | General code generation |
 
 ---
 
@@ -35,6 +36,7 @@ CLASSIFY the task:
   ├─ Frontend UI / styling / components?  → gemini_execute
   ├─ Backend API / DB / server logic?     → codex_execute
   ├─ Architecture / review / refactor?    → claude_execute
+  ├─ Shell / git / gh command suggestion? → copilot_execute
   ├─ General coding (no specialist match)? → cursor_execute or claude_execute
   └─ Multiple concerns (full-stack)?      → split into subtasks, route each
      ↓
@@ -69,6 +71,11 @@ INTEGRATE and report back
 
 ### General Coding → `cursor_execute` (fallback)
 - Any coding task when neither gemini nor codex is available
+
+### Shell / Git / GitHub CLI → `copilot_execute`
+- "How do I list all git branches sorted by last commit date?"
+- "What is the gh CLI command to create a pull request from the current branch?"
+- "Suggest a shell command to find all files modified in the last 7 days"
 
 ---
 
