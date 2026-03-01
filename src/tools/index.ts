@@ -18,6 +18,7 @@ import getClaudeTools from '@/tools/claude';
 import getCursorTools from '@/tools/cursor';
 import getGeminiTools from '@/tools/gemini';
 import getCodexTools from '@/tools/codex';
+import getCopilotTools from '@/tools/copilot';
 import getLocalMcpTools from '@/tools/local-mcp';
 import { Session } from '@/core/agent';
 
@@ -49,6 +50,7 @@ export default async function getTools(session?: Session) {
     cursorTools,
     geminiTools,
     codexTools,
+    copilotTools,
     localMcpTools,
   ] = await Promise.all([
     getBashTools(session),
@@ -71,6 +73,7 @@ export default async function getTools(session?: Session) {
     getCursorTools(session),
     getGeminiTools(session),
     getCodexTools(session),
+    getCopilotTools(session),
     getLocalMcpTools(),
   ]);
   
@@ -95,6 +98,7 @@ export default async function getTools(session?: Session) {
     ...cursorTools,
     ...geminiTools,
     ...codexTools,
+    ...copilotTools,
     ...localMcpTools,
   ];
 }
