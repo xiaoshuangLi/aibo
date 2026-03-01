@@ -4,7 +4,6 @@ process.env.AIBO_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 process.env.AIBO_MODEL_NAME = 'gpt-4o-mini';
 process.env.AIBO_RECURSION_LIMIT = '25';
 process.env.AIBO_CHECKPOINTER_TYPE = 'memory';
-process.env.AIBO_MEMORY_WINDOW_SIZE = '5';
 process.env.AIBO_TENCENTCLOUD_APP_ID = 'test-app-id';
 process.env.AIBO_TENCENTCLOUD_SECRET_ID = 'test-secret-id';
 process.env.AIBO_TENCENTCLOUD_SECRET_KEY = 'test-secret-key';

@@ -1,6 +1,6 @@
 ---
 name: coding-agent-router
-description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor). Use when local AI coding CLIs are available and you need to decide which agent handles which subtask.
+description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor, copilot). Use when local AI coding CLIs are available and you need to decide which agent handles which subtask.
 ---
 
 # Coding Agent Router Skill

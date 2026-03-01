@@ -170,16 +170,6 @@ AIBO_CHECKPOINTER_TYPE=memory
 
 ---
 
-## 记忆配置
-
-| 变量名 | 是否必填 | 默认值 | 说明 |
-|--------|----------|--------|------|
-| `AIBO_MEMORY_WINDOW_SIZE` | ❌ | `5` | 滑动窗口记忆大小，决定保留最近多少轮对话 |
-
-```dotenv
-AIBO_MEMORY_WINDOW_SIZE=5
-```
-
 ---
 
 ## 输出配置
@@ -371,9 +361,6 @@ AIBO_MODEL_NAME=gpt-4o
 # LangChain
 AIBO_RECURSION_LIMIT=1000
 AIBO_CHECKPOINTER_TYPE=memory
-
-# 记忆
-AIBO_MEMORY_WINDOW_SIZE=5
 
 # 输出
 AIBO_VERBOSE_OUTPUT=false

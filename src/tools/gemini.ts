@@ -88,7 +88,7 @@ function handleGeminiExecutionError(
  */
 function createGeminiExecuteTool(session?: Session) {
   return tool(
-  async ({ prompt, timeout = 300000, cwd, args = [] }) => {
+  async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
     const execArgs = ["-p", prompt, ...args];
 

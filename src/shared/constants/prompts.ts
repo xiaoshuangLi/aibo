@@ -15,7 +15,7 @@ import { config } from '@/core/config';
  * @returns The system prompt string in the configured language
  */
 export function getSystemPrompt(): string {
-  const currentLanguage = config.language.code;
+  const currentLanguage = config.language?.code;
   const languageName = currentLanguage === 'zh' ? 'Chinese (中文)' : 'English';
   
   // Add language emphasis at the beginning
