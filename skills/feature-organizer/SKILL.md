@@ -57,13 +57,15 @@ Large changesets MUST use a structured, domain-based analysis approach to preven
    ```
 
 2. **Group files by domain/module**: Categorize all changed files into logical groups:
-   - **Core business logic** (e.g., `src/core/`, `src/services/`, `src/models/`)
-   - **API layer** (e.g., `src/api/`, `src/routes/`, `src/controllers/`)
-   - **UI components** (e.g., `src/components/`, `src/pages/`, `src/views/`)
-   - **Configuration & infrastructure** (e.g., `config/`, `.env*`, build files)
+   - **Core agent logic** (e.g., `src/core/`, `src/features/`)
+   - **Tools** (e.g., `src/tools/`)
+   - **Infrastructure** (e.g., `src/infrastructure/`)
+   - **Shared utilities** (e.g., `src/shared/`, `src/types/`)
+   - **CLI & presentation** (e.g., `src/cli/`, `src/presentation/`)
+   - **Skills & agents** (e.g., `skills/`, `agents/`)
+   - **Configuration & build** (e.g., `config/`, `.env*`, build files)
    - **Tests** (e.g., `__tests__/`, `*.test.*`, `*.spec.*`)
-   - **Documentation** (e.g., `docs/`, `*.md`)
-   - **Other utilities** (helpers, utilities, shared code)
+   - **Documentation** (e.g., `docs/`, `*.md`, `features/`)
 
 3. **Analyze each group systematically** — for EVERY file in each group, identify:
    - **New functions/methods/classes added**: List each one with its purpose
@@ -169,15 +171,15 @@ The following JavaScript validation scripts are provided to ensure each phase is
 
 ### Scenario 1: Path Alias Conversion Feature
 - **Changes**: Relative path imports converted to `@/` aliases across 15+ files
-- **Analysis approach**: Group files by layer (components, services, utilities), analyze each group systematically
+- **Analysis approach**: Group files by domain (core, tools, infrastructure, shared), analyze each group systematically
 - **Extracted requirements**: List every file changed with the specific alias pattern applied
 - **Feature file**: `features/043-path-alias-conversion.md`
 
-### Scenario 2: Large API Refactoring
-- **Changes**: 20+ files modified across API routes, controllers, and models
-- **Analysis approach**: Start with `git diff --stat` for overview, group by domain (auth, user, payment), analyze each domain's changes
-- **Key risk**: Missing a renamed endpoint or changed parameter - use cross-file impact analysis
-- **Feature file**: `features/044-api-refactoring.md`
+### Scenario 2: Large Infrastructure Refactoring
+- **Changes**: 20+ files modified across core agent logic, tools, and infrastructure
+- **Analysis approach**: Start with `git diff --stat` for overview, group by domain (core, tools, infrastructure), analyze each domain's changes
+- **Key risk**: Missing a renamed tool or changed internal interface - use cross-file impact analysis
+- **Feature file**: `features/044-infrastructure-refactoring.md`
 
 ### Scenario 3: New Utility Function
 - **Uncommitted changes**: New utility function added with tests
