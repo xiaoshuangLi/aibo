@@ -1,18 +1,18 @@
 ---
 name: coding-agent-router
-description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor, copilot). Use when any local AI coding CLI is available and you need to decide which agent handles which subtask.
+description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor, copilot). Use whenever any local AI coding CLI is available — whether one tool or many.
 ---
 
 # Coding Agent Router Skill
 
 ## 🎯 Purpose
 
-When any local AI coding CLI tool is available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`, `copilot_execute`), this skill guides how to intelligently route each subtask to the **right executor** rather than doing everything manually.
+When one or more local AI coding CLI tools are available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`, `copilot_execute`), this skill guides how to **delegate first** and then route to the best available executor.
 
 **Core principles:**
-1. **Always delegate to an available coding tool** — never implement code yourself when a coding agent CLI is available.
-2. **Single tool = universal handler**: If only ONE coding tool is available, route ALL coding tasks to it regardless of task type.
-3. **Multiple tools = match task to strength**: When several tools are available, pick the specialist that best fits the task type.
+1. **Delegate first, always.** The moment any coding tool is detected, use it for all coding work — never implement code yourself.
+2. **Route to the best specialist.** When multiple tools are available, match the task type to each tool's strength. When only one tool is available, it handles everything.
+3. **No specialist match → use the most general available tool** (`cursor_execute` or `copilot_execute` or `claude_execute`), not direct implementation.
 
 ---
 
@@ -23,7 +23,7 @@ When any local AI coding CLI tool is available (`claude_execute`, `gemini_execut
 | **Claude Code** | `claude_execute` | Architecture decisions, code review, complex refactoring, cross-file analysis, debugging hard logic bugs, explaining large codebases | Pure frontend pixel work |
 | **Gemini CLI** | `gemini_execute` | Frontend UI components (React/Vue/HTML/CSS), algorithm implementation, tasks needing 1M token context, multimodal (image + code) | Database schema design |
 | **OpenAI Codex** | `codex_execute` | Backend API (REST/GraphQL), database/ORM, server-side logic, CLI tools, scripts, data pipelines | UI component styling |
-| **Cursor** | `cursor_execute` | General AI-assisted coding; any coding task when no other specialist tool is available | — |
+| **Cursor** | `cursor_execute` | General AI-assisted coding; handles any task type when used as the sole or fallback tool | — |
 | **GitHub Copilot** | `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase, debugging | — |
 
 ---
@@ -33,18 +33,22 @@ When any local AI coding CLI tool is available (`claude_execute`, `gemini_execut
 ```
 Task received
      ↓
-CHECK available tools (inspect which CLI tools are present)
+CHECK available tools (inspect which CLI tools are present in the tool list)
      ↓
-IF only ONE tool is available:
-  └─ Route ALL coding tasks to that tool immediately — no further classification needed
+← ANY tools available? → NO  →  implement directly with edit_file / execute_bash
+     ↓ YES
+DELEGATE — always route to an available tool; never implement code yourself
      ↓
-IF multiple tools are available, CLASSIFY the task:
-  ├─ Frontend UI / styling / components?  → gemini_execute
-  ├─ Backend API / DB / server logic?     → codex_execute
-  ├─ Architecture / review / refactor?    → claude_execute
-  ├─ Shell / git / gh command suggestion? → copilot_execute or execute_bash
-  ├─ General coding (no specialist match)? → cursor_execute → copilot_execute → claude_execute
-  └─ Multiple concerns (full-stack)?      → split into subtasks, route each
+CLASSIFY the task to pick the best available tool:
+  ├─ Frontend UI / styling / components?         → gemini_execute (if available)
+  ├─ Backend API / DB / server logic?            → codex_execute  (if available)
+  ├─ Architecture / review / complex refactor?   → claude_execute (if available)
+  ├─ Shell / git / gh command suggestion?        → copilot_execute or execute_bash
+  ├─ General coding / no specialist match?       → cursor_execute (preferred) → copilot_execute → claude_execute (priority order: pick the first one that is available)
+  └─ Multiple concerns (full-stack)?             → split into subtasks, route each
+     ↓
+If the ideal specialist is NOT available, route to the closest available alternative
+  (e.g. claude unavailable → use cursor or copilot for the task)
      ↓
 DELEGATE with a complete self-contained prompt
      ↓
@@ -75,8 +79,8 @@ INTEGRATE and report back
 - "Design the data flow architecture for this new feature"
 - "Debug why this async race condition occurs"
 
-### General Coding → `cursor_execute` or `copilot_execute` (when available as the only/primary tool)
-- Any coding task when no specialist tool matches, OR when this is the only available tool
+### General Coding → `cursor_execute` or `copilot_execute` (when available)
+- Any coding task when no specialist tool matches, or when these are the only available tools
 - Writing code, editing files, running commands, searching the codebase
 - "Fix the bug in src/api.ts"
 - "Add unit tests for the UserService class"

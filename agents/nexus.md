@@ -28,7 +28,7 @@ Available executors (check which tools exist):
   copilot_execute → GitHub Copilot CLI (general-purpose coding: file editing, shell commands, codebase search)
 ```
 
-**⚠️ Single-tool rule**: If only ONE executor is available, use it for ALL tasks — do not try to classify tasks or implement code yourself. Delegate everything to the single available tool.
+**Delegation rule**: If ANY executor(s) are available, ALL implementation work MUST be delegated to them — do not write code yourself. When multiple executors are available, route each task to the best specialist. When only one is available, it handles all tasks.
 
 If none are available, fall back to direct tools (edit_file, execute_bash, etc.) and note this limitation.
 
@@ -138,10 +138,10 @@ Break the feature into **atomic tasks (≤5 min each)**, grouped into execution 
 - `Claude`   → Architecture decisions, code review, cross-file refactoring
 - `Gemini`   → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
 - `Codex`    → Backend API, database, server-side logic, scripts
-- `Cursor`   → General-purpose coding when no specialist matches
+- `Cursor`   → General-purpose coding; handles any task type when used as the sole or fallback executor
 - `Copilot`  → General-purpose AI coding: file editing, shell commands, codebase search
 
-**⚠️ Single-tool rule**: If only ONE executor is available, assign ALL tasks to it regardless of task type.
+**Route to the best available specialist. If the ideal specialist is not available, route to the closest available alternative rather than implementing code yourself.**
 
 ```markdown
 # <Feature Name> — Tasks
