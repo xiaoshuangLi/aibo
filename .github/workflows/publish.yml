@@ -45,7 +45,23 @@ jobs:
           echo "Package.json version has not changed. Skipping CI/CD pipeline."
           exit 0
 
+      - name: 🔍 Check if version is already published on npm
+        id: check_npm
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          PACKAGE_NAME=$(jq -r '.name' package.json)
+          CURRENT_VERSION=$(jq -r '.version' package.json)
+          PUBLISHED=$(npm view "${PACKAGE_NAME}@${CURRENT_VERSION}" version 2>/dev/null | tr -d '[:space:]' || echo "")
+          if [ "$PUBLISHED" = "$CURRENT_VERSION" ]; then
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "Version ${CURRENT_VERSION} is already published on npm. Skipping publish."
+          else
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "Version ${CURRENT_VERSION} is not yet published on npm. Proceeding."
+          fi
+
       - name: 🐘 Setup Node.js
+        if: steps.check_npm.outputs.should_publish == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -53,6 +69,7 @@ jobs:
 
       - name: 📦 Cache node_modules
         id: cache-node-modules
+        if: steps.check_npm.outputs.should_publish == 'true'
         uses: actions/cache@v3
         with:
           path: ~/.npm
@@ -62,17 +79,19 @@ jobs:
 
       - name: 📦 Install dependencies
         # 只有当 package-lock.json 或 package.json 发生变化时才重新安装
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        if: steps.check_npm.outputs.should_publish == 'true' && steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: 🏗️ Build project
+        if: steps.check_npm.outputs.should_publish == 'true'
         run: npm run build
 
       - name: 🧪 Run tests
+        if: steps.check_npm.outputs.should_publish == 'true'
         run: npm test
 
       - name: 🚀 Publish to NPM
-        if: success()
+        if: steps.check_npm.outputs.should_publish == 'true'
         run: npm run publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
