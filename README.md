@@ -9,7 +9,7 @@
 - 🤝 **多智能体协作**: 内置 15 个专业 Agent（协调者、架构师、编码者、测试者等），支持并行任务分解与执行
 - 🛠️ **技能扩展（Skills）**: 通过 `skills/` 目录扩展 AI 的专项能力，内置 45+ 技能（代码审查、CI/CD、前端开发、整理代码等）
 - 🔗 **MCP 工具集成**: 通过 `mcps/` 目录接入 GitHub、Slack 等外部服务，扩展 AI 工具调用范围
-- 🖥️ **本机 CLI 工具集成**: 自动检测并调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex），将编码子任务委派给这些工具执行
+- 🖥️ **本机 CLI 工具集成**: 自动检测并调用本机已安装的编程 CLI 工具（Claude Code、Gemini CLI、Codex、Cursor、GitHub Copilot），将编码子任务委派给这些工具执行
 - 🏢 **飞书企业集成**: 作为飞书机器人接入企业群/私聊，支持互动卡片消息和 `/rebot` 重启命令
 - 🎙️ **语音输入**: 通过腾讯云 ASR 实现实时语音转文字输入（需配置腾讯云密钥）
 - 🌐 **网页搜索与抓取**: 内置 Web 搜索和网页内容获取能力，辅助信息收集与研究
@@ -276,6 +276,24 @@ Skills 是 AIBO 的专项能力模块，定义在 `skills/` 目录中，每个 S
 
 ---
 
+## 🖥️ 本机 CLI 工具集成
+
+AIBO 支持直接调用本机已安装的 AI 编程 CLI 工具，**无需额外配置**，启动时自动检测并加载。
+
+| 工具 | 命令 | 擅长场景 |
+|------|------|---------|
+| 🟣 **Claude Code** | `claude` | 架构决策、代码审查、复杂重构、跨文件分析 |
+| 🔵 **Gemini CLI** | `gemini` | 前端 UI 组件（React/Vue/CSS）、超长上下文任务 |
+| 🟢 **OpenAI Codex** | `codex` | 后端 API、数据库/ORM、服务端逻辑、脚本 |
+| 🔷 **Cursor** | `cursor` | 通用编程：文件编辑、Shell 命令、代码库搜索 |
+| ⚫ **GitHub Copilot** | `copilot` | 通用编程：文件编辑、Shell 命令、代码库搜索 |
+
+当多个工具同时可用时，AIBO 按任务类型自动路由（前端 → Gemini、后端 → Codex、架构 → Claude、通用 → Cursor/Copilot）；只有一个工具时，所有任务都委派给该工具。
+
+> 📖 详细安装指南及路由策略请参阅 **[docs/cli-tools.md](docs/cli-tools.md)**
+
+---
+
 ## 🔗 MCP 工具集成（Model Context Protocol）
 
 MCP（Model Context Protocol）允许 AIBO 连接外部工具和服务，极大扩展其能力边界。工具配置定义在 `mcps/` 目录中。
@@ -287,7 +305,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 - 🐙 **GitHub / Slack 等**：通过标准 MCP 配置接入第三方服务 API，实现自动化操作
 - 🌐 **自定义服务**：接入任意支持 MCP 协议的 HTTP 服务，灵活扩展能力边界
 
-> 💡 **与本机 CLI 工具集成的区别**：AIBO 还支持直接调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex 等），这是独立于 MCP 的另一项功能特性，无需额外配置，AIBO 启动时会自动检测并加载。
+> 💡 **与本机 CLI 工具集成的区别**：AIBO 还支持直接调用本机已安装的编程 CLI 工具（Claude Code、Gemini CLI、Codex、Cursor、GitHub Copilot 等），这是独立于 MCP 的另一项功能特性，无需额外配置，AIBO 启动时会自动检测并加载。
 
 ### ➕ 添加 MCP 工具
 
@@ -373,6 +391,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 |---------|------|
 | [docs/env.md](docs/env.md) | 所有环境变量的详细说明及获取步骤 |
 | [docs/mcp.md](docs/mcp.md) | MCP 工具集成说明（接入 GitHub、Slack 等外部服务） |
+| [docs/cli-tools.md](docs/cli-tools.md) | 本机 CLI 工具集成（Claude Code、Gemini CLI、Codex、Cursor、GitHub Copilot） |
 | [agents/](agents/) | 内置 Agent 定义，可扩展自定义 Agent |
 | [skills/](skills/) | 内置技能列表，可扩展自定义技能 |
 

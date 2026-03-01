@@ -11,7 +11,7 @@ AIBO 启动时会自动完成以下两步发现流程，无需手动管理工具
 
 每个已配置的服务器通过 `@langchain/mcp-adapters` 的 `MultiServerMCPClient` 建立真实连接，并通过 MCP 协议自动发现工具列表——**无需在配置文件中手动枚举工具**。连接失败的服务器会被跳过，不影响其他服务器的加载。
 
-> 💡 **与本机 CLI 工具集成的区别**：AIBO 还支持直接调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex 等），这是独立于 MCP 的另一项功能特性，无需额外配置，AIBO 启动时会自动检测并加载可用工具。
+> 💡 **与本机 CLI 工具集成的区别**：AIBO 还支持直接调用本机已安装的编程 CLI 工具（Claude Code、Gemini CLI、Codex、Cursor、GitHub Copilot 等），这是独立于 MCP 的另一项功能特性，无需额外配置，AIBO 启动时会自动检测并加载可用工具。
 
 ---
 
