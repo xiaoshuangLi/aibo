@@ -153,7 +153,7 @@ function createCheckpointer() {
  * @see {@link config} 了解环境变量配置详情
  * @see {@link main} 了解主执行函数
  */
-export async function createAIAgent(session?: Session) {
+export async function createAIAgent(session?: Session): Promise<any> {
   if (cachedAgent) {
     return cachedAgent;
   }
@@ -223,8 +223,8 @@ function filterSubAgentTools(tools: any[]): any[] {
     checkpointer: createCheckpointer(),
     tools,
     skills: allSkillsDirs,
-    subagents: subAgents,
-    middleware: [toolRetryMiddleware],
+    subagents: subAgents as any,
+    middleware: [toolRetryMiddleware] as any,
     interruptOn: { grep: false },
   });
 

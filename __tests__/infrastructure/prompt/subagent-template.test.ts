@@ -123,5 +123,35 @@ describe('SubAgentPromptTemplate', () => {
       expect(result).toContain('Run tests');
       expect(result).toContain('Write comprehensive tests');
     });
+
+    it('should use default empty arrays when capabilities and guidelines are omitted', () => {
+      const result = createReinforcedSubAgentPrompt('Test prompt', 'tester');
+      expect(result).toContain('Test prompt');
+      expect(result).toContain('CAPABILITIES');
+      expect(result).toContain('GUIDELINES');
+    });
+  });
+});
+
+describe('SubAgentPromptTemplate - Chinese language branch', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.mock('@/core/config', () => ({
+      config: {
+        language: { code: 'zh' },
+        persona: { style: undefined },
+      },
+    }));
+  });
+
+  afterEach(() => {
+    jest.resetModules();
+  });
+
+  it('should use Chinese language name when language code is zh', () => {
+    const { SubAgentPromptTemplate } = require('../../../src/infrastructure/prompt/subagent-template');
+    const template = new SubAgentPromptTemplate();
+    const result = template.createReinforcedSubAgentPrompt('base', 'coder');
+    expect(result).toContain('Chinese (中文)');
   });
 });

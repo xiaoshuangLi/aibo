@@ -116,3 +116,37 @@ describe('getSystemPrompt - English locale', () => {
     expect(prompt.length).toBeGreaterThan(0);
   });
 });
+
+// ── prompts: persona style branch and Chinese locale ─────────────────────────
+
+describe('getSystemPrompt - persona style branch', () => {
+  it('includes persona section when config.persona.style is set', () => {
+    jest.resetModules();
+    jest.mock('@/core/config', () => ({
+      config: {
+        language: { code: 'en' },
+        persona: { style: 'You are a helpful assistant.' },
+      },
+    }));
+    const { getSystemPrompt } = require('@/shared/constants/prompts');
+    const prompt = getSystemPrompt();
+    expect(prompt).toContain('PERSONA');
+    expect(prompt).toContain('You are a helpful assistant.');
+    jest.resetModules();
+  });
+
+  it('returns Chinese prompt when language code is zh', () => {
+    jest.resetModules();
+    jest.mock('@/core/config', () => ({
+      config: {
+        language: { code: 'zh' },
+        persona: { style: undefined },
+      },
+    }));
+    const { getSystemPrompt } = require('@/shared/constants/prompts');
+    const prompt = getSystemPrompt();
+    expect(typeof prompt).toBe('string');
+    expect(prompt).toContain('Chinese (中文)');
+    jest.resetModules();
+  });
+});

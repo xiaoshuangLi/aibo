@@ -284,4 +284,51 @@ describe('TencentASR Coverage Tests', () => {
       logSpy.mockRestore();
     }
   });
+
+  test('recognizeSpeech returns null when audioBuffer is empty', async () => {
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.alloc(0));
+    const result = await asr.recognizeSpeech(100);
+    expect(result).toBeNull();
+    recordAudioSpy.mockRestore();
+  });
+
+  test('recognizeSpeech throws wrapped Error when non-Error is thrown', async () => {
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockRejectedValue('string error');
+    await expect(asr.recognizeSpeech(100)).rejects.toThrow('string error');
+    recordAudioSpy.mockRestore();
+  });
+
+  test('recognizeSpeech uses default duration when called without arguments', async () => {
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
+    mockSentenceRecognition.mockResolvedValue({ Result: 'hello' });
+    const result = await asr.recognizeSpeech();
+    expect(result).toBe('hello');
+    recordAudioSpy.mockRestore();
+  });
+
+  test('createVoiceRecognition uses provided config values (truthy paths in || expressions)', () => {
+    const customConfig = {
+      appId: 'custom-app-id',
+      secretId: 'custom-secret-id',
+      secretKey: 'custom-secret-key',
+      region: 'ap-beijing',
+    };
+    expect(() => createVoiceRecognition(customConfig)).not.toThrow();
+  });
+
+  test('startContinuousRecognition: result is null (no speech) covers false branch of result&&isRunning', async () => {
+    const recordAudioSpy = jest.spyOn((asr as any).audioRecorder, 'recordAudio').mockResolvedValue(Buffer.from([1, 2, 3]));
+    mockSentenceRecognition.mockResolvedValue({ Result: '' });
+
+    const onResult = jest.fn();
+    const onError = jest.fn();
+
+    const stop = asr.startContinuousRecognition(onResult, onError);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    stop();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(onResult).not.toHaveBeenCalled();
+    recordAudioSpy.mockRestore();
+  });
 });

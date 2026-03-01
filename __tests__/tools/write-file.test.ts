@@ -95,4 +95,31 @@ describe('writeFileTool', () => {
     expect(tools).toHaveLength(1);
     expect(tools[0].name).toBe('write_file');
   });
+
+  test('resolves relative file_path against cwd', async () => {
+    const originalCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const result = await writeFileTool.invoke({ file_path: 'relative-write-test.ts', content: 'hello' });
+      const parsed = JSON.parse(result);
+      expect(parsed.success).toBe(true);
+      expect(parsed.file_path).toBe(path.join(tmpDir, 'relative-write-test.ts'));
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  test('handles non-Error exception (string thrown)', async () => {
+    const fsModule = require('fs');
+    const origWrite = fsModule.writeFileSync;
+    fsModule.writeFileSync = () => { throw 'string error'; };
+    try {
+      const result = await writeFileTool.invoke({ file_path: path.join(tmpDir, 'throw-test.ts'), content: 'x' });
+      const parsed = JSON.parse(result);
+      expect(parsed.success).toBe(false);
+      expect(parsed.error).toBe('string error');
+    } finally {
+      fsModule.writeFileSync = origWrite;
+    }
+  });
 });

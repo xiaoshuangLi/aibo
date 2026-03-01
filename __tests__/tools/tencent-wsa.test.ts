@@ -1,4 +1,5 @@
 import { tencentWsaSearchTool } from '@/tools/tencent-wsa';
+import getTencentWsaTools from '@/tools/tencent-wsa';
 import * as wsaService from '@/infrastructure/tencent-cloud/wsa';
 
 jest.mock('@/infrastructure/tencent-cloud/wsa');
@@ -78,5 +79,56 @@ describe('Tencent WSA Search Tool', () => {
 
     expect(parsedResult.success).toBe(false);
     expect(parsedResult.error).toBe('Network error');
+  });
+
+  it('should handle non-Error exception (string error)', async () => {
+    const mockWsa = {
+      canSearch: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockRejectedValue('string error'),
+    };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
+    const result = await tencentWsaSearchTool.invoke({ query: 'test' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.error).toBe('string error');
+  });
+
+  it('should use fallback values when Pages, Version, and RequestId are undefined', async () => {
+    const mockResponse = {};
+    const mockWsa = {
+      canSearch: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockResolvedValue(mockResponse),
+    };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
+    const result = await tencentWsaSearchTool.invoke({ query: 'test' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(true);
+    expect(parsedResult.results).toEqual([]);
+    expect(parsedResult.version).toBe('unknown');
+    expect(parsedResult.requestId).toBeNull();
+  });
+
+  it('getTencentWsaTools should return an array containing the tool', async () => {
+    const tools = await getTencentWsaTools();
+    expect(tools).toHaveLength(1);
+    expect(tools[0]).toBe(tencentWsaSearchTool);
+  });
+
+  it('should use SEARCH_ERROR fallback when error message is empty', async () => {
+    const mockWsa = {
+      canSearch: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockRejectedValue(new Error('')),
+    };
+    (wsaService.createTencentWSA as jest.Mock).mockReturnValue(mockWsa);
+
+    const result = await tencentWsaSearchTool.invoke({ query: 'test' });
+    const parsedResult = JSON.parse(result);
+
+    expect(parsedResult.success).toBe(false);
+    expect(parsedResult.error).toBe('SEARCH_ERROR');
   });
 });
