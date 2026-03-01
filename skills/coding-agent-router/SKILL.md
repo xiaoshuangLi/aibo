@@ -21,6 +21,7 @@ The core principle: **match the task type to the agent's strength**, then delega
 | **Gemini CLI** | `gemini_execute` | Frontend UI components (React/Vue/HTML/CSS), algorithm implementation, tasks needing 1M token context, multimodal (image + code) | Database schema design |
 | **OpenAI Codex** | `codex_execute` | Backend API (REST/GraphQL), database/ORM, server-side logic, CLI tools, scripts, data pipelines | UI component styling |
 | **Cursor** | `cursor_execute` | General AI-assisted coding when no specialist tool is available; opening files in the Cursor editor | — |
+| **GitHub Copilot** | `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase, debugging | — |
 
 ---
 
@@ -35,7 +36,8 @@ CLASSIFY the task:
   ├─ Frontend UI / styling / components?  → gemini_execute
   ├─ Backend API / DB / server logic?     → codex_execute
   ├─ Architecture / review / refactor?    → claude_execute
-  ├─ General coding (no specialist match)? → cursor_execute or claude_execute
+  ├─ Shell / git / gh command suggestion? → copilot_execute or execute_bash
+  ├─ General coding (no specialist match)? → cursor_execute or copilot_execute or claude_execute
   └─ Multiple concerns (full-stack)?      → split into subtasks, route each
      ↓
 DELEGATE with a complete self-contained prompt
@@ -69,6 +71,13 @@ INTEGRATE and report back
 
 ### General Coding → `cursor_execute` (fallback)
 - Any coding task when neither gemini nor codex is available
+
+### General Coding → `copilot_execute` (fallback)
+- Any coding task when other specialist tools are unavailable
+- Writing code, editing files, running commands, searching the codebase
+- "Fix the bug in src/api.ts"
+- "Add unit tests for the UserService class"
+- "Search for all usages of the deprecated method and replace them"
 
 ---
 

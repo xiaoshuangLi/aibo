@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isCursorAvailable(): boolean {
   try {
-    execSync("which cursor", { stdio: "ignore" });
+    execSync("cursor --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;

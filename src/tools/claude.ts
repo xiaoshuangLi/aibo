@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isClaudeAvailable(): boolean {
   try {
-    execSync("which claude", { stdio: "ignore" });
+    execSync("claude --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;
