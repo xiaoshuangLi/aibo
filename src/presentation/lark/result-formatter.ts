@@ -50,8 +50,12 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task', 'todo_write', 'todo_read'].includes(name)) {
     return 'task_management';
+  }
+  // AI代理执行工具
+  if (['claude_execute', 'cursor_execute', 'cursor_open', 'gemini_execute', 'codex_execute'].includes(name)) {
+    return 'agent_runner';
   }
   // Composio工具
   if (name.startsWith('COMPOSIO_')) {
@@ -522,6 +526,38 @@ export const formatTaskManagementResult = (name: string, result: any): string =>
              ).join('\n');
     }
   }
+  if (name === 'todo_write') {
+    if (result.success === false) {
+      return `❌ **待办事项更新失败**: ${result.message || result.error || '未知错误'}`;
+    }
+    if (result.todos && Array.isArray(result.todos)) {
+      if (result.todos.length === 0) return '📝 **待办事项列表已清空**';
+      const completed = result.todos.filter((t: any) => t.status === 'completed').length;
+      const total = result.todos.length;
+      return `📝 **待办事项已更新 (${completed}/${total} 完成)**\n\n` +
+             result.todos.map((todo: any) => {
+               const statusIcon = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⬜';
+               const priorityTag = todo.priority ? ` \`${todo.priority}\`` : '';
+               return `- ${statusIcon} \`#${todo.id}\`${priorityTag} ${todo.content}`;
+             }).join('\n');
+    }
+  }
+  if (name === 'todo_read') {
+    if (result.todos && Array.isArray(result.todos)) {
+      if (result.todos.length === 0) return '📝 **待办事项列表为空**';
+      const summary = result.summary || {};
+      const notStarted = summary.not_started ?? 0;
+      const inProgress = summary.in_progress ?? 0;
+      const completed = summary.completed ?? 0;
+      const header = `📝 **待办事项 (共 ${result.total || result.todos.length} 项: ✅${completed} 🔄${inProgress} ⬜${notStarted})**\n\n`;
+      const lines = result.todos.map((todo: any) => {
+        const statusIcon = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⬜';
+        const priorityTag = todo.priority ? ` \`${todo.priority}\`` : '';
+        return `- ${statusIcon} \`#${todo.id}\`${priorityTag} ${todo.content}`;
+      });
+      return header + lines.join('\n');
+    }
+  }
   return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 };
 
@@ -582,7 +618,41 @@ export const formatComposioResult = (name: string, result: any): string => {
 };
 
 /**
- * 格式化结构化结果对象（用于改进的预览函数）
+ * 格式化 AI 代理执行工具结果
+ */
+export const formatAgentRunnerResult = (name: string, result: any): string => {
+  if (result.success === false) {
+    if (result.interrupted) {
+      return `⚠️ **执行被中断**\n${result.message || '用户中断了执行'}`;
+    }
+    let errorOutput = `❌ **执行失败**: ${result.error || '未知错误'}\n${result.message || ''}`;
+    if (result.stdout && result.stdout !== '(empty)') {
+      const stdoutLang = inferLanguageType(undefined, result.stdout);
+      errorOutput += `\n\n**标准输出:**\n\`\`\`${stdoutLang || 'bash'}\n${result.stdout}\n\`\`\``;
+    }
+    if (result.stderr && result.stderr !== '(empty)') {
+      const stderrLang = inferLanguageType(undefined, result.stderr);
+      errorOutput += `\n\n**标准错误:**\n\`\`\`${stderrLang || ''}\n${result.stderr}\n\`\`\``;
+    }
+    return errorOutput.trim();
+  }
+  if (name === 'cursor_open') {
+    const path = result.path || '未知路径';
+    return `✅ **已在 Cursor 中打开**: \`${path}\``;
+  }
+  let output = '';
+  if (result.stdout && result.stdout !== '(empty)') {
+    const stdoutLang = inferLanguageType(undefined, result.stdout);
+    output += `**输出:**\n\`\`\`${stdoutLang || 'bash'}\n${result.stdout}\n\`\`\``;
+  }
+  if (result.stderr && result.stderr !== '(empty)') {
+    const stderrLang = inferLanguageType(undefined, result.stderr);
+    output += `${output ? '\n\n' : ''}**标准错误:**\n\`\`\`${stderrLang || ''}\n${result.stderr}\n\`\`\``;
+  }
+  return output || '✅ 执行完成（无输出）';
+};
+
+/**
  * @param result - 结构化结果对象
  * @param verbose - 是否详细模式
  * @returns 格式化的Markdown字符串
@@ -802,6 +872,8 @@ export const formatToolResultByType = (name: string, toolType: string, success: 
       return formatTaskManagementResult(name, parsedResult);
     case 'composio':
       return formatComposioResult(name, parsedResult);
+    case 'agent_runner':
+      return formatAgentRunnerResult(name, parsedResult);
     default:
       return formatDefaultToolResult(parsedResult);
   }
