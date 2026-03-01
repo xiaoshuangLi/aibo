@@ -41,7 +41,7 @@ describe('Codex CLI Tool', () => {
       expect(parsed.success).toBe(true);
       if (parsed.success) {
         expect(parsed.data.prompt).toBe('create a REST API endpoint');
-        expect(parsed.data.timeout).toBe(300000);
+        expect(parsed.data.timeout).toBe(6000000);
         expect(parsed.data.args).toEqual([]);
       }
     });
