@@ -1,15 +1,15 @@
 ---
 name: coding-agent-router
-description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor). Use when local AI coding CLIs are available and you need to decide which agent handles which subtask.
+description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (copilot, claude, gemini, codex, cursor). Use when local AI coding CLIs are available and you need to decide which agent handles which subtask. Proactively uses copilot_execute as the default general-purpose executor when available.
 ---
 
 # Coding Agent Router Skill
 
 ## 🎯 Purpose
 
-When multiple local AI coding CLI tools are available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`), this skill guides how to intelligently route each subtask to the **right executor** rather than doing everything with a single agent or doing it manually.
+When multiple local AI coding CLI tools are available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`, `copilot_execute`), this skill guides how to intelligently route each subtask to the **right executor** rather than doing everything with a single agent or doing it manually.
 
-The core principle: **match the task type to the agent's strength**, then delegate fully.
+The core principle: **match the task type to the agent's strength, then delegate fully**. When `copilot_execute` is available, use it proactively as the default general-purpose executor — do not wait for other tools to fail first.
 
 ---
 
@@ -17,11 +17,11 @@ The core principle: **match the task type to the agent's strength**, then delega
 
 | Executor | Tool Name | Best For | Avoid For |
 |----------|-----------|----------|-----------|
+| **GitHub Copilot** | `copilot_execute` | **PRIMARY general-purpose executor**: writing code, editing files, running shell commands, searching the codebase, debugging, fixing bugs, adding tests — use proactively when available | — |
 | **Claude Code** | `claude_execute` | Architecture decisions, code review, complex refactoring, cross-file analysis, debugging hard logic bugs, explaining large codebases | Pure frontend pixel work |
 | **Gemini CLI** | `gemini_execute` | Frontend UI components (React/Vue/HTML/CSS), algorithm implementation, tasks needing 1M token context, multimodal (image + code) | Database schema design |
 | **OpenAI Codex** | `codex_execute` | Backend API (REST/GraphQL), database/ORM, server-side logic, CLI tools, scripts, data pipelines | UI component styling |
-| **Cursor** | `cursor_execute` | General AI-assisted coding when no specialist tool is available; opening files in the Cursor editor | — |
-| **GitHub Copilot** | `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase, debugging | — |
+| **Cursor** | `cursor_execute` | General AI-assisted coding when neither Copilot nor a specialist tool is available; opening files in the Cursor editor | — |
 
 ---
 
@@ -36,8 +36,9 @@ CLASSIFY the task:
   ├─ Frontend UI / styling / components?  → gemini_execute
   ├─ Backend API / DB / server logic?     → codex_execute
   ├─ Architecture / review / refactor?    → claude_execute
-  ├─ Shell / git / gh command suggestion? → copilot_execute or execute_bash
-  ├─ General coding (no specialist match)? → cursor_execute or copilot_execute or claude_execute
+  ├─ General coding / file edits / debugging / shell / tests?
+  │     → copilot_execute (if available) ← USE THIS FIRST
+  │     → cursor_execute (fallback if copilot unavailable)
   └─ Multiple concerns (full-stack)?      → split into subtasks, route each
      ↓
 DELEGATE with a complete self-contained prompt
@@ -46,6 +47,8 @@ VERIFY the result
      ↓
 INTEGRATE and report back
 ```
+
+> **Key rule**: `copilot_execute` is the default choice for any task that does not clearly belong to a specialist (Gemini/Codex/Claude). Check for it **before** attempting manual implementation or falling back to `cursor_execute`.
 
 ---
 
@@ -69,15 +72,16 @@ INTEGRATE and report back
 - "Design the data flow architecture for this new feature"
 - "Debug why this async race condition occurs"
 
-### General Coding → `cursor_execute` (fallback)
-- Any coding task when neither gemini nor codex is available
-
-### General Coding → `copilot_execute` (fallback)
-- Any coding task when other specialist tools are unavailable
-- Writing code, editing files, running commands, searching the codebase
+### General Coding → `copilot_execute` (PRIMARY — use proactively when available)
+- Any coding task that doesn't clearly belong to a frontend, backend, or architecture specialist
+- Writing code, editing files, running shell commands, searching the codebase, debugging
 - "Fix the bug in src/api.ts"
 - "Add unit tests for the UserService class"
 - "Search for all usages of the deprecated method and replace them"
+- "Implement the new feature in src/utils.ts"
+
+### General Coding → `cursor_execute` (fallback when copilot unavailable)
+- Any coding task when neither `copilot_execute` nor a specialist tool is available
 
 ---
 
@@ -219,3 +223,4 @@ If a specialist tool call fails or the CLI is not installed:
 | Sending vague prompts ("fix the bug") | Agent lacks context to act | Write self-contained prompts with file paths and requirements |
 | Not verifying output | Undetected compile errors or test failures | Always build + test after delegation |
 | Doing the implementation yourself instead of delegating | Defeats the purpose of having specialist agents | Delegate first; only fall back if delegation fails |
+| Treating `copilot_execute` as a last resort | Misses proactive use of an available local tool | When `copilot_execute` is available, assign it general coding tasks immediately — do not wait for other tools to fail |
