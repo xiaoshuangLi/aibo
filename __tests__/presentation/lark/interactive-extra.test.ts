@@ -54,13 +54,15 @@ function makeAdapter() {
   };
 }
 function makeSession() {
-  return {
+  const s: any = {
     threadId: 'test-thread',
     isRunning: false,
     abortController: new AbortController(),
     start: jest.fn().mockResolvedValue(undefined),
     end: jest.fn(),
   };
+  s.setAbortController = jest.fn((c: AbortController) => { s.abortController = c; });
+  return s;
 }
 
 describe('startLarkInteractiveMode - success path', () => {
@@ -169,6 +171,7 @@ describe('handleUserMessage - error on processStreamChunks (line 150)', () => {
       abortController: null,
       end: jest.fn(),
     };
+    session.setAbortController = jest.fn((c: AbortController) => { session.abortController = c; });
     const agent = { stream: jest.fn() };
 
     await handleUserMessage('hello', session, agent);
