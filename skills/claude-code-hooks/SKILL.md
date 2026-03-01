@@ -195,6 +195,68 @@ execute_bash command="cat package.json | python3 -c \"import sys,json; d=json.lo
 
 ---
 
+## 👁️ Mechanism 4: Post-Implementation Review
+
+### What Claude Code Does
+After every non-trivial change, Claude Code performs a self-review by re-reading the changed files as a reviewer — checking correctness, edge cases, security, and consistency. This is the step that catches "it compiles but it's wrong" bugs that formatters and tests miss.
+
+### AIBO Equivalent: Mandatory Post-Implementation Review
+
+After build and tests pass, review every changed file before declaring done.
+
+#### Option A: Self-Review (always available)
+```bash
+# Step 1: Get the list of changed files
+execute_bash command="git diff --name-only HEAD"
+
+# Step 2: Read each changed file with reviewer eyes
+view_file path="<changed-file>"
+```
+
+Apply this checklist to each file:
+- **Correctness** — Does the logic do exactly what was intended?
+- **Edge cases** — What happens with null, empty, 0, very large input, concurrent calls?
+- **Error handling** — Are all errors caught, logged, and surfaced correctly?
+- **Security** — Any unsanitized input, exposed secrets, or missing authorization checks?
+- **Naming** — Are variables and functions named clearly and consistently with the codebase?
+
+#### Option B: Delegate to Claude Code (if `claude_execute` is available)
+```typescript
+claude_execute({
+  prompt: `Review the following changed files for correctness, edge cases, security, and maintainability.
+Changed files (relative to working directory):
+- src/services/user.ts
+- src/types/user.ts
+
+For each issue found, output: file, line, severity (blocking/suggestion), and what to fix.
+Severity "blocking" = must fix before merging. "suggestion" = improve quality but not critical.`,
+  cwd: projectDir
+})
+```
+
+#### Option C: Use think Tool (when Claude CLI is not available)
+```typescript
+think({
+  thought: `
+    Reviewing src/services/user.ts (validateUser function):
+    
+    Logic check: returns early for empty email, but "notanemail" also passes...
+    → ISSUE (blocking): missing email format validation
+    
+    Edge case: what if email is whitespace only? " " is truthy → bypasses guard
+    → ISSUE (blocking): need trim() before the empty check
+    
+    Security: no SQL/XSS concerns here — purely in-memory ✓
+    
+    Summary: 2 blocking issues found, must fix before marking complete.
+  `
+})
+```
+
+> 📖 See the **code-review** skill for the full review checklist covering correctness, security, performance, maintainability, and tests.
+
+---
+
 ## 🔄 Combined Quality Enforcement Workflow
 
 This is the complete AIBO equivalent of Claude Code operating with all hooks active:
@@ -229,6 +291,11 @@ AFTER ALL CHANGES:
 │ 6. TEST VERIFICATION                                     │
 │    - Run affected tests                                  │
 │    - Fix ALL failures before declaring done              │
+│                                                          │
+│ 7. POST-IMPLEMENTATION REVIEW                            │
+│    - Read each changed file with reviewer eyes           │
+│    - Check correctness, edge cases, security, naming     │
+│    - Fix any blocking issues found; then re-run tests    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -273,6 +340,57 @@ If the project doesn't have a `CLAUDE.md`, create one to give all agents (Claude
 
 ---
 
+## 🔧 Tool Installation FAQ
+
+### Q: Do I need to install ESLint, Prettier, etc. locally or globally?
+
+**No global installation required.** There are two cases:
+
+#### Case 1: The project already has these tools in `package.json`
+This is the most common case. After running `npm install`, all tools are available inside `node_modules/.bin/`. Use `npx` to run them — it finds the local version automatically:
+
+```bash
+# These work without any global install, just after `npm install`:
+npx prettier --write src/services/user.ts
+npx eslint --fix src/services/user.ts
+npx tsc --noEmit
+```
+
+How to check if the project already has them:
+```bash
+cat package.json | grep -E '"eslint"|"prettier"|"typescript"'
+# If they appear under "dependencies" or "devDependencies", just run npm install
+```
+
+#### Case 2: The project does NOT have these tools in `package.json`
+Install them as dev dependencies — they will be added to `node_modules` and never need a global install:
+
+```bash
+# TypeScript/JavaScript project without linting:
+npm install --save-dev eslint prettier
+
+# Python project without formatting:
+pip install black ruff
+
+# Go and Rust have formatters built in — no install needed
+```
+
+#### Summary
+
+| Tool | Requires Global Install | How to Use |
+|---|---|---|
+| ESLint | ❌ No | `npx eslint` (after `npm install`) |
+| Prettier | ❌ No | `npx prettier` (after `npm install`) |
+| TypeScript (`tsc`) | ❌ No | `npx tsc` (after `npm install`) |
+| Python `black` | ❌ No | `pip install black` (per project or venv) |
+| Python `ruff` | ❌ No | `pip install ruff` (per project or venv) |
+| Go `gofmt` | ✅ Included with Go | built into Go installation |
+| Rust `rustfmt` | ✅ Included with Rust | built into Rust installation |
+
+**Recommendation**: Check `package.json` (or `pyproject.toml`) first. In most projects, running `npm install` once is all that's needed — no global tools required.
+
+---
+
 ## 📊 Quality Gap Analysis: Claude Code vs. Bare Agent
 
 | Quality Factor | Claude Code | AIBO (default) | AIBO (with this skill) |
@@ -281,6 +399,7 @@ If the project doesn't have a `CLAUDE.md`, create one to give all agents (Claude
 | Lint auto-fix | ✅ Automatic (hooks) | ❌ Manual | ✅ Simulated hooks |
 | Project conventions | ✅ CLAUDE.md auto-loaded | ❌ Not loaded | ✅ Explicit load step |
 | Extended reasoning | ✅ `--extended-thinking` | ❌ Not used | ✅ Via `claude_execute --extended-thinking` or `think` tool |
+| Post-implementation review | ✅ Mandatory self-review | ❌ Skipped | ✅ Mandatory (step 7) |
 | Build verification | ✅ Mandatory | ⚠️ Sometimes skipped | ✅ Mandatory (enforced) |
 | Test verification | ✅ Mandatory | ⚠️ Sometimes skipped | ✅ Mandatory (enforced) |
 
@@ -289,9 +408,10 @@ If the project doesn't have a `CLAUDE.md`, create one to give all agents (Claude
 ## ✅ Summary: What to Do Every Session
 
 1. **Load project context** → read CLAUDE.md/AGENTS.md/README at session start
-2. **Discover quality tools** → find formatter and linter commands from package.json/config
+2. **Discover quality tools** → check package.json to find formatter/linter; run `npm install` — no global install needed
 3. **Simulate hooks** → format + lint immediately after every file write
 4. **Use extended thinking** → `claude_execute` with `args: ["--extended-thinking"]` for complex tasks, or `think` tool for deep reasoning without Claude CLI
 5. **Never skip verification** → build passes + tests pass = done; otherwise keep fixing
+6. **Always self-review** → re-read every changed file before declaring done; delegate to `claude_execute` for complex reviews
 
 This workflow closes the quality gap between Claude Code and AIBO.
