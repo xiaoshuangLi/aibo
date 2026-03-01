@@ -20,7 +20,7 @@ process.on = mockProcessOn as any;
 
 // Config mock - we'll mutate larkType per test
 const configMock = {
-  config: { interaction: { larkType: 'direct_message' } },
+  config: { interaction: { larkType: 'direct_message' }, language: { code: 'en' }, persona: { style: undefined } },
 };
 jest.mock('@/core/config', () => configMock);
 

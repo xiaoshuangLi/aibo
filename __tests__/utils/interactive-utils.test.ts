@@ -22,6 +22,8 @@ jest.mock('../../src/core/config', () => ({
     output: {
       verbose: false,
     },
+    language: { code: 'en' },
+    persona: { style: undefined },
   },
 }));
 

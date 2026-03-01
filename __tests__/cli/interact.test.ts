@@ -20,6 +20,8 @@ jest.mock('@/cli/init', () => ({
 jest.mock('@/core/config', () => ({
   config: {
     interaction: { mode: 'console' },
+    language: { code: 'en' },
+    persona: { style: undefined },
   },
 }));
 

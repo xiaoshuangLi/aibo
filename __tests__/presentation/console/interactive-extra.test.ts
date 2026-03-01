@@ -81,7 +81,7 @@ jest.mock('@/infrastructure/session/manager', () => ({
 }));
 
 jest.mock('@/core/config', () => ({
-  config: { model: { name: 'test-model' }, specialKeyword: { keyword: '干活' } },
+  config: { model: { name: 'test-model' }, specialKeyword: { keyword: '干活' }, language: { code: 'en' }, persona: { style: undefined } },
 }));
 
 const origIsTTY = (process.stdin as any).isTTY;
