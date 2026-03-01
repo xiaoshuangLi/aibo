@@ -90,7 +90,7 @@ function createCopilotExecuteTool(session?: Session) {
   return tool(
   async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["-i", prompt, ...args, "--allow-all"];
+    const execArgs = ["-p", prompt, ...args, "--allow-all"];
 
     try {
       const promise = execFileAsync("copilot", execArgs, {
