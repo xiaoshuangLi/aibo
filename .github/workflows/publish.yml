@@ -16,38 +16,8 @@ jobs:
         with:
           fetch-depth: 2  # 获取最近两次提交用于比较
 
-      - name: 🔍 Check if package.json version changed
-        id: check_version
-        run: |
-          # 获取上一次提交的 package.json 内容
-          if git show HEAD~1:package.json > /tmp/prev_package.json 2>/dev/null; then
-            PREV_VERSION=$(jq -r '.version' /tmp/prev_package.json)
-            CURRENT_VERSION=$(jq -r '.version' package.json)
-            echo "Previous version: $PREV_VERSION"
-            echo "Current version: $CURRENT_VERSION"
-            
-            if [ "$PREV_VERSION" != "$CURRENT_VERSION" ]; then
-              echo "version_changed=true" >> $GITHUB_OUTPUT
-              echo "Version changed from $PREV_VERSION to $CURRENT_VERSION"
-            else
-              echo "version_changed=false" >> $GITHUB_OUTPUT
-              echo "Version not changed"
-            fi
-          else
-            # 如果是第一次提交，也视为版本变化
-            echo "version_changed=true" >> $GITHUB_OUTPUT
-            echo "First commit or no previous package.json"
-          fi
-
-      - name: ⚠️ Skip workflow if version not changed
-        if: steps.check_version.outputs.version_changed != 'true'
-        run: |
-          echo "Package.json version has not changed. Skipping CI/CD pipeline."
-          exit 0
-
       - name: 🔍 Check if version is already published on npm
         id: check_npm
-        if: steps.check_version.outputs.version_changed == 'true'
         run: |
           PACKAGE_NAME=$(jq -r '.name' package.json)
           CURRENT_VERSION=$(jq -r '.version' package.json)
