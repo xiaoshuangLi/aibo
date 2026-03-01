@@ -96,6 +96,36 @@ function findAllAgentsDirectories(rootDir: string): string[] {
  * @returns 包含frontmatter对象和剩余内容的对象
  * @throws {Error} 如果YAML解析失败
  */
+/**
+ * 预处理YAML内容，将顶级纯标量值中包含 ": " 的行自动加引号，
+ * 避免 js-yaml 将其误解为嵌套映射条目。
+ *
+ * 只处理未缩进的 `key: value` 行，且 value 是未加引号的纯文本（非数组、对象、块标量）。
+ */
+function preprocessYamlScalars(yamlContent: string): string {
+  return yamlContent.split('\n').map(line => {
+    const keyValueMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*):\s+(.+)$/);
+    if (keyValueMatch) {
+      const key = keyValueMatch[1];
+      const value = keyValueMatch[2];
+      // Only quote plain scalars that contain ": " and are not already quoted/complex
+      if (
+        value.includes(': ') &&
+        !value.startsWith('"') &&
+        !value.startsWith("'") &&
+        !value.startsWith('[') &&
+        !value.startsWith('{') &&
+        !value.startsWith('|') &&
+        !value.startsWith('>')
+      ) {
+        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\t/g, '\\t');
+        return `${key}: "${escaped}"`;
+      }
+    }
+    return line;
+  }).join('\n');
+}
+
 function parseFrontmatter(content: string): { frontmatter: Record<string, any>; body: string } {
   const frontmatterRegex = /^---\s*([\s\S]*?)\s*---\s*([\s\S]*)$/;
   const match = content.match(frontmatterRegex);
@@ -105,7 +135,7 @@ function parseFrontmatter(content: string): { frontmatter: Record<string, any>; 
   }
   
   try {
-    const yamlContent = match[1];
+    const yamlContent = preprocessYamlScalars(match[1]);
     const body = match[2];
     const frontmatter = yaml.load(yamlContent) as Record<string, any>;
     return { frontmatter, body };

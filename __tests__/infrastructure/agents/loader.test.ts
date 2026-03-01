@@ -101,6 +101,18 @@ describe('Agent Loader', () => {
       expect(result[0].systemPrompt).toContain('SUBAGENT ROLE DEFINITION');
     });
 
+    test('should load agent with unquoted description containing a colon', () => {
+      // description value contains ": " which is valid plain text but trips up YAML parsers
+      const content = `---\nname: nexus\ndescription: Follows the Nexus workflow: Requirements → Design → Tasks\n---\nSystem prompt.`;
+      writeFileSync(join(agentsDir, 'nexus.md'), content);
+
+      const result = loadSubAgents(testDir);
+
+      expect(result.length).toBe(1);
+      expect(result[0].name).toBe('nexus');
+      expect(result[0].description).toBe('Follows the Nexus workflow: Requirements → Design → Tasks');
+    });
+
     test('should handle invalid YAML frontmatter gracefully', () => {
       // 创建包含无效YAML的agent文件
       const invalidContent = `---
