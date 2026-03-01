@@ -50,6 +50,15 @@ describe('LangChainToolRetryMiddleware - Coverage Tests', () => {
     expect(result).toContain('No stack trace available');
   });
 
+  it('should use default Error name when error.name is empty string', () => {
+    const testError = new Error('Test error message');
+    Object.defineProperty(testError, 'name', { value: '', configurable: true });
+    
+    const result = enhancedErrorHandler(testError);
+    expect(result).toContain('Error'); // fallback to 'Error'
+    expect(result).toContain('Test error message');
+  });
+
   it('should create custom middleware with custom configuration', () => {
     const customConfig = {
       maxRetries: 2,

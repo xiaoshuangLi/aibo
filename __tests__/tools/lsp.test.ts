@@ -667,6 +667,23 @@ describe('LSP integration tests', () => {
       const content = fs.readFileSync(FIXTURE_FILE, 'utf-8');
       expect(parseResult(await updateDocumentTool.invoke({ file_path: FIXTURE_FILE, new_content: content })).success).toBe(true);
     });
+
+    it('fails without modifying disk when document is not open in LSP', async () => {
+      // Close the fixture so it is no longer registered with the LSP server.
+      await closeDocumentTool.invoke({ file_path: FIXTURE_FILE });
+
+      const orig = fs.readFileSync(FIXTURE_FILE, 'utf-8');
+      const result = parseResult(
+        await updateDocumentTool.invoke({ file_path: FIXTURE_FILE, new_content: orig + '\n// sentinel\n' })
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      // Disk must NOT have been touched by the failed call.
+      expect(fs.readFileSync(FIXTURE_FILE, 'utf-8')).toBe(orig);
+
+      // Re-open for subsequent tests.
+      await openDocumentTool.invoke({ file_path: FIXTURE_FILE });
+    });
   });
 
   // ── closeDocumentTool ───────────────────────────────────────────────────────

@@ -24,10 +24,15 @@ Available executors (check which tools exist):
   claude_execute  → Claude Code CLI  (architecture, review, refactoring)
   gemini_execute  → Gemini CLI       (frontend UI, algorithms, large context)
   codex_execute   → Codex CLI        (backend API, database, server logic)
-  cursor_execute  → Cursor CLI       (general coding fallback)
+  cursor_execute  → Cursor CLI       (general-purpose coding)
+  copilot_execute → GitHub Copilot CLI (general-purpose coding: file editing, shell commands, codebase search)
 ```
 
-If none are available, fall back to direct tools (edit_file, execute_bash, etc.) and note this limitation.
+**Single tool detected:** Use that one tool for ALL tasks in this session — regardless of task type.
+
+**Multiple tools detected:** Route each task to the best specialist (see Phase 3 executor guide); use any general-purpose tool (cursor_execute, copilot_execute, claude_execute) for tasks that don't match a specialist.
+
+**If none are available:** Fall back to direct tools (edit_file, execute_bash, etc.) and note this limitation.
 
 ---
 
@@ -132,10 +137,13 @@ flowchart TD
 Break the feature into **atomic tasks (≤5 min each)**, grouped into execution batches by dependency.
 
 **Executor selection guide:**
-- `Claude`  → Architecture decisions, code review, cross-file refactoring
-- `Gemini`  → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
-- `Codex`   → Backend API, database, server-side logic, scripts
-- `Cursor`  → General coding fallback
+- `Claude`   → Architecture decisions, code review, cross-file refactoring
+- `Gemini`   → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
+- `Codex`    → Backend API, database, server-side logic, scripts
+- `Cursor`   → General-purpose coding (use when available, especially as fallback)
+- `Copilot`  → General-purpose coding (use when available, especially as fallback)
+
+> If only one executor is available, assign ALL tasks to that executor regardless of type.
 
 ```markdown
 # <Feature Name> — Tasks
@@ -272,11 +280,13 @@ After all batches complete:
 
 | Situation | Fallback |
 |-----------|---------|
-| `gemini_execute` not available | Use `claude_execute` for frontend tasks |
-| `codex_execute` not available | Use `claude_execute` for backend tasks |
-| `cursor_execute` not available | Use `claude_execute` for general tasks |
+| `gemini_execute` not available | Use `claude_execute` or any available general-purpose tool for frontend tasks |
+| `codex_execute` not available | Use `claude_execute` or any available general-purpose tool for backend tasks |
+| `cursor_execute` not available | Use `copilot_execute` or `claude_execute` for general tasks |
+| `copilot_execute` not available | Use `cursor_execute` or `claude_execute` for general tasks |
+| Only one executor available | Use it for ALL tasks regardless of task type |
 | All CLI tools unavailable | Implement directly using edit_file + execute_bash |
-| Agent returns an error | Retry once with a clearer prompt; then fall back to next option |
+| Agent returns an error | Retry once with a clearer prompt; then try the next available executor |
 
 ---
 
@@ -287,3 +297,5 @@ After all batches complete:
 - ❌ Do NOT write vague prompts — coding agents need complete context
 - ❌ Do NOT mark a task complete without verifying build + tests pass
 - ❌ Do NOT run all tasks sequentially when they can be parallelized
+- ❌ Do NOT skip a locally installed tool just because another "specialist" isn't available — any available tool beats manual implementation
+- ❌ Do NOT assume only one tool exists — enumerate all available tools and build a fallback chain

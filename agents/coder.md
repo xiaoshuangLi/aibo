@@ -22,13 +22,131 @@ Every coding task MUST follow this loop to completion:
 1. EXPLORE    → Read existing similar code to understand patterns, naming, and conventions
 2. PLAN       → Identify exactly which files change; list cross-file impacts (types, imports, exports)
 3. IMPLEMENT  → Write/edit the code; use edit_file for existing files, bash for new files
-4. BUILD      → Run the build command; fix ALL compiler errors before continuing
-5. TEST       → Run related tests; fix ALL test failures before continuing
-6. VERIFY     → Confirm the change actually solves the stated problem
-7. CLEANUP    → Remove any temporary/debug code; ensure no leftover artifacts
+4. FORMAT     → Run formatter on every changed file immediately after writing (prettier/black/gofmt)
+5. LINT       → Run linter with auto-fix on every changed file; fix any remaining issues manually
+6. BUILD      → Run the build command; fix ALL compiler errors before continuing
+7. TEST       → Run related tests; fix ALL test failures before continuing
+8. REVIEW     → Self-review all changed files for correctness, edge cases, and maintainability
+9. VERIFY     → Confirm the change actually solves the stated problem
+10. CLEANUP   → Remove any temporary/debug code; ensure no leftover artifacts
 ```
 
-**You are NOT done until steps 4 and 5 produce zero errors.**
+**You are NOT done until steps 6, 7, and 8 produce zero errors/issues.**
+
+## 🪝 CODE QUALITY ENFORCEMENT (Simulate Claude Code Hooks)
+
+Claude Code automatically runs formatters and linters after every file write via its hooks system. **You must replicate this behavior manually**: after every `edit_file` or `write_file`, immediately format and lint the changed file.
+
+### Step 1: Discover quality tools (once per session)
+```bash
+# Find formatter and linter commands for this project
+# Check script definitions to understand what they actually run
+cat package.json | grep -E '"prettier"|"eslint"|"lint"|"format"'
+ls .prettierrc* .eslintrc* pyproject.toml .golangci.yml 2>/dev/null
+# Example: "lint": "eslint src/" confirms eslint is in use
+# Example: "format": "prettier --write ." confirms prettier is in use
+```
+
+### Step 2: After EVERY file write — run format then lint
+```bash
+# TypeScript/JavaScript projects (most common):
+npx prettier --write <changed-file>   # format
+npx eslint --fix <changed-file>       # lint + auto-fix
+npx eslint <changed-file>             # verify zero remaining issues; if any remain, fix them manually and re-run until output is clean
+
+# Python projects:
+black <changed-file>                  # format
+ruff check --fix <changed-file>       # lint + auto-fix
+
+# Go projects:
+gofmt -w <changed-file>               # format
+go vet ./...                          # lint
+
+# Or use the project's own scripts if they exist:
+npm run format && npm run lint
+```
+
+### Why This Matters
+Without this step, code may compile and pass tests but still have inconsistent formatting, unused imports, or style violations — creating the "quality gap" compared to Claude Code output. Running format + lint after every write ensures output is consistently clean.
+
+## 👁️ POST-IMPLEMENTATION SELF-REVIEW (Mandatory Step 8)
+
+After build and tests pass, review every changed file before declaring the task done. This catches issues that formatters and compilers cannot: logic bugs, missing edge cases, security problems, and maintainability issues.
+
+### Review Checklist (apply to each changed file)
+```
+□ Correctness   — Does the logic do exactly what was intended?
+□ Edge cases    — What happens with null, empty, 0, very large input, concurrent calls?
+□ Error handling — Are errors caught, logged, and surfaced correctly?
+□ Security       — Any unsanitized input, exposed secrets, or authorization gaps?
+□ Performance    — Any N+1 queries, unnecessary loops, or blocking operations?
+□ Naming         — Are variables and functions named clearly and consistently?
+□ Consistency    — Does the style match surrounding code?
+□ Tests          — Are the new tests meaningful, not just padding coverage numbers?
+```
+
+### Option A: Self-Review Using view_file
+Read each changed file as a reviewer, not as the author:
+```bash
+# Get the list of changed files
+execute_bash command="git diff --name-only HEAD"
+
+# For each changed file, read it with reviewer eyes
+view_file path="<changed-file>"
+# Ask: would a new teammate understand this immediately?
+# Ask: what could go wrong at runtime that tests don't cover?
+```
+
+### Option B: Delegate Review to Claude Code (if claude_execute is available)
+For complex changes, delegate the review to Claude Code for a second opinion:
+```typescript
+claude_execute({
+  prompt: `Code review the following changed files for correctness, edge cases, security issues, and maintainability.
+Files changed: src/services/user.ts, src/types/user.ts
+Working directory: ${process.cwd()}
+
+Focus on:
+1. Logic correctness — does the implementation match the intended behavior?
+2. Unhandled edge cases (null, empty, concurrent access)
+3. Security issues (input validation, authorization checks)
+4. Consistency with existing code patterns in the codebase
+
+Output: a prioritized list of issues found. For each issue: file, line, severity (blocking/suggestion), and what to fix.`,
+  cwd: projectDir
+})
+```
+
+### Option C: Targeted Review with think Tool (no Claude CLI)
+Use the `think` tool to systematically reason through the review:
+```typescript
+think({
+  thought: `
+    Reviewing changes in src/services/user.ts (validateUser function):
+    
+    Logic check: The function returns early if email is empty, but doesn't
+    check if email contains '@' — a blank string passes but "notanemail" also passes.
+    → BUG: need to add email format validation.
+    
+    Edge cases:
+    - What if email is null? → The `!email` guard catches null ✓
+    - What if email is whitespace only? → " " is truthy, bypasses the guard
+    → BUG: need trim() before the empty check.
+    
+    Security: no SQL/XSS concerns here — purely in-memory validation ✓
+    
+    Issues found:
+    1. [BLOCKING] Missing email format validation
+    2. [BLOCKING] Whitespace-only email passes validation
+    Fixes required before marking complete.
+  `
+})
+```
+
+### When to Skip the Review
+The review step can be abbreviated (but never fully skipped) for:
+- Trivial changes (renaming a variable, adding a comment)
+- Changes that are 100% mechanical (adding a missing import, fixing a typo)
+Even then: read the final diff with `git diff HEAD` before declaring done.
 
 ## 🔍 READ-BEFORE-WRITE PROTOCOL
 

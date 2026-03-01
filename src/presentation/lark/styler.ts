@@ -20,7 +20,9 @@ import {
   processLarkText,
   isJsonContent,
   isErrorContent,
-  getToolType
+  getToolType,
+  getToolTypeEmoji,
+  formatErrorText
 } from './shared';
 import { 
   formatToolResultByType,
@@ -111,19 +113,7 @@ export const styled: OutputStyler = {
       title = `${success ? '✅' : '❌'} ${name}: ${success ? '完成' : '失败'}`;
     } else {
       // 根据工具类型设置不同的标题前缀
-      const typeEmojis: Record<string, string> = {
-        filesystem: '📁',
-        system: '💻',
-        github: '🐧',
-        code_analysis: '🔍',
-        knowledge: '📚',
-        search: '🌐',
-        task_management: '📋',
-        composio: '🔌',
-        other: '🔧'
-      };
-      
-      const typeEmoji = typeEmojis[toolType] || '🔧';
+      const typeEmoji = getToolTypeEmoji(toolType);
       title = `${success ? '✅' : '❌'} ${typeEmoji} ${name}: ${success ? '成功' : '失败'}`;
     }
     
@@ -293,11 +283,7 @@ export const styled: OutputStyler = {
       
       // 检测错误信息
       if (isErrorContent(trimmed)) {
-        if (trimmed.includes('\n')) {
-          return `❌ **执行错误**\n\`\`\`\n${trimmed}\n\`\`\``;
-        } else {
-          return `❌ **${trimmed}**`;
-        }
+        return formatErrorText(trimmed);
       }
       
       // 处理多行文本

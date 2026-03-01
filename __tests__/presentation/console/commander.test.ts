@@ -5,6 +5,10 @@ import {
   handleCompactCommand,
   handleUnknownCommand,
   handleExitCommand,
+  handlePwdCommand,
+  handleLsCommand,
+  handleVerboseCommand,
+  handleVoiceCommand,
   createHandleInternalCommand,
 } from '@/presentation/console/commander';
 import * as library from '@/shared/utils/library';
@@ -241,5 +245,214 @@ describe('createHandleInternalCommand', () => {
     expect(result).toBe(true);
     const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
     expect(output).toContain('/nonexistent');
+  });
+});
+
+// ===== handlePwdCommand =====
+describe('handlePwdCommand', () => {
+  it('should return true and print current directory', async () => {
+    const result = await handlePwdCommand();
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain(process.cwd());
+  });
+});
+
+// ===== handleLsCommand =====
+describe('handleLsCommand', () => {
+  it('should return true and print directory contents on success', async () => {
+    const result = await handleLsCommand();
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('项');
+  });
+
+  it('should return true and print error when directory reading fails', async () => {
+    const originalCwd = process.cwd;
+    process.cwd = jest.fn().mockReturnValue('/nonexistent-path-that-does-not-exist-xyz');
+    const result = await handleLsCommand();
+    expect(result).toBe(true);
+    process.cwd = originalCwd;
+  });
+});
+
+// ===== handleVerboseCommand =====
+describe('handleVerboseCommand', () => {
+  it('should toggle verbose from false to true and return true', async () => {
+    const { config } = require('@/core/config');
+    config.output.verbose = false;
+    const result = await handleVerboseCommand();
+    expect(result).toBe(true);
+    expect(config.output.verbose).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('详细模式');
+  });
+
+  it('should toggle verbose from true to false and return true', async () => {
+    const { config } = require('@/core/config');
+    config.output.verbose = true;
+    const result = await handleVerboseCommand();
+    expect(result).toBe(true);
+    expect(config.output.verbose).toBe(false);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('简略模式');
+  });
+});
+
+// ===== handleVoiceCommand =====
+describe('handleVoiceCommand', () => {
+  it('should return true and show error when canRecord returns false', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(false),
+    });
+    const result = await handleVoiceCommand({} as any, {} as any);
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('麦克风');
+  });
+
+  it('should return true and handle recognized speech when canRecord and result are both truthy', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    const { handleUserInput } = require('@/presentation/console/input');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(true),
+      recognizeSpeech: jest.fn().mockResolvedValue('test speech'),
+    });
+    const mockSession = { threadId: 'test' };
+    const mockAgent = {};
+    const result = await handleVoiceCommand(mockSession as any, mockAgent as any);
+    expect(result).toBe(true);
+    expect(handleUserInput).toHaveBeenCalledWith('test speech', mockSession, mockAgent);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('识别结果');
+  });
+
+  it('should return true and show error when recognition returns null', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(true),
+      recognizeSpeech: jest.fn().mockResolvedValue(null),
+    });
+    const result = await handleVoiceCommand({} as any, {} as any);
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('未识别');
+  });
+
+  it('should return true and show error when recognition throws', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(true),
+      recognizeSpeech: jest.fn().mockRejectedValue(new Error('mic error')),
+    });
+    const result = await handleVoiceCommand({} as any, {} as any);
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('语音识别失败');
+  });
+});
+
+// ===== handleExitCommand - branch with rl =====
+describe('handleExitCommand - with rl', () => {
+  it('should call rl.close() when session has rl with close function', async () => {
+    const mockRlClose = jest.fn();
+    const session = { rl: { close: mockRlClose }, end: jest.fn() };
+    await handleExitCommand(session as any);
+    expect(mockRlClose).toHaveBeenCalled();
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
+  });
+});
+
+// ===== createHandleInternalCommand - missing switch cases =====
+describe('createHandleInternalCommand - additional routes', () => {
+  it('should route /clear to handleClearCommand', async () => {
+    const session: any = { threadId: 'sess-clear' };
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/clear');
+    expect(result).toBe(true);
+  });
+
+  it('should route /pwd to handlePwdCommand', async () => {
+    const session: any = {};
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/pwd');
+    expect(result).toBe(true);
+    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain(process.cwd());
+  });
+
+  it('should route /ls to handleLsCommand', async () => {
+    const session: any = {};
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/ls');
+    expect(result).toBe(true);
+  });
+
+  it('should route /verbose to handleVerboseCommand', async () => {
+    const session: any = {};
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/verbose');
+    expect(result).toBe(true);
+  });
+
+  it('should route /voice to handleVoiceCommand', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(false),
+    });
+    const session: any = {};
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/voice');
+    expect(result).toBe(true);
+  });
+
+  it('should route /speech to handleVoiceCommand', async () => {
+    const { createVoiceRecognition } = require('@/features/voice-input/recognition');
+    (createVoiceRecognition as jest.Mock).mockReturnValue({
+      canRecord: jest.fn().mockReturnValue(false),
+    });
+    const session: any = {};
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    const result = await handler('/speech');
+    expect(result).toBe(true);
+  });
+
+  it('should route /exit to handleExitCommand', async () => {
+    const session: any = { rl: null, end: jest.fn() };
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    await handler('/exit');
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
+  });
+
+  it('should route /quit to handleExitCommand', async () => {
+    const session: any = { rl: null, end: jest.fn() };
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    await handler('/quit');
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
+  });
+
+  it('should route /q to handleExitCommand', async () => {
+    const session: any = { rl: null, end: jest.fn() };
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    await handler('/q');
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
+  });
+
+  it('should route /stop to handleExitCommand', async () => {
+    const session: any = { rl: null, end: jest.fn() };
+    const agent: any = {};
+    const handler = createHandleInternalCommand(session, agent);
+    await handler('/stop');
+    expect(mockProcessExit).toHaveBeenCalledWith(0);
   });
 });

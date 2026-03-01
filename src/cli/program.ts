@@ -30,6 +30,8 @@ export function createProgram(): Command {
 
   program
     .description('AI bot with DeepAgents')
+    .option('--mode <mode>', 'Set interaction mode (console|lark)')
+    .option('--type <type>', 'Set lark interaction type (user_chat|group_chat), only effective when --mode=lark')
     .allowUnknownOption();
 
   program.action(async () => {

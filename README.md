@@ -50,7 +50,7 @@ AIBO_LANGUAGE=zh
 ```bash
 aibo
 # 或显式指定
-aibo --interaction=console
+aibo --mode=console
 ```
 
 启动后直接在终端与 AIBO 对话，输入任务描述即可。
@@ -71,7 +71,7 @@ AIBO_LARK_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```bash
 aibo
 # 或显式指定
-aibo --interaction=lark
+aibo --mode=lark
 ```
 
 > 💡 同时配置了 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 时，`aibo` 默认以飞书模式启动。
@@ -84,6 +84,31 @@ aibo --interaction=lark
 AIBO_TENCENTCLOUD_APP_ID=1234567890
 AIBO_TENCENTCLOUD_SECRET_ID=AKIDxxxxxxxxxxxxxxxx
 AIBO_TENCENTCLOUD_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 🖥️ 命令行参数
+
+`aibo` 命令支持以下参数：
+
+| 参数 | 说明 | 可选值 | 默认值 |
+|------|------|--------|--------|
+| `--mode <mode>` | 指定交互模式 | `console` \| `lark` | 自动检测（有 Lark 配置时为 `lark`，否则为 `console`） |
+| `--type <type>` | 指定飞书交互类型（仅 `--mode=lark` 生效） | `user_chat` \| `group_chat` | `user_chat` |
+
+示例：
+
+```bash
+# 强制使用终端模式
+aibo --mode=console
+
+# 强制使用飞书模式
+aibo --mode=lark
+
+# 飞书群聊模式
+aibo --mode=lark --type=group_chat
+
+# 也可以通过子命令方式调用
+aibo interact --mode=lark --type=group_chat
 ```
 
 ### 🔧 本地开发
@@ -305,7 +330,6 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 |--------|------|--------|------|
 | `AIBO_RECURSION_LIMIT` | ❌ | `1000` | LangGraph 递归深度上限 |
 | `AIBO_CHECKPOINTER_TYPE` | ❌ | `memory` | 检查点存储类型：`memory` / `sqlite` / `filesystem` |
-| `AIBO_MEMORY_WINDOW_SIZE` | ❌ | `5` | 对话滑动窗口记忆大小 |
 | `AIBO_VERBOSE_OUTPUT` | ❌ | `false` | 是否开启调试输出 |
 | `AIBO_LANGUAGE` | ❌ | `en` | 提示语言：`en` / `zh` |
 | `AIBO_PERSONA` | ❌ | 魅魔人设 | 自定义 AI 人设描述 |
@@ -337,7 +361,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 | `AIBO_LARK_RECEIVE_ID` | ❌ | 默认消息接收方 ID |
 | `AIBO_LARK_INTERACTIVE_TEMPLATE_ID` | ❌ | 飞书互动卡片模板 ID |
 
-> 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --interaction=console` 或 `aibo --interaction=lark` 显式指定模式。
+> 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --mode=console` 或 `aibo --mode=lark` 显式指定模式。
 >
 > 📖 详细配置步骤（含飞书卡片搭建说明）请参阅 **[docs/env.md — Lark 飞书配置](docs/env.md#lark-飞书配置)**。
 

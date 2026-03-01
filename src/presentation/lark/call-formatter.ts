@@ -11,7 +11,9 @@
 
 import { 
   inferLanguageType, 
-  getToolType
+  getToolType,
+  getToolTypeEmoji,
+  formatStringAsCode
 } from './shared';
 
 /**
@@ -150,13 +152,7 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
     if (!trimmedArgs) {
       return '空参数';
     }
-    if (trimmedArgs.includes('\n')) {
-      const lang = inferLanguageType(undefined, trimmedArgs);
-      const langTag = lang ? lang : '';
-      return `\`\`\`${langTag}\n${trimmedArgs}\n\`\`\``;
-    } else {
-      return `\`${trimmedArgs}\``;
-    }
+    return formatStringAsCode(trimmedArgs);
   } else if (typeof args === 'object') {
     return `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``;
   } else {
@@ -212,13 +208,7 @@ export const formatSystemToolCall = (name: string, args: any): string => {
     if (!trimmedArgs) {
       return '空参数';
     }
-    if (trimmedArgs.includes('\n')) {
-      const lang = inferLanguageType(undefined, trimmedArgs);
-      const langTag = lang ? lang : '';
-      return `\`\`\`${langTag}\n${trimmedArgs}\n\`\`\``;
-    } else {
-      return `\`${trimmedArgs}\``;
-    }
+    return formatStringAsCode(trimmedArgs);
   } else if (typeof args === 'object') {
     return `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``;
   } else {
@@ -310,6 +300,67 @@ export const formatThinkToolCall = (args: any): string => {
 };
 
 
+/**
+ * 格式化 AI 代理执行工具调用参数
+ * @param name - 工具名称
+ * @param args - 工具参数
+ * @returns 格式化后的内容字符串
+ */
+export const formatAgentRunnerToolCall = (name: string, args: any): string => {
+  if (args == null) {
+    return '无参数';
+  }
+
+  if (name === 'cursor_open') {
+    if (typeof args === 'string') {
+      return `**路径**: \`${args}\``;
+    }
+    if (typeof args === 'object') {
+      const path = args.path || '未知路径';
+      let content = `**路径**: \`${path}\``;
+      if (args.timeout) content += `\n**超时**: ${args.timeout}ms`;
+      return content;
+    }
+  }
+
+  // claude_execute / cursor_execute / gemini_execute / codex_execute
+  if (typeof args === 'object') {
+    const prompt = args.prompt || '无提示词';
+    let content = `**提示词**:\n\`\`\`\n${prompt}\n\`\`\``;
+    if (args.cwd) content += `\n**工作目录**: \`${args.cwd}\``;
+    if (args.timeout) content += `\n**超时**: ${args.timeout}ms`;
+    if (args.args && Array.isArray(args.args) && args.args.length > 0) {
+      content += `\n**附加参数**: \`${args.args.join(' ')}\``;
+    }
+    return content;
+  }
+  if (typeof args === 'string') {
+    return `**提示词**:\n\`\`\`\n${args}\n\`\`\``;
+  }
+  return formatDefaultToolCall(args);
+};
+
+/**
+ * 格式化 todo_write 工具调用参数
+ * @param args - 工具参数
+ * @returns 格式化后的内容字符串
+ */
+export const formatTodoWriteToolCall = (args: any): string => {
+  if (args == null) return '无参数';
+  if (typeof args === 'object' && Array.isArray(args.todos)) {
+    const todos = args.todos;
+    if (todos.length === 0) return '清空待办事项列表';
+    const lines = todos.map((t: any) => {
+      const status = t.status || 'not_started';
+      const priority = t.priority ? ` [${t.priority}]` : '';
+      const id = t.id ? `#${t.id} ` : '';
+      return `- ${id}**${status}**${priority}: ${t.content || '(无内容)'}`;
+    });
+    return `📝 **更新待办事项 (${todos.length} 项)**\n\n${lines.join('\n')}`;
+  }
+  return formatDefaultToolCall(args);
+};
+
 export const formatToolCallArgs = (name: string, args: any): string => {
   const toolType = getToolType(name);
 
@@ -321,6 +372,12 @@ export const formatToolCallArgs = (name: string, args: any): string => {
     case 'task_management':
       if (name === 'task') {
         return formatTaskToolCall(args);
+      }
+      if (name === 'todo_write') {
+        return formatTodoWriteToolCall(args);
+      }
+      if (name === 'todo_read') {
+        return '读取当前待办事项列表';
       }
       return formatDefaultToolCall(args);
     
@@ -335,6 +392,9 @@ export const formatToolCallArgs = (name: string, args: any): string => {
     
     case 'thinking':
       return formatThinkToolCall(args);
+    
+    case 'agent_runner':
+      return formatAgentRunnerToolCall(name, args);
     
     default:
       return formatDefaultToolCall(args);
@@ -355,20 +415,6 @@ export const getToolCallTitle = (name: string, args: any): string => {
   
   // 根据工具类型设置不同的标题前缀
   const toolType = getToolType(name);
-  const typeEmojis: Record<string, string> = {
-    filesystem: '📁',
-    system: '💻',
-    github: '🐧',
-    web: '🔗',
-    thinking: '💭',
-    code_analysis: '🔍',
-    knowledge: '📚',
-    search: '🌐',
-    task_management: '📋',
-    composio: '🔌',
-    other: '🔧'
-  };
-  
-  const typeEmoji = typeEmojis[toolType] || '🔧';
+  const typeEmoji = getToolTypeEmoji(toolType);
   return `${typeEmoji} 工具调用: ${name}`;
 };

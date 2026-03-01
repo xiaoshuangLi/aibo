@@ -33,6 +33,7 @@ console.log(`📄 最新功能文档: ${latestFeature}`);
 
 // 检查文档是否包含必需的章节
 const requiredSections = [
+    '## 📌 需求背景 (Requirements Background)',
     '## 📋 Specification (规格说明)',
     '## 🏗️ Technical Design (技术设计)',
     '## 📝 Implementation Plan (实施计划)',
@@ -58,6 +59,30 @@ if (missingSections.length === 0) {
         console.error(`   - ${section}`);
     });
     console.error('   请确保功能文档包含所有必需的章节');
+    process.exit(1);
+}
+
+// 检查功能变更清单是否存在于 Specification 章节中
+const specSectionMatch = featureContent.match(/## 📋 Specification[\s\S]*?(?=\n## |$)/);
+const specSection = specSectionMatch ? specSectionMatch[0] : '';
+const hasFunctionalChangesList = specSection.includes('### 📑 功能变更清单');
+if (hasFunctionalChangesList) {
+    console.log('✅ 功能变更清单章节已包含');
+} else {
+    console.error('⚠️  缺少功能变更清单章节 (### 📑 功能变更清单)');
+    console.error('   请确保在 Specification 章节中列出所有功能变更');
+    process.exit(1);
+}
+
+// 检查开发工作量章节是否存在于 Implementation Plan 章节中
+const implSectionMatch = featureContent.match(/## 📝 Implementation Plan[\s\S]*?(?=\n## |$)/);
+const implSection = implSectionMatch ? implSectionMatch[0] : '';
+const hasWorkloadSection = implSection.includes('### 📊 开发工作量明细');
+if (hasWorkloadSection) {
+    console.log('✅ 开发工作量明细章节已包含');
+} else {
+    console.error('⚠️  缺少开发工作量明细章节 (### 📊 开发工作量明细)');
+    console.error('   请确保在 Implementation Plan 章节中填写实际开发工作量');
     process.exit(1);
 }
 

@@ -329,8 +329,12 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task', 'todo_write', 'todo_read'].includes(name)) {
     return 'task_management';
+  }
+  // AI代理执行工具
+  if (['claude_execute', 'cursor_execute', 'cursor_open', 'gemini_execute', 'codex_execute'].includes(name)) {
+    return 'agent_runner';
   }
   // Composio工具
   if (name.startsWith('COMPOSIO_')) {
@@ -338,4 +342,59 @@ export const getToolType = (name: string): string => {
   }
   // 其他工具
   return 'other';
+};
+
+/**
+ * 工具类型对应的 Emoji 映射
+ */
+export const TOOL_TYPE_EMOJIS: Record<string, string> = {
+  filesystem: '📁',
+  system: '💻',
+  github: '🐧',
+  web: '🔗',
+  thinking: '💭',
+  code_analysis: '🔍',
+  knowledge: '📚',
+  search: '🌐',
+  task_management: '📋',
+  composio: '🔌',
+  agent_runner: '🤖',
+  other: '🔧'
+};
+
+/**
+ * 获取工具类型对应的 Emoji
+ * @param toolType - 工具类型
+ * @returns 对应的 Emoji 字符串
+ */
+export const getToolTypeEmoji = (toolType: string): string => {
+  return TOOL_TYPE_EMOJIS[toolType] || '🔧';
+};
+
+/**
+ * 将字符串格式化为行内代码或代码块
+ * 多行字符串使用带语言标识的代码块，单行使用行内代码
+ * @param text - 要格式化的文本
+ * @returns 格式化后的 Markdown 字符串
+ */
+export const formatStringAsCode = (text: string): string => {
+  if (text.includes('\n')) {
+    const lang = inferLanguageType(undefined, text);
+    return `\`\`\`${lang ?? ''}\n${text}\n\`\`\``;
+  }
+  return `\`${text}\``;
+};
+
+/**
+ * 将错误文本格式化为 Markdown 格式
+ * 多行使用代码块，单行使用粗体
+ * @param text - 错误文本
+ * @returns 格式化后的 Markdown 字符串
+ */
+export const formatErrorText = (text: string): string => {
+  if (text.includes('\n')) {
+    const lang = inferLanguageType(undefined, text);
+    return `❌ **执行错误**\n\`\`\`${lang ?? ''}\n${text}\n\`\`\``;
+  }
+  return `❌ **${text}**`;
 };

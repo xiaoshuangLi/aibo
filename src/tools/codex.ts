@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
  */
 function isCodexAvailable(): boolean {
   try {
-    execSync("which codex", { stdio: "ignore" });
+    execSync("codex --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -88,9 +88,9 @@ function handleCodexExecutionError(
  */
 function createCodexExecuteTool(session?: Session) {
   return tool(
-  async ({ prompt, timeout = 300000, cwd, args = [] }) => {
+  async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["-p", prompt, ...args];
+    const execArgs = ["-p", prompt, ...args, "--yolo"];
 
     try {
       const promise = execFileAsync("codex", execArgs, {
@@ -125,7 +125,7 @@ Best suited for: backend API development (REST/GraphQL), database design and que
 Requires the 'codex' command to be installed locally (https://github.com/openai/codex).`,
     schema: z.object({
       prompt: z.string().describe("The task or prompt to send to Codex (e.g., 'implement a REST API endpoint for user authentication', 'write a SQL migration script')."),
-      timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
+      timeout: z.number().optional().default(6000000).describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
       cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
       args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the codex command."),
     }),

@@ -63,4 +63,23 @@ describe('Config - Interaction Mode Coverage', () => {
     const { config } = require('../src/core/config');
     expect(config.interaction.mode).toBe('lark');
   });
+
+  it('should return lark mode when root command --mode=lark is passed', () => {
+    process.argv = ['node', 'script.js', '--mode=lark'];
+    const { config } = require('../src/core/config');
+    expect(config.interaction.mode).toBe('lark');
+  });
+
+  it('should return console mode when root command --mode=console is passed', () => {
+    process.argv = ['node', 'script.js', '--mode=console'];
+    const { config } = require('../src/core/config');
+    expect(config.interaction.mode).toBe('console');
+  });
+
+  it('root --mode=lark takes precedence over env-var lark detection', () => {
+    process.argv = ['node', 'script.js', '--mode=lark'];
+    // Even without Lark env vars, --mode=lark forces lark mode
+    const { config } = require('../src/core/config');
+    expect(config.interaction.mode).toBe('lark');
+  });
 });
