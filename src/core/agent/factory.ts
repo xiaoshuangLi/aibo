@@ -89,24 +89,31 @@ export function buildCodingAgentHint(
     ? `fall back to ${fallbackTools.join(' or ')}`
     : `fall back to the most general tool available`;
 
+  // When only one tool is available, add an explicit single-tool rule
+  const singleToolNote = available.length === 1
+    ? `\n⚠️ **Only one coding tool is available (${available[0]}). You MUST use it for ALL coding tasks — no exceptions. Do NOT attempt to implement code yourself.**`
+    : '';
+
   return `
 
 ## 🤖 PRIORITY: Use Local AI Coding Agents
 
 The following local AI coding agent CLI tool(s) are available on this system: ${toolList}.
+${singleToolNote}
 
 **When handling any coding task — writing code, fixing bugs, refactoring, adding tests, explaining code, or multi-file changes — you MUST delegate the work to the appropriate tool below instead of implementing it yourself.**
 ${routingTable}
 
 ### Routing rules
 
-1. **Pick the right agent for the task type** using the table above.
-2. If multiple agents could handle the task, prefer the specialist (gemini for frontend, codex for backend, claude for review/architecture).
-3. If none of the specialist agents match, ${fallbackClause}.
-4. Pass a **complete, self-contained task description** as the \`prompt\` argument so the agent can act autonomously.
-5. Always set \`cwd\` to the relevant project directory.
-6. After the agent responds, review its output and verify correctness before reporting back.
-7. Only fall back to direct tools (edit_file, write_file, execute_bash) when the coding agent tool is unavailable or has already failed.`;
+1. **If only ONE tool is listed above, use it immediately for ALL coding tasks without exception — do not implement code yourself.**
+2. **Pick the right agent for the task type** using the table above when multiple tools are available.
+3. If multiple agents could handle the task, prefer the specialist (gemini for frontend, codex for backend, claude for review/architecture).
+4. If none of the specialist agents match, ${fallbackClause}.
+5. Pass a **complete, self-contained task description** as the \`prompt\` argument so the agent can act autonomously.
+6. Always set \`cwd\` to the relevant project directory.
+7. After the agent responds, review its output and verify correctness before reporting back.
+8. Only fall back to direct tools (edit_file, write_file, execute_bash) when the coding agent tool is unavailable or has already failed.`;
 }
 
 /**

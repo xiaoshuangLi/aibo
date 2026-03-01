@@ -24,9 +24,11 @@ Available executors (check which tools exist):
   claude_execute  → Claude Code CLI  (architecture, review, refactoring)
   gemini_execute  → Gemini CLI       (frontend UI, algorithms, large context)
   codex_execute   → Codex CLI        (backend API, database, server logic)
-  cursor_execute  → Cursor CLI       (general coding fallback)
+  cursor_execute  → Cursor CLI       (general-purpose coding)
   copilot_execute → GitHub Copilot CLI (general-purpose coding: file editing, shell commands, codebase search)
 ```
+
+**⚠️ Single-tool rule**: If only ONE executor is available, use it for ALL tasks — do not try to classify tasks or implement code yourself. Delegate everything to the single available tool.
 
 If none are available, fall back to direct tools (edit_file, execute_bash, etc.) and note this limitation.
 
@@ -136,8 +138,10 @@ Break the feature into **atomic tasks (≤5 min each)**, grouped into execution 
 - `Claude`   → Architecture decisions, code review, cross-file refactoring
 - `Gemini`   → Frontend UI (React/Vue/HTML/CSS), algorithms, large-context tasks
 - `Codex`    → Backend API, database, server-side logic, scripts
-- `Cursor`   → General coding fallback
-- `Copilot`  → General-purpose AI coding: file editing, shell commands, codebase search (use when other specialists are unavailable)
+- `Cursor`   → General-purpose coding when no specialist matches
+- `Copilot`  → General-purpose AI coding: file editing, shell commands, codebase search
+
+**⚠️ Single-tool rule**: If only ONE executor is available, assign ALL tasks to it regardless of task type.
 
 ```markdown
 # <Feature Name> — Tasks

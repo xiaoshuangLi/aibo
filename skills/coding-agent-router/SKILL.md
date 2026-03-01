@@ -1,15 +1,18 @@
 ---
 name: coding-agent-router
-description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor). Use when local AI coding CLIs are available and you need to decide which agent handles which subtask.
+description: Multi-executor task routing skill for intelligently delegating coding tasks to the right local AI coding agent CLI (claude, gemini, codex, cursor, copilot). Use when any local AI coding CLI is available and you need to decide which agent handles which subtask.
 ---
 
 # Coding Agent Router Skill
 
 ## 🎯 Purpose
 
-When multiple local AI coding CLI tools are available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`), this skill guides how to intelligently route each subtask to the **right executor** rather than doing everything with a single agent or doing it manually.
+When any local AI coding CLI tool is available (`claude_execute`, `gemini_execute`, `codex_execute`, `cursor_execute`, `copilot_execute`), this skill guides how to intelligently route each subtask to the **right executor** rather than doing everything manually.
 
-The core principle: **match the task type to the agent's strength**, then delegate fully.
+**Core principles:**
+1. **Always delegate to an available coding tool** — never implement code yourself when a coding agent CLI is available.
+2. **Single tool = universal handler**: If only ONE coding tool is available, route ALL coding tasks to it regardless of task type.
+3. **Multiple tools = match task to strength**: When several tools are available, pick the specialist that best fits the task type.
 
 ---
 
@@ -20,7 +23,7 @@ The core principle: **match the task type to the agent's strength**, then delega
 | **Claude Code** | `claude_execute` | Architecture decisions, code review, complex refactoring, cross-file analysis, debugging hard logic bugs, explaining large codebases | Pure frontend pixel work |
 | **Gemini CLI** | `gemini_execute` | Frontend UI components (React/Vue/HTML/CSS), algorithm implementation, tasks needing 1M token context, multimodal (image + code) | Database schema design |
 | **OpenAI Codex** | `codex_execute` | Backend API (REST/GraphQL), database/ORM, server-side logic, CLI tools, scripts, data pipelines | UI component styling |
-| **Cursor** | `cursor_execute` | General AI-assisted coding when no specialist tool is available; opening files in the Cursor editor | — |
+| **Cursor** | `cursor_execute` | General AI-assisted coding; any coding task when no other specialist tool is available | — |
 | **GitHub Copilot** | `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase, debugging | — |
 
 ---
@@ -32,12 +35,15 @@ Task received
      ↓
 CHECK available tools (inspect which CLI tools are present)
      ↓
-CLASSIFY the task:
+IF only ONE tool is available:
+  └─ Route ALL coding tasks to that tool immediately — no further classification needed
+     ↓
+IF multiple tools are available, CLASSIFY the task:
   ├─ Frontend UI / styling / components?  → gemini_execute
   ├─ Backend API / DB / server logic?     → codex_execute
   ├─ Architecture / review / refactor?    → claude_execute
   ├─ Shell / git / gh command suggestion? → copilot_execute or execute_bash
-  ├─ General coding (no specialist match)? → cursor_execute or copilot_execute or claude_execute
+  ├─ General coding (no specialist match)? → cursor_execute → copilot_execute → claude_execute
   └─ Multiple concerns (full-stack)?      → split into subtasks, route each
      ↓
 DELEGATE with a complete self-contained prompt
@@ -69,11 +75,8 @@ INTEGRATE and report back
 - "Design the data flow architecture for this new feature"
 - "Debug why this async race condition occurs"
 
-### General Coding → `cursor_execute` (fallback)
-- Any coding task when neither gemini nor codex is available
-
-### General Coding → `copilot_execute` (fallback)
-- Any coding task when other specialist tools are unavailable
+### General Coding → `cursor_execute` or `copilot_execute` (when available as the only/primary tool)
+- Any coding task when no specialist tool matches, OR when this is the only available tool
 - Writing code, editing files, running commands, searching the codebase
 - "Fix the bug in src/api.ts"
 - "Add unit tests for the UserService class"
