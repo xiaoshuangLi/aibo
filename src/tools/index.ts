@@ -18,6 +18,7 @@ import getClaudeTools from '@/tools/claude';
 import getCursorTools from '@/tools/cursor';
 import getGeminiTools from '@/tools/gemini';
 import getCodexTools from '@/tools/codex';
+import getGithubRepoTools from '@/tools/github-repo';
 import { Session } from '@/core/agent';
 
 /**
@@ -48,6 +49,7 @@ export default async function getTools(session?: Session) {
     cursorTools,
     geminiTools,
     codexTools,
+    githubRepoTools,
   ] = await Promise.all([
     getBashTools(session),
     getUtilsTools(),
@@ -69,6 +71,7 @@ export default async function getTools(session?: Session) {
     getCursorTools(session),
     getGeminiTools(session),
     getCodexTools(session),
+    getGithubRepoTools(),
   ]);
   
   return [
@@ -92,5 +95,6 @@ export default async function getTools(session?: Session) {
     ...cursorTools,
     ...geminiTools,
     ...codexTools,
+    ...githubRepoTools,
   ];
 }
