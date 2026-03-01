@@ -2,6 +2,9 @@ import { gracefulShutdown, setupExitHandlers } from '@/presentation/console/inte
 import { Session } from '@/core/agent/session';
 import { TerminalAdapter } from '@/presentation/console/adapter';
 
+jest.mock('@/core/agent/factory', () => ({
+  createAIAgent: jest.fn().mockResolvedValue({ stream: jest.fn() }),
+}));
 jest.mock('@/core/agent/session');
 jest.mock('@/presentation/console/adapter');
 jest.mock('@/presentation/console/input', () => ({
