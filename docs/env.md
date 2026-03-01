@@ -14,7 +14,6 @@ cp .env.example .env
 
 - [模型配置](#模型配置)
 - [LangChain 配置](#langchain-配置)
-- [记忆配置](#记忆配置)
 - [输出配置](#输出配置)
 - [语言配置](#语言配置)
 - [人设 / 交流风格配置](#人设--交流风格配置)
@@ -315,10 +314,10 @@ AIBO_LARK_INTERACTIVE_TEMPLATE_ID=AAq0xxxxxxxxxxx
    - ⚠️ **重要**：卡片模板中必须添加支持 `title` 和 `content` 两个变量，AIBO 将通过这两个变量动态填充消息标题和内容。
    - 复制模板 ID，填入 `AIBO_LARK_INTERACTIVE_TEMPLATE_ID`。
 
-> **启动模式说明**：当 `AIBO_LARK_APP_ID`、`AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 命令将自动以飞书模式启动。可通过命令行参数覆盖：
+> **启动模式说明**：当 `AIBO_LARK_APP_ID`、`AIBO_LARK_APP_SECRET`、`AIBO_LARK_RECEIVE_ID`、`AIBO_LARK_INTERACTIVE_TEMPLATE_ID` 四个变量均已配置时，`aibo` 命令将自动以飞书模式启动。可通过命令行参数覆盖：
 > ```bash
-> aibo --interaction=console  # 强制使用终端模式
-> aibo --interaction=lark     # 强制使用飞书模式
+> aibo --mode=console  # 强制使用终端模式
+> aibo --mode=lark     # 强制使用飞书模式
 > ```
 
 ---

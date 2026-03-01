@@ -7,7 +7,7 @@
 - 🧠 **自主编程**: 跨语言编写、修改、调试和优化代码，具备完整的本地文件系统访问能力
 - 🔌 **多模型支持**: 兼容 OpenAI、Anthropic Claude、Google Gemini、Mistral、Groq、Ollama、Azure OpenAI 及任意 OpenAI 兼容接口
 - 🤝 **多智能体协作**: 内置 15 个专业 Agent（协调者、架构师、编码者、测试者等），支持并行任务分解与执行
-- 🛠️ **技能扩展（Skills）**: 通过 `skills/` 目录扩展 AI 的专项能力，内置 40+ 技能（代码审查、CI/CD、前端开发等）
+- 🛠️ **技能扩展（Skills）**: 通过 `skills/` 目录扩展 AI 的专项能力，内置 45+ 技能（代码审查、CI/CD、前端开发、整理代码等）
 - 🔗 **MCP 工具集成**: 通过 `mcps/` 目录接入 GitHub、Slack 等外部服务，扩展 AI 工具调用范围
 - 🖥️ **本机 CLI 工具集成**: 自动检测并调用本机已安装的编程 CLI 工具（Claude Code、Cursor、Gemini CLI、Codex），将编码子任务委派给这些工具执行
 - 🏢 **飞书企业集成**: 作为飞书机器人接入企业群/私聊，支持互动卡片消息和 `/rebot` 重启命令
@@ -74,7 +74,7 @@ aibo
 aibo --mode=lark
 ```
 
-> 💡 同时配置了 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 时，`aibo` 默认以飞书模式启动。
+> 💡 当 `AIBO_LARK_APP_ID`、`AIBO_LARK_APP_SECRET`、`AIBO_LARK_RECEIVE_ID`、`AIBO_LARK_INTERACTIVE_TEMPLATE_ID` 四个变量均已配置时，`aibo` 默认以飞书模式启动。
 
 #### 场景三：语音输入模式
 
@@ -264,12 +264,12 @@ Skills 是 AIBO 的专项能力模块，定义在 `skills/` 目录中，每个 S
 | 💻 **编程开发** | `autonomous-coding`、`debugging`、`self-debugging`、`code-review`、`refactoring` |
 | 🌐 **前端** | `react-development`、`vue-development`、`typescript-frontend`、`frontend-design`、`web-artifacts-builder` |
 | 🧪 **测试** | `test-driven-development`、`webapp-testing`、`playwright-skill` |
-| 🔧 **工程化** | `ci-cd`、`git-workflow`、`using-git-worktrees`、`spec-driven-development` |
+| 🔧 **工程化** | `ci-cd`、`git-workflow`、`using-git-worktrees`、`spec-driven-development`、`claude-code-hooks` |
 | 📄 **文档与内容** | `doc-coauthoring`、`pdf`、`docx`、`pptx`、`xlsx` |
 | 🤖 **AI & Agent** | `coding-agent-router`、`parallel-agents`、`subagent-driven-development`、`write-subagent-todos`、`mcp-builder`、`skill-creator` |
 | 🎨 **设计** | `canvas-design`、`brand-guidelines`、`theme-factory`、`algorithmic-art`、`d3js-skill` |
 | ☁️ **平台集成** | `github-automation`、`gitlab-automation`、`slack-gif-creator`、`tencent-wsa` |
-| 📋 **项目管理** | `project-context`、`context-management`、`feature-organizer`、`internal-comms` |
+| 📋 **项目管理** | `project-context`、`context-management`、`feature-organizer`、`internal-comms`、`file-organizer` |
 | 🧠 **提示词** | `chain-of-thought`、`few-shot-prompting`、`api-design` |
 
 **📁 自定义技能**：在 `skills/` 目录下创建新文件夹，添加 `SKILL.md` 文件，按照现有格式描述技能的触发条件、工作流程和最佳实践。
@@ -361,7 +361,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 | `AIBO_LARK_RECEIVE_ID` | ❌ | 默认消息接收方 ID |
 | `AIBO_LARK_INTERACTIVE_TEMPLATE_ID` | ❌ | 飞书互动卡片模板 ID |
 
-> 💡 当 `AIBO_LARK_APP_ID` 和 `AIBO_LARK_APP_SECRET` 均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --mode=console` 或 `aibo --mode=lark` 显式指定模式。
+> 💡 当 `AIBO_LARK_APP_ID`、`AIBO_LARK_APP_SECRET`、`AIBO_LARK_RECEIVE_ID`、`AIBO_LARK_INTERACTIVE_TEMPLATE_ID` 四个变量均已配置时，`aibo` 将自动以飞书模式启动。可通过 `aibo --mode=console` 或 `aibo --mode=lark` 显式指定模式。
 >
 > 📖 详细配置步骤（含飞书卡片搭建说明）请参阅 **[docs/env.md — Lark 飞书配置](docs/env.md#lark-飞书配置)**。
 
