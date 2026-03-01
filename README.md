@@ -374,6 +374,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 |---------|------|
 | [docs/env.md](docs/env.md) | 所有环境变量的详细说明及获取步骤 |
 | [docs/mcp.md](docs/mcp.md) | MCP 工具集成说明（接入 GitHub、Slack 等外部服务） |
+| [docs/lark-best-practices.md](docs/lark-best-practices.md) | 飞书工作模式集成最佳实践（可集成能力全景 + 手机 IM 编程最佳实践） |
 | [agents/](agents/) | 内置 Agent 定义，可扩展自定义 Agent |
 | [skills/](skills/) | 内置技能列表，可扩展自定义技能 |
 
