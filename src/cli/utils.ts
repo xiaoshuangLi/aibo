@@ -10,8 +10,8 @@ import { Command } from 'commander';
  * @module cli/utils
  */
 
-/** Known subcommands that are not the root command. */
-const KNOWN_SUBCOMMANDS = ['init', 'interact'];
+/** Ignore subcommands that are not the root command. */
+const IGNORE_SUBCOMMANDS = ['init'];
 
 /**
  * Parses the `--mode` option from process.argv.
@@ -33,17 +33,7 @@ const KNOWN_SUBCOMMANDS = ['init', 'interact'];
 export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
   const subcommand = process.argv[2];
 
-  if (subcommand === 'interact') {
-    const subCmd = new Command();
-    subCmd
-      .option('--mode <mode>', 'Set interaction mode (console|lark)')
-      .allowUnknownOption();
-    subCmd.parse(['node', 'interact', ...process.argv.slice(3)]);
-    const opts = subCmd.opts();
-    return opts.mode === 'lark' ? 'lark' : 'console';
-  }
-
-  if (subcommand && KNOWN_SUBCOMMANDS.includes(subcommand)) {
+  if (subcommand && IGNORE_SUBCOMMANDS.includes(subcommand)) {
     return null;
   }
 
@@ -78,17 +68,7 @@ export function parseInteractionModeFromArgs(): 'console' | 'lark' | null {
 export function parseLarkTypeFromArgs(): 'user_chat' | 'group_chat' | null {
   const subcommand = process.argv[2];
 
-  if (subcommand === 'interact') {
-    const subCmd = new Command();
-    subCmd
-      .option('--type <type>', 'Set lark interaction type (user_chat|group_chat)')
-      .allowUnknownOption();
-    subCmd.parse(['node', 'interact', ...process.argv.slice(3)]);
-    const opts = subCmd.opts();
-    return opts.type === 'group_chat' ? 'group_chat' : 'user_chat';
-  }
-
-  if (subcommand && KNOWN_SUBCOMMANDS.includes(subcommand)) {
+  if (subcommand && IGNORE_SUBCOMMANDS.includes(subcommand)) {
     return null;
   }
 
@@ -102,5 +82,5 @@ export function parseLarkTypeFromArgs(): 'user_chat' | 'group_chat' | null {
 
   if (opts.type === 'group_chat') return 'group_chat';
   if (opts.type === 'user_chat') return 'user_chat';
-  return null;
+  return 'user_chat';
 }

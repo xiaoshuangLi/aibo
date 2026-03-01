@@ -42,10 +42,10 @@ jobs:
         if: steps.check_npm.outputs.should_publish == 'true'
         uses: actions/cache@v3
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
 
       - name: 📦 Install dependencies
         # 只有当 package-lock.json 或 package.json 发生变化时才重新安装
