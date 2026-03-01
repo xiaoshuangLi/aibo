@@ -1,5 +1,15 @@
 import { createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 import { ToolMessage } from 'langchain';
+import { SessionManager } from '@/infrastructure/session/manager';
+
+// Mock SessionManager to isolate middleware tests
+jest.mock('@/infrastructure/session/manager', () => ({
+  SessionManager: {
+    getInstance: jest.fn().mockReturnValue({
+      updateLiveTokenUsage: jest.fn(),
+    }),
+  },
+}));
 
 // Mock the session object with all required methods
 const createMockSession = () => ({
@@ -116,6 +126,13 @@ describe('SessionOutputCaptureMiddleware - Comprehensive Tests', () => {
   });
 
   describe('wrapModelCall', () => {
+    let mockUpdateLiveTokenUsage: jest.Mock;
+
+    beforeEach(() => {
+      mockUpdateLiveTokenUsage = (SessionManager.getInstance() as any).updateLiveTokenUsage;
+      mockUpdateLiveTokenUsage.mockClear();
+    });
+
     it('should log system message and AI response', async () => {
       const request = {
         messages: [{ content: 'user input' }],
@@ -168,6 +185,39 @@ describe('SessionOutputCaptureMiddleware - Comprehensive Tests', () => {
       expect(mockSession.logErrorMessage).toHaveBeenCalledWith(
         expect.stringContaining('Model execution failed')
       );
+    });
+
+    it('should call updateLiveTokenUsage when usage_metadata is present', async () => {
+      const request = { messages: [{ content: 'user input' }] };
+      const handler = jest.fn().mockResolvedValue({
+        content: 'AI response',
+        usage_metadata: { input_tokens: 1200, output_tokens: 150 },
+      });
+
+      await middleware.wrapModelCall(request, handler);
+
+      expect(mockUpdateLiveTokenUsage).toHaveBeenCalledWith(1200, 150);
+    });
+
+    it('should not call updateLiveTokenUsage when usage_metadata is absent', async () => {
+      const request = { messages: [{ content: 'user input' }] };
+      const handler = jest.fn().mockResolvedValue({ content: 'AI response' });
+
+      await middleware.wrapModelCall(request, handler);
+
+      expect(mockUpdateLiveTokenUsage).not.toHaveBeenCalled();
+    });
+
+    it('should not call updateLiveTokenUsage when both token counts are zero', async () => {
+      const request = { messages: [{ content: 'user input' }] };
+      const handler = jest.fn().mockResolvedValue({
+        content: 'AI response',
+        usage_metadata: { input_tokens: 0, output_tokens: 0 },
+      });
+
+      await middleware.wrapModelCall(request, handler);
+
+      expect(mockUpdateLiveTokenUsage).not.toHaveBeenCalled();
     });
   });
 

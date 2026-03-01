@@ -234,6 +234,13 @@ export class SessionManager {
   private currentSessionId: string | null = null;
   private sessionKnowledgeStore: Map<string, KnowledgeItem[]>;
 
+  /**
+   * Live token usage accumulated by the wrapModelCall middleware.
+   * inputTokens: the last model call's input tokens (full context window size).
+   * outputTokens: cumulative sum of all model call output tokens.
+   */
+  private liveTokenUsage: { inputTokens: number; outputTokens: number } | null = null;
+
   private constructor(
     sessionsDir: string = path.join(process.cwd(), '.data', 'sessions')
   ) {
@@ -347,7 +354,44 @@ export class SessionManager {
    * 清除当前会话（创建新会话）
    */
   public clearCurrentSession(): string {
+    this.resetLiveTokenUsage();
     return this.createSession();
+  }
+
+  // ==================== 实时Token追踪（LangChain usage_metadata）====================
+
+  /**
+   * 使用 LangChain wrapModelCall 中间件中的 usage_metadata 更新实时 Token 计数。
+   *
+   * 调用规则：
+   *   - inputTokens  : 以最新值覆盖（每次调用包含完整上下文，取最后一次即可）
+   *   - outputTokens : 累加（每次调用产生独立的新输出）
+   *
+   * @param inputTokens  - 本次 LLM 调用的输入 Token 数
+   * @param outputTokens - 本次 LLM 调用的输出 Token 数
+   */
+  public updateLiveTokenUsage(inputTokens: number, outputTokens: number): void {
+    if (!this.liveTokenUsage) {
+      this.liveTokenUsage = { inputTokens: 0, outputTokens: 0 };
+    }
+    if (inputTokens > 0) {
+      this.liveTokenUsage.inputTokens = inputTokens;
+    }
+    this.liveTokenUsage.outputTokens += outputTokens;
+  }
+
+  /**
+   * 返回当前会话累积的实时 Token 使用量，若尚无数据则返回 null。
+   */
+  public getLiveTokenUsage(): { inputTokens: number; outputTokens: number } | null {
+    return this.liveTokenUsage ? { ...this.liveTokenUsage } : null;
+  }
+
+  /**
+   * 重置实时 Token 计数（新会话开始时调用）。
+   */
+  public resetLiveTokenUsage(): void {
+    this.liveTokenUsage = null;
   }
 
   /**
@@ -555,6 +599,10 @@ export class SessionManager {
 
   /**
    * 获取当前会话的AI监控元数据
+   *
+   * 优先使用 wrapModelCall 中间件通过 LangChain usage_metadata 实时追踪的 Token 数据；
+   * 若尚无实时数据，则回退到从 session.json 检查点文件中解析。
+   *
    * @returns AITelemetryRecord对象，如果无法获取则返回null
    */
   public getCurrentSessionMetadata(): AITelemetryRecord | null {
@@ -574,13 +622,30 @@ export class SessionManager {
       const sessionContent = fs.readFileSync(sessionFilePath, 'utf-8');
       const sessionData = JSON.parse(sessionContent);
       
-      // 提取AI监控元数据
-      return this.extractAIMonitoringMetadata(sessionData, currentSessionId);
+      // 从检查点解析基础元数据
+      const metadata = this.extractAIMonitoringMetadata(sessionData, currentSessionId);
+
+      // 如果中间件已经通过 LangChain usage_metadata 实时追踪到了 Token 数据，
+      // 用这些更准确的数值覆盖从检查点解析得到的估算值
+      const live = this.getLiveTokenUsage();
+      if (live) {
+        metadata.token_usage.input_tokens = live.inputTokens;
+        metadata.token_usage.output_tokens = live.outputTokens;
+        metadata.token_usage.total_tokens = live.inputTokens + live.outputTokens;
+        metadata.metadata.token_usage_formatted = {
+          input_tokens_formatted: this.formatTokenCount(live.inputTokens),
+          output_tokens_formatted: this.formatTokenCount(live.outputTokens),
+          total_tokens_formatted: this.formatTokenCount(live.inputTokens + live.outputTokens),
+        };
+      }
+
+      return metadata;
     } catch (error) {
       console.error('❌ Failed to get current session metadata:', error);
       return null;
     }
   }
+
 
   // ==================== AI监控元数据生成功能 ====================
 

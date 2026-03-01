@@ -12,6 +12,7 @@ import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent';
 import { config } from '@/core/config';
+import { SessionManager } from '@/infrastructure/session';
 
 /**
  * Configuration options for the session output capture middleware
@@ -125,6 +126,20 @@ export function createSessionOutputCaptureMiddleware(
         // Execute the actual model call
         const response = await handler(request);
         
+        // Track token usage via LangChain's usage_metadata (the accurate, LangChain-native way).
+        // input_tokens : overwrite with the latest call's value (each call re-sends the full
+        //               context window, so summing would inflate the count — the last call
+        //               already includes everything).
+        // output_tokens: accumulate across calls (each call generates unique new tokens).
+        const usageMeta = (response as any)?.usage_metadata;
+        if (usageMeta && typeof usageMeta === 'object') {
+          const inputTokens = (usageMeta.input_tokens as number) || 0;
+          const outputTokens = (usageMeta.output_tokens as number) || 0;
+          if (inputTokens > 0 || outputTokens > 0) {
+            SessionManager.getInstance().updateLiveTokenUsage(inputTokens, outputTokens);
+          }
+        }
+
         // Log AI response completion
         if (session && typeof session.streamAIContent === 'function') {
           // Extract the main content from the response

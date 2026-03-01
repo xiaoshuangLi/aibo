@@ -469,6 +469,95 @@ describe('SessionManager', () => {
     });
 
     describe('AI Monitoring Metadata Functions', () => {
+      describe('Live Token Tracking (LangChain usage_metadata)', () => {
+        it('getLiveTokenUsage should return null initially', () => {
+          expect(sessionManager.getLiveTokenUsage()).toBeNull();
+        });
+
+        it('updateLiveTokenUsage should accumulate outputTokens and overwrite inputTokens', () => {
+          sessionManager.updateLiveTokenUsage(1000, 100);
+          sessionManager.updateLiveTokenUsage(1200, 150);
+
+          const live = sessionManager.getLiveTokenUsage();
+          expect(live).not.toBeNull();
+          expect(live!.inputTokens).toBe(1200);   // last value wins
+          expect(live!.outputTokens).toBe(250);   // 100 + 150
+        });
+
+        it('updateLiveTokenUsage should skip zero inputTokens update', () => {
+          sessionManager.updateLiveTokenUsage(1000, 100);
+          sessionManager.updateLiveTokenUsage(0, 50);
+
+          const live = sessionManager.getLiveTokenUsage();
+          expect(live!.inputTokens).toBe(1000);   // unchanged
+          expect(live!.outputTokens).toBe(150);
+        });
+
+        it('resetLiveTokenUsage should clear accumulated data', () => {
+          sessionManager.updateLiveTokenUsage(1000, 100);
+          sessionManager.resetLiveTokenUsage();
+          expect(sessionManager.getLiveTokenUsage()).toBeNull();
+        });
+
+        it('clearCurrentSession should reset live token usage', () => {
+          sessionManager.updateLiveTokenUsage(500, 80);
+          sessionManager.clearCurrentSession();
+          expect(sessionManager.getLiveTokenUsage()).toBeNull();
+        });
+
+        it('getCurrentSessionMetadata should use live token counts when available', () => {
+          // Set up a minimal session.json so the checkpoint path succeeds
+          (fs.existsSync as jest.Mock).mockReturnValue(true);
+          (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify({
+            checkpoint: { ts: '2023-01-01T00:00:00Z', channel_values: { messages: [] } },
+            lastUpdated: '2023-01-01T00:00:01Z'
+          }));
+          (sessionManager as any).currentSessionId = 'session-live-test';
+
+          // Feed live token data (as the middleware would)
+          sessionManager.updateLiveTokenUsage(50000, 500);
+
+          const metadata = sessionManager.getCurrentSessionMetadata();
+
+          expect(metadata).not.toBeNull();
+          expect(metadata!.token_usage.input_tokens).toBe(50000);
+          expect(metadata!.token_usage.output_tokens).toBe(500);
+          expect(metadata!.token_usage.total_tokens).toBe(50500);
+          expect(metadata!.metadata.token_usage_formatted.input_tokens_formatted).toBe('50.00K');
+        });
+
+        it('getCurrentSessionMetadata should fall back to checkpoint data when no live counts', () => {
+          (fs.existsSync as jest.Mock).mockReturnValue(true);
+          (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify({
+            checkpoint: {
+              ts: '2023-01-01T00:00:00Z',
+              channel_values: {
+                messages: [
+                  { type: 'constructor', id: [null, null, 'HumanMessage'], kwargs: { content: 'Hello' } },
+                  {
+                    type: 'constructor', id: [null, null, 'AIMessage'],
+                    kwargs: {
+                      content: 'Hi',
+                      usage_metadata: { input_tokens: 200, output_tokens: 30 },
+                      response_metadata: { model_name: 'gpt-4', model_provider: 'openai', finish_reason: 'stop' }
+                    }
+                  }
+                ]
+              }
+            },
+            lastUpdated: '2023-01-01T00:00:01Z'
+          }));
+          (sessionManager as any).currentSessionId = 'session-fallback-test';
+          sessionManager.resetLiveTokenUsage();
+
+          const metadata = sessionManager.getCurrentSessionMetadata();
+
+          expect(metadata).not.toBeNull();
+          expect(metadata!.token_usage.input_tokens).toBe(200);
+          expect(metadata!.token_usage.output_tokens).toBe(30);
+        });
+      });
+
       describe('formatTokenCount', () => {
         it('should format 0 tokens as "0"', () => {
           const result = (sessionManager as any).formatTokenCount(0);
