@@ -125,7 +125,7 @@ Best suited for: frontend UI development (React/Vue/HTML/CSS), algorithm impleme
 Requires the 'gemini' command to be installed locally (https://github.com/google-gemini/gemini-cli).`,
     schema: z.object({
       prompt: z.string().describe("The task or prompt to send to Gemini (e.g., 'create a React login form component', 'implement a binary search algorithm')."),
-      timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
+      timeout: z.number().optional().default(6000000).describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
       cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
       args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the gemini command."),
     }),

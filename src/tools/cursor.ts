@@ -119,7 +119,7 @@ Use this to leverage Cursor's AI coding capabilities: writing code, debugging, r
 Requires the 'cursor' command to be installed locally.`,
       schema: z.object({
         prompt: z.string().describe("The task or prompt to send to Cursor AI (e.g., 'fix the bug in src/utils.ts', 'add unit tests for this module')."),
-        timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
+        timeout: z.number().optional().default(6000000).describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
         cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
         args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the cursor command."),
       }),

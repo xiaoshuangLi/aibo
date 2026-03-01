@@ -90,7 +90,7 @@ function createCopilotExecuteTool(session?: Session) {
   return tool(
   async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["-p", prompt, ...args, "--yolo"];
+    const execArgs = ["-p", prompt, ...args, "--autopilot", "--yolo"];
 
     try {
       const promise = execFileAsync("copilot", execArgs, {
@@ -125,7 +125,7 @@ Use this to leverage Copilot's AI coding capabilities: writing code, editing fil
 Requires the 'copilot' command to be installed locally (https://github.com/github/copilot-cli).`,
     schema: z.object({
       prompt: z.string().describe("The task or prompt to send to GitHub Copilot (e.g., 'fix the bug in src/utils.ts', 'add unit tests for this module', 'search for all usages of UserService')."),
-      timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
+      timeout: z.number().optional().default(6000000).describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
       cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
       args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the copilot command."),
     }),
