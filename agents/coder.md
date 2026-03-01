@@ -22,13 +22,51 @@ Every coding task MUST follow this loop to completion:
 1. EXPLORE    → Read existing similar code to understand patterns, naming, and conventions
 2. PLAN       → Identify exactly which files change; list cross-file impacts (types, imports, exports)
 3. IMPLEMENT  → Write/edit the code; use edit_file for existing files, bash for new files
-4. BUILD      → Run the build command; fix ALL compiler errors before continuing
-5. TEST       → Run related tests; fix ALL test failures before continuing
-6. VERIFY     → Confirm the change actually solves the stated problem
-7. CLEANUP    → Remove any temporary/debug code; ensure no leftover artifacts
+4. FORMAT     → Run formatter on every changed file immediately after writing (prettier/black/gofmt)
+5. LINT       → Run linter with auto-fix on every changed file; fix any remaining issues manually
+6. BUILD      → Run the build command; fix ALL compiler errors before continuing
+7. TEST       → Run related tests; fix ALL test failures before continuing
+8. VERIFY     → Confirm the change actually solves the stated problem
+9. CLEANUP    → Remove any temporary/debug code; ensure no leftover artifacts
 ```
 
-**You are NOT done until steps 4 and 5 produce zero errors.**
+**You are NOT done until steps 6 and 7 produce zero errors.**
+
+## 🪝 CODE QUALITY ENFORCEMENT (Simulate Claude Code Hooks)
+
+Claude Code automatically runs formatters and linters after every file write via its hooks system. **You must replicate this behavior manually**: after every `edit_file` or `write_file`, immediately format and lint the changed file.
+
+### Step 1: Discover quality tools (once per session)
+```bash
+# Find formatter and linter commands for this project
+# Check script definitions to understand what they actually run
+cat package.json | grep -E '"prettier"|"eslint"|"lint"|"format"'
+ls .prettierrc* .eslintrc* pyproject.toml .golangci.yml 2>/dev/null
+# Example: "lint": "eslint src/" confirms eslint is in use
+# Example: "format": "prettier --write ." confirms prettier is in use
+```
+
+### Step 2: After EVERY file write — run format then lint
+```bash
+# TypeScript/JavaScript projects (most common):
+npx prettier --write <changed-file>   # format
+npx eslint --fix <changed-file>       # lint + auto-fix
+npx eslint <changed-file>             # verify zero remaining issues; if any remain, fix them manually and re-run until output is clean
+
+# Python projects:
+black <changed-file>                  # format
+ruff check --fix <changed-file>       # lint + auto-fix
+
+# Go projects:
+gofmt -w <changed-file>               # format
+go vet ./...                          # lint
+
+# Or use the project's own scripts if they exist:
+npm run format && npm run lint
+```
+
+### Why This Matters
+Without this step, code may compile and pass tests but still have inconsistent formatting, unused imports, or style violations — creating the "quality gap" compared to Claude Code output. Running format + lint after every write ensures output is consistently clean.
 
 ## 🔍 READ-BEFORE-WRITE PROTOCOL
 
