@@ -4,9 +4,11 @@ import path from 'path';
 /**
  * CLI init command module for aibo.
  *
- * `aibo init` creates a `.aibo` symbolic link in the current working directory
- * pointing to the globally-installed aibo package, then prints the GitHub
- * README URL so the user can follow the setup guide to configure their `.env`.
+ * `aibo init` creates a `.aibo` directory in the current working directory
+ * containing selective symbolic links to the subdirectories of the
+ * globally-installed aibo package that are required at runtime (`agents` and
+ * `skills`), then prints the GitHub README URL so the user can follow the
+ * setup guide to configure their `.env`.
  *
  * @module cli/init
  */
@@ -28,28 +30,54 @@ export function resolvePackageDir(): string {
 }
 
 /**
- * Creates (or recreates) a `.aibo` symbolic link inside `targetDir` that
- * points to `packageDir`.
+ * Subdirectories from the package that are linked into `.aibo`.
+ * Only the directories actually consumed at runtime are included so that the
+ * `.aibo` folder stays minimal and does not expose unrelated package internals
+ * (e.g. `node_modules`, `dist`, `src`).
+ */
+export const AIBO_LINKED_SUBDIRS = ['agents', 'skills'] as const;
+
+/**
+ * Creates (or recreates) a `.aibo` directory inside `targetDir` that contains
+ * selective symbolic links to the subdirectories of `packageDir` that are
+ * required at runtime (`agents` and `skills`).
  *
- * @param targetDir - Directory in which the symlink should be created (usually cwd)
- * @param packageDir - Absolute path the symlink should point to
+ * Using a real directory with targeted sub-symlinks (rather than a single
+ * directory symlink pointing at the entire package) avoids exposing
+ * unrelated package internals through `.aibo`.
+ *
+ * @param targetDir - Directory in which `.aibo` should be created (usually cwd)
+ * @param packageDir - Absolute path to the aibo package installation directory
  */
 export function createAiboSymlink(targetDir: string, packageDir: string): void {
-  const symlinkPath = path.join(targetDir, '.aibo');
+  const aiboPath = path.join(targetDir, '.aibo');
 
   try {
-    const stat = fs.lstatSync(symlinkPath);
+    const stat = fs.lstatSync(aiboPath);
     // Remove whatever is there (symlink, directory, or file) before recreating
     if (stat.isDirectory() && !stat.isSymbolicLink()) {
-      fs.rmSync(symlinkPath, { recursive: true, force: true });
+      fs.rmSync(aiboPath, { recursive: true, force: true });
     } else {
-      fs.unlinkSync(symlinkPath);
+      fs.unlinkSync(aiboPath);
     }
   } catch {
     // Nothing to remove — that's fine
   }
 
-  fs.symlinkSync(packageDir, symlinkPath, 'dir');
+  // Create .aibo as a real directory so that only the selected subdirectories
+  // are accessible, rather than the entire package tree.
+  fs.mkdirSync(aiboPath);
+
+  for (const subdir of AIBO_LINKED_SUBDIRS) {
+    const srcPath = path.join(packageDir, subdir);
+    const destPath = path.join(aiboPath, subdir);
+    try {
+      fs.accessSync(srcPath);
+      fs.symlinkSync(srcPath, destPath, 'dir');
+    } catch {
+      // Subdirectory doesn't exist in packageDir — skip silently
+    }
+  }
 }
 
 /**
@@ -121,9 +149,10 @@ export function updateGitignore(targetDir: string, entries: string[]): void {
 /**
  * Entry point for `aibo init`.
  *
- * Creates the `.aibo` symlink in the current working directory, adds `.data`
- * and `.aibo` to the local `.gitignore`, and prints the README URL so the user
- * can follow the configuration guide.
+ * Creates the `.aibo` directory (containing selective sub-symlinks) in the
+ * current working directory, adds `.data` and `.aibo` to the local
+ * `.gitignore`, and prints the README URL so the user can follow the
+ * configuration guide.
  */
 export async function runInit(): Promise<void> {
   const cwd = process.cwd();
@@ -131,12 +160,12 @@ export async function runInit(): Promise<void> {
 
   console.log('\nWelcome to aibo init! 🎉\n');
 
-  // Create .aibo symlink
+  // Create .aibo directory with selective sub-symlinks
   try {
     createAiboSymlink(cwd, packageDir);
-    console.log(`✅  Created .aibo → ${packageDir}\n`);
+    console.log(`✅  Created .aibo with links to ${AIBO_LINKED_SUBDIRS.join(', ')} from ${packageDir}\n`);
   } catch (error: any) {
-    console.error(`⚠️   Failed to create .aibo symlink: ${error.message}\n`);
+    console.error(`⚠️   Failed to create .aibo: ${error.message}\n`);
   }
 
   // Update .gitignore with .data and .aibo entries
