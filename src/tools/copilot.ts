@@ -7,13 +7,13 @@ import { Session } from "@/core/agent";
 const execFileAsync = promisify(execFile);
 
 /**
- * 检查 gh copilot 命令是否在本地可用
+ * 检查 copilot 命令是否在本地可用
  *
- * @returns boolean - 如果 gh copilot 命令可用则返回 true
+ * @returns boolean - 如果 copilot 命令可用则返回 true
  */
-function isGhCopilotAvailable(): boolean {
+function isCopilotAvailable(): boolean {
   try {
-    execSync("gh copilot --help", { stdio: "ignore" });
+    execSync("which copilot", { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -72,27 +72,28 @@ function handleCopilotExecutionError(
 /**
  * GitHub Copilot CLI 执行工具
  *
- * 通过本地 gh copilot 命令行工具获取命令建议，利用 GitHub Copilot 的
- * AI 能力提供 shell 命令、git 操作和 gh 命令的智能建议。
+ * 通过本地 copilot 命令行工具执行编程任务，利用 GitHub Copilot 的
+ * AI 能力完成代码生成、文件编辑、shell 命令执行、代码库搜索等任务。
  *
  * 行为分支：
- * 1. 正常执行：gh copilot 命令成功执行，返回包含 stdout、stderr 和 success:true 的 JSON
+ * 1. 正常执行：copilot 命令成功执行，返回包含 stdout、stderr 和 success:true 的 JSON
  * 2. 命令超时：执行时间超过指定超时，返回包含 "Command timeout" 错误的 JSON
  * 3. 命令执行失败：返回包含错误代码和消息的 JSON
  *
  * 最适合场景：
- * - 获取 shell 命令建议
- * - 获取 git 操作命令建议
- * - 获取 gh CLI 命令建议
+ * - 通用 AI 辅助编程任务（代码生成、调试、重构）
+ * - 文件编辑与创建
+ * - Shell 命令执行
+ * - 代码库搜索与分析
  */
 function createCopilotExecuteTool(session?: Session) {
   return tool(
-  async ({ prompt, timeout = 300000, cwd, target = "shell", args = [] }) => {
+  async ({ prompt, timeout = 300000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["copilot", "suggest", "-t", target, prompt, ...args];
+    const execArgs = ["-p", prompt, ...args];
 
     try {
-      const promise = execFileAsync("gh", execArgs, {
+      const promise = execFileAsync("copilot", execArgs, {
         timeout,
         cwd: cwd || process.cwd(),
         env: process.env,
@@ -118,16 +119,15 @@ function createCopilotExecuteTool(session?: Session) {
   },
   {
     name: "copilot_execute",
-    description: `Execute a task or prompt using the GitHub Copilot CLI (gh copilot suggest command).
-Sends the prompt to GitHub Copilot running locally and returns command suggestions.
-Best suited for: shell command suggestions, git operations, and gh CLI command suggestions.
-Requires the 'gh' CLI with the GitHub Copilot extension to be installed locally (https://github.com/github/gh-copilot).`,
+    description: `Execute a task or prompt using the GitHub Copilot CLI (copilot command).
+Sends the prompt to GitHub Copilot running locally and returns the result.
+Use this to leverage Copilot's AI coding capabilities: writing code, editing files, running shell commands, searching the codebase, debugging, and more.
+Requires the 'copilot' command to be installed locally (https://github.com/github/copilot-cli).`,
     schema: z.object({
-      prompt: z.string().describe("The task or prompt to send to GitHub Copilot (e.g., 'list all running docker containers', 'undo the last git commit')."),
+      prompt: z.string().describe("The task or prompt to send to GitHub Copilot (e.g., 'fix the bug in src/utils.ts', 'add unit tests for this module', 'search for all usages of UserService')."),
       timeout: z.number().optional().default(300000).describe("Timeout in milliseconds (default: 300000 = 5 minutes). Increase for complex tasks."),
       cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
-      target: z.enum(["shell", "gh", "git"]).optional().default("shell").describe("Target type for the suggestion: 'shell' (default), 'gh', or 'git'."),
-      args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the gh copilot suggest command."),
+      args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the copilot command."),
     }),
   }
 );
@@ -136,13 +136,13 @@ Requires the 'gh' CLI with the GitHub Copilot extension to be installed locally 
 /**
  * 异步获取 GitHub Copilot CLI 工具的方法
  *
- * 在返回工具前检查本地是否安装了 gh copilot 命令。
+ * 在返回工具前检查本地是否安装了 copilot 命令。
  * 如果命令不可用，返回空数组。
  *
  * @returns Promise<Array<any>> - 包含 GitHub Copilot CLI 工具的数组，或空数组（如果命令不可用）
  */
 export default async function getCopilotTools(session?: Session) {
-  if (!isGhCopilotAvailable()) {
+  if (!isCopilotAvailable()) {
     return [];
   }
 

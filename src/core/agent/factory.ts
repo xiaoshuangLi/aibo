@@ -75,7 +75,7 @@ export function buildCodingAgentHint(
   if (hasGeminiTool) routingRows.push('| `gemini_execute` | Frontend UI (React/Vue/HTML/CSS), algorithm implementation, large-context tasks (1M tokens) |');
   if (hasCodexTool) routingRows.push('| `codex_execute`  | Backend API (REST/GraphQL), database/ORM design, server-side business logic, scripts |');
   if (hasCursorTool) routingRows.push('| `cursor_execute` | General AI-assisted coding when no specialist tool is available; open files in Cursor editor |');
-  if (hasCopilotTool) routingRows.push('| `copilot_execute` | Shell command suggestions, git operation suggestions, gh CLI command suggestions |');
+  if (hasCopilotTool) routingRows.push('| `copilot_execute` | General-purpose AI coding: writing code, editing files, running shell commands, searching the codebase |');
 
   const routingTable = routingRows.length > 0
     ? `\n| Tool | Best for |\n|------|----------|\n${routingRows.join('\n')}`

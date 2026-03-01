@@ -26,64 +26,41 @@ describe('GitHub Copilot CLI Tool', () => {
 
     it('should have correct tool description', () => {
       expect(copilotExecuteTool.description).toContain('GitHub Copilot CLI');
-      expect(copilotExecuteTool.description).toContain('gh copilot suggest');
+      expect(copilotExecuteTool.description).toContain('copilot');
     });
 
-    it('should mention shell command use-case in description', () => {
-      expect(copilotExecuteTool.description).toContain('shell');
+    it('should mention coding use-cases in description', () => {
+      expect(copilotExecuteTool.description).toContain('editing files');
     });
 
     it('should have correct schema', () => {
       const schema = copilotExecuteTool.schema;
       expect(schema).toBeDefined();
 
-      const parsed = schema.safeParse({ prompt: 'list all running docker containers' });
+      const parsed = schema.safeParse({ prompt: 'fix the bug in src/utils.ts' });
       expect(parsed.success).toBe(true);
       if (parsed.success) {
-        expect(parsed.data.prompt).toBe('list all running docker containers');
+        expect(parsed.data.prompt).toBe('fix the bug in src/utils.ts');
         expect(parsed.data.timeout).toBe(300000);
-        expect(parsed.data.target).toBe('shell');
         expect(parsed.data.args).toEqual([]);
-      }
-    });
-
-    it('should accept optional target type', () => {
-      const schema = copilotExecuteTool.schema;
-      const parsed = schema.safeParse({
-        prompt: 'undo the last git commit',
-        target: 'git',
-      });
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.target).toBe('git');
       }
     });
 
     it('should accept optional args', () => {
       const schema = copilotExecuteTool.schema;
       const parsed = schema.safeParse({
-        prompt: 'list open pull requests',
-        target: 'gh',
-        args: ['--quiet'],
+        prompt: 'add unit tests for UserService',
+        args: ['--no-interactive'],
       });
       expect(parsed.success).toBe(true);
       if (parsed.success) {
-        expect(parsed.data.args).toEqual(['--quiet']);
+        expect(parsed.data.args).toEqual(['--no-interactive']);
       }
-    });
-
-    it('should reject invalid target type', () => {
-      const schema = copilotExecuteTool.schema;
-      const parsed = schema.safeParse({
-        prompt: 'do something',
-        target: 'invalid',
-      });
-      expect(parsed.success).toBe(false);
     });
   });
 
   describe('getCopilotTools', () => {
-    it('should return empty array when gh copilot command is not available', async () => {
+    it('should return empty array when copilot command is not available', async () => {
       (childProcess.execSync as jest.Mock).mockImplementation(() => {
         throw new Error('command not found');
       });
@@ -92,7 +69,7 @@ describe('GitHub Copilot CLI Tool', () => {
       expect(tools).toEqual([]);
     });
 
-    it('should return copilot tools when gh copilot command is available', async () => {
+    it('should return copilot tools when copilot command is available', async () => {
       (childProcess.execSync as jest.Mock).mockReturnValue('');
 
       const tools = await getCopilotTools();

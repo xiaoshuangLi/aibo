@@ -204,7 +204,7 @@ describe('buildCodingAgentHint', () => {
     expect(hint).not.toContain('codex_execute');
     expect(hint).not.toContain('cursor_execute');
     expect(hint).toContain('PRIORITY');
-    expect(hint).toContain('Shell');
+    expect(hint).toContain('editing files');
   });
 
   it('should include all five agents when all tools including copilot are available', () => {
