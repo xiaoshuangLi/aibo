@@ -1,5 +1,7 @@
 # AIBO — Copilot Instructions
 
+After any code change, **MUST** run `npm run test` to check, **MUST** pass all test.
+
 ## Build, Test, and Dev Commands
 
 ```bash
