@@ -56,11 +56,6 @@ jest.mock('@/infrastructure/session/manager', () => {
   };
 });
 
-// Mock child_process (spawn for restart - exec is spied per test in handleRebotCommand)
-jest.mock('child_process', () => ({
-  ...jest.requireActual('child_process'),
-  spawn: jest.fn(() => ({ on: jest.fn(), unref: jest.fn() }))
-}));
 
 // Mock FileDiffVisualizer
 const mockFileDiffVisualizerInstance = {
@@ -96,7 +91,8 @@ jest.mock('child_process', () => ({
   spawn: jest.fn(() => ({
     on: jest.fn(),
     unref: jest.fn()
-  }))
+  })),
+  execFile: jest.fn()
 }));
 
 // Mock LspClientManager

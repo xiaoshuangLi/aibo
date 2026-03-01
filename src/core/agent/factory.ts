@@ -34,6 +34,15 @@ const backend = new SafeFilesystemBackend({
 let cachedAgent: ReturnType<typeof createDeepAgent>;
 
 /**
+ * 过滤掉子代理不应该使用的工具
+ * @param tools - 原始工具列表
+ * @returns 过滤后的工具列表
+ */
+function filterSubAgentTools(tools: any[]): any[] {
+  return tools.filter(tool => tool.name !== 'write-subagent-todos');
+}
+
+/**
  * 创建检查点器实例
  * 根据配置动态创建不同类型的检查点器
  */
@@ -101,21 +110,6 @@ export async function createAIAgent(session?: Session): Promise<any> {
 
   // 查找工作目录下的所有skills目录
   const allSkillsDirs = findSkillsDirectories(process.cwd());
-
-  /**
- * 过滤掉子代理不应该使用的工具
- * @param tools - 原始工具列表
- * @returns 过滤后的工具列表
- */
-function filterSubAgentTools(tools: any[]): any[] {
-  return tools.filter(tool => {
-    // 禁止子代理使用 write-subagent-todos 工具
-    if (tool.name === 'write-subagent-todos') {
-      return false;
-    }
-    return true;
-  });
-}
 
 // 为子代理应用默认配置（强化提示词已在代理加载器中处理）
   const subAgentsWithDefaults = customSubAgents.map(agent => ({
