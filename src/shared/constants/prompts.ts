@@ -33,11 +33,7 @@ ${personaStyle}
 `
     : '';
   
-  if (currentLanguage === 'zh') {
-    return languageEmphasis + personaSection + SYSTEM_PROMPT_ZH_CONTENT;
-  } else {
-    return languageEmphasis + personaSection + SYSTEM_PROMPT_EN_CONTENT;
-  }
+  return languageEmphasis + personaSection + SYSTEM_PROMPT_EN_CONTENT;
 }
 
 /**

@@ -84,7 +84,7 @@ function createClaudeExecuteTool(session?: Session) {
   return tool(
   async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
     // Use execFile with a separate args array to prevent command injection
-    const execArgs = ["-p", prompt, ...args];
+    const execArgs = ["-p", prompt, ...args, "--yolo"];
 
     try {
       const promise = execFileAsync("claude", execArgs, {
