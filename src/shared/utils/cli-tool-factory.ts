@@ -11,6 +11,11 @@ const execFileAsync = promisify(execFile);
  */
 export const cliToolSchema = z.object({
   prompt: z.string().describe("The task or prompt to send to the CLI tool."),
+  continueSession: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to continue the previous session (adds --continue flag)."),
   timeout: z.number().optional().default(6000000).describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
   cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
   args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the command."),
@@ -32,6 +37,8 @@ export interface CliToolConfig {
   extraArgs?: string[];
   /** Flag used to pass the prompt (e.g. "-p" for claude/cursor) */
   promptFlag: string;
+  /** Flag used to continue the previous session (default: "--continue") */
+  continueFlag?: string;
   /** Additional flags appended at the end (e.g. ["--autopilot"] for copilot) */
   trailingArgs?: string[];
 }
@@ -113,11 +120,12 @@ export function handleCliExecutionError(
  * @param session - Optional session for real-time progress streaming
  */
 export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
-  const { command, toolName, description, promptFlag, subcommand = [], extraArgs = [], trailingArgs = [] } = config;
+  const { command, toolName, description, promptFlag, subcommand = [], extraArgs = [], trailingArgs = [], continueFlag = "--continue" } = config;
 
   return tool(
-    async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
-      const execArgs = [...subcommand, promptFlag, prompt, ...args, ...extraArgs, ...trailingArgs];
+    async ({ prompt, continueSession = false, timeout = 6000000, cwd, args = [] }) => {
+      const continueArgs = continueSession ? [continueFlag] : [];
+      const execArgs = [...subcommand, promptFlag, prompt, ...continueArgs, ...args, ...extraArgs, ...trailingArgs];
 
       try {
         const promise = execFileAsync(command, execArgs, {

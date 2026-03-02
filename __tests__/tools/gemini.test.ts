@@ -43,6 +43,7 @@ describe('Gemini CLI Tool', () => {
         expect(parsed.data.prompt).toBe('create a button component');
         expect(parsed.data.timeout).toBe(6000000);
         expect(parsed.data.args).toEqual([]);
+        expect(parsed.data.continueSession).toBe(false);
       }
     });
 

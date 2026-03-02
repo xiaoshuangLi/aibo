@@ -40,6 +40,24 @@ describe('codex tool execution', () => {
     expect(parsed.prompt).toBe('implement REST API');
   });
 
+  it('should not pass --continue flag when continueSession is false', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'implement API', continueSession: false });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('--continue');
+  });
+
+  it('should pass --continue flag when continueSession is true', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'continue task', continueSession: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--continue');
+  });
+
   it('should return (empty) for empty stdout/stderr', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
 

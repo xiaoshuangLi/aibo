@@ -39,6 +39,24 @@ describe('claude tool execution', () => {
     expect(callArgs).not.toContain('--yolo');
   });
 
+  it('should not pass --continue flag when continueSession is false', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'write tests', continueSession: false });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('--continue');
+  });
+
+  it('should pass --continue flag when continueSession is true', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'continue task', continueSession: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--continue');
+  });
+
   it('should return success JSON when command succeeds', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: 'claude result', stderr: '' });
 

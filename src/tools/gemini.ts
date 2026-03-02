@@ -11,6 +11,7 @@ Sends the prompt to Gemini AI running locally and returns the result.
 Best suited for: frontend UI development (React/Vue/HTML/CSS), algorithm implementation, multimodal tasks, and tasks requiring a large context window.
 Requires the 'gemini' command to be installed locally (https://github.com/google-gemini/gemini-cli).`,
       promptFlag: "-p",
+      continueFlag: "--resume",
       extraArgs: ["--yolo"],
     },
     session,

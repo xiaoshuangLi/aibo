@@ -40,6 +40,25 @@ describe('gemini tool execution', () => {
     expect(parsed.prompt).toBe('create React component');
   });
 
+  it('should not pass --resume flag when continueSession is false', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'create component', continueSession: false });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('--resume');
+  });
+
+  it('should pass --resume flag when continueSession is true', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'continue task', continueSession: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--resume');
+    expect(callArgs).not.toContain('--continue');
+  });
+
   it('should return (empty) for empty stdout/stderr', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
 
