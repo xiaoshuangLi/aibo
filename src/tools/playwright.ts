@@ -38,6 +38,8 @@ function formatError(toolName: string, error: unknown): string {
 
 const HTML_MAX_LENGTH = 50_000;
 const TRUNCATION_MARKER = "\n<!-- [truncated] -->";
+const SNAPSHOT_MAX_LENGTH = 20_000;
+const SNAPSHOT_TRUNCATION_MARKER = "\n... [snapshot truncated]";
 
 /**
  * Strip heavyweight noise from raw HTML before returning it to the LLM:
@@ -47,7 +49,7 @@ const TRUNCATION_MARKER = "\n<!-- [truncated] -->";
  * Then truncate to HTML_MAX_LENGTH characters so a dense page never blows
  * the context window.
  */
-function sanitizeHtml(html: string): string {
+function sanitizeHtml(html: string, maxLength: number = HTML_MAX_LENGTH): string {
   let result = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
@@ -56,10 +58,19 @@ function sanitizeHtml(html: string): string {
     .replace(/\s+style='[^']*'/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  if (result.length > HTML_MAX_LENGTH) {
-    result = result.slice(0, HTML_MAX_LENGTH - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
+  if (result.length > maxLength) {
+    result = result.slice(0, maxLength - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
   }
   return result;
+}
+
+/**
+ * Truncate an ARIA snapshot to stay within token budget.
+ * Unlike HTML, the snapshot is plain text so we just slice at maxLength.
+ */
+function truncateSnapshot(snapshot: string, maxLength: number): string {
+  if (snapshot.length <= maxLength) return snapshot;
+  return snapshot.slice(0, maxLength - SNAPSHOT_TRUNCATION_MARKER.length) + SNAPSHOT_TRUNCATION_MARKER;
 }
 
 // -----------------------------------------------------------------------
@@ -96,9 +107,9 @@ export const browserNavigateTool = tool(
 // 2. browser_screenshot
 // -----------------------------------------------------------------------
 export const browserScreenshotTool = tool(
-  async ({ full_page = false }) => {
+  async ({ full_page = false, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       const buffer = await p.screenshot({ fullPage: full_page, type: "png" });
       const base64 = buffer.toString("base64");
       return JSON.stringify({ success: true, format: "png", base64 }, null, 2);
@@ -115,6 +126,10 @@ export const browserScreenshotTool = tool(
         .boolean()
         .optional()
         .describe("Capture the full scrollable page (default: false, captures viewport only)"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -123,14 +138,17 @@ export const browserScreenshotTool = tool(
 // 3. browser_get_content
 // -----------------------------------------------------------------------
 export const browserGetContentTool = tool(
-  async ({ type = "text" }) => {
+  async ({ type = "text", max_length, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       let content: string;
       if (type === "html") {
-        content = sanitizeHtml(await p.content());
+        const limit = max_length ?? HTML_MAX_LENGTH;
+        content = sanitizeHtml(await p.content(), limit);
       } else {
-        content = (await p.textContent("body")) ?? "";
+        const raw = (await p.textContent("body")) ?? "";
+        const limit = max_length ?? HTML_MAX_LENGTH;
+        content = raw.length > limit ? raw.slice(0, limit - TRUNCATION_MARKER.length) + TRUNCATION_MARKER : raw;
       }
       return JSON.stringify({ success: true, type, content }, null, 2);
     } catch (e) {
@@ -148,6 +166,16 @@ export const browserGetContentTool = tool(
         .describe(
           "Content type to retrieve: 'text' (default, plain text only) or 'html' (sanitized HTML – scripts/styles removed)"
         ),
+      max_length: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Maximum character length of the returned content (default: 50000). Lower values reduce token usage."),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -156,9 +184,9 @@ export const browserGetContentTool = tool(
 // 4. browser_click
 // -----------------------------------------------------------------------
 export const browserClickTool = tool(
-  async ({ selector }) => {
+  async ({ selector, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.locator(selector).click({ timeout: 10000 });
       return JSON.stringify({ success: true, selector }, null, 2);
     } catch (e) {
@@ -175,6 +203,10 @@ export const browserClickTool = tool(
         .describe(
           "CSS selector, role selector (role=button[name='Submit']), or text selector (text=Submit) identifying the element to click"
         ),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -183,9 +215,9 @@ export const browserClickTool = tool(
 // 5. browser_type
 // -----------------------------------------------------------------------
 export const browserTypeTool = tool(
-  async ({ selector, text }) => {
+  async ({ selector, text, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       const locator = p.locator(selector);
       await locator.fill(text, { timeout: 10000 });
       return JSON.stringify({ success: true, selector, text }, null, 2);
@@ -200,6 +232,10 @@ export const browserTypeTool = tool(
     schema: z.object({
       selector: z.string().describe("CSS or semantic selector identifying the input element"),
       text: z.string().describe("Text to type into the element"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -208,9 +244,9 @@ export const browserTypeTool = tool(
 // 6. browser_press
 // -----------------------------------------------------------------------
 export const browserPressTool = tool(
-  async ({ key }) => {
+  async ({ key, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.keyboard.press(key);
       return JSON.stringify({ success: true, key }, null, 2);
     } catch (e) {
@@ -227,6 +263,10 @@ export const browserPressTool = tool(
         .describe(
           "Key name to press (e.g. 'Enter', 'Tab', 'Escape', 'ArrowDown', 'Control+a')"
         ),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -235,9 +275,9 @@ export const browserPressTool = tool(
 // 7. browser_select_option
 // -----------------------------------------------------------------------
 export const browserSelectOptionTool = tool(
-  async ({ selector, value }) => {
+  async ({ selector, value, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.locator(selector).selectOption(value, { timeout: 10000 });
       return JSON.stringify({ success: true, selector, value }, null, 2);
     } catch (e) {
@@ -251,6 +291,10 @@ export const browserSelectOptionTool = tool(
     schema: z.object({
       selector: z.string().describe("CSS or semantic selector identifying the <select> element"),
       value: z.string().describe("The option value or visible text to select"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -259,9 +303,9 @@ export const browserSelectOptionTool = tool(
 // 8. browser_hover
 // -----------------------------------------------------------------------
 export const browserHoverTool = tool(
-  async ({ selector }) => {
+  async ({ selector, headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.locator(selector).hover({ timeout: 10000 });
       return JSON.stringify({ success: true, selector }, null, 2);
     } catch (e) {
@@ -274,6 +318,10 @@ export const browserHoverTool = tool(
       "Hover the mouse over an element. Useful for triggering CSS hover menus, tooltips, or revealing hidden controls.",
     schema: z.object({
       selector: z.string().describe("CSS or semantic selector identifying the element to hover"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -282,9 +330,9 @@ export const browserHoverTool = tool(
 // 9. browser_wait_load
 // -----------------------------------------------------------------------
 export const browserWaitLoadTool = tool(
-  async ({ state = "networkidle" }) => {
+  async ({ state = "networkidle", headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.waitForLoadState(state as LoadState, { timeout: 30000 });
       return JSON.stringify({ success: true, state }, null, 2);
     } catch (e) {
@@ -300,6 +348,10 @@ export const browserWaitLoadTool = tool(
         .enum(["load", "domcontentloaded", "networkidle"])
         .optional()
         .describe("Target load state to wait for (default: networkidle)"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -308,9 +360,9 @@ export const browserWaitLoadTool = tool(
 // 10. browser_wait_selector
 // -----------------------------------------------------------------------
 export const browserWaitSelectorTool = tool(
-  async ({ selector, state = "visible" }) => {
+  async ({ selector, state = "visible", headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.waitForSelector(selector, { state: state as "attached" | "detached" | "visible" | "hidden", timeout: 30000 });
       return JSON.stringify({ success: true, selector, state }, null, 2);
     } catch (e) {
@@ -327,6 +379,10 @@ export const browserWaitSelectorTool = tool(
         .enum(["attached", "detached", "visible", "hidden"])
         .optional()
         .describe("Target element state (default: visible)"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -335,10 +391,11 @@ export const browserWaitSelectorTool = tool(
 // 11. browser_snapshot
 // -----------------------------------------------------------------------
 export const browserSnapshotTool = tool(
-  async () => {
+  async ({ max_length = SNAPSHOT_MAX_LENGTH, headless }) => {
     try {
-      const p = await getPage();
-      const snapshot = await p.locator("body").ariaSnapshot();
+      const p = await getPage(headless);
+      const raw = await p.locator("body").ariaSnapshot();
+      const snapshot = truncateSnapshot(raw, max_length);
       return JSON.stringify({ success: true, snapshot }, null, 2);
     } catch (e) {
       return formatError("browser_snapshot", e);
@@ -347,8 +404,19 @@ export const browserSnapshotTool = tool(
   {
     name: "browser_snapshot",
     description:
-      "Get a compact ARIA accessibility snapshot of the current page. Returns a structured text representation of all semantic and interactive elements — far smaller than raw HTML. Prefer this over browser_get_content when you need to understand page structure or locate elements.",
-    schema: z.object({}),
+      "Get a compact ARIA accessibility snapshot of the current page. Returns a structured text representation of all semantic and interactive elements — far smaller than raw HTML. Prefer this over browser_get_content when you need to understand page structure or locate elements. Output is capped at 20,000 characters by default.",
+    schema: z.object({
+      max_length: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Maximum character length of the returned snapshot (default: 20000). Lower values reduce token usage."),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
+    }),
   }
 );
 
@@ -375,7 +443,7 @@ function isSafeScript(script: string): boolean {
 }
 
 export const browserEvaluateTool = tool(
-  async ({ script }) => {
+  async ({ script, headless }) => {
     if (!isSafeScript(script)) {
       return JSON.stringify(
         {
@@ -389,7 +457,7 @@ export const browserEvaluateTool = tool(
       );
     }
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       const EVAL_TIMEOUT_MS = 10000;
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`Script evaluation exceeded ${EVAL_TIMEOUT_MS}ms timeout`)), EVAL_TIMEOUT_MS)
@@ -410,6 +478,10 @@ export const browserEvaluateTool = tool(
         .describe(
           "JavaScript expression or function body to evaluate in the page context (e.g. 'document.title' or '() => Array.from(document.querySelectorAll(\".price\")).map(el => el.textContent)')"
         ),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
