@@ -3,7 +3,7 @@ import { z } from "zod";
 import axios from "axios";
 import TurndownService from "turndown";
 
-const MAX_CONTENT_LENGTH = 100_000; // 100 KB
+const MAX_CONTENT_LENGTH = 5_000; // 100 KB
 const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
 
 // Remove script and style elements before converting to markdown
