@@ -32,6 +32,42 @@ describe('cursor tool execution', () => {
       executeTool = tools[0];
     });
 
+    it('should invoke agent with "-p <prompt>" args', async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+      await executeTool.invoke({ prompt: 'fix bug' });
+
+      expect(execFileAsyncMock).toHaveBeenCalledWith(
+        'agent',
+        ['-p', 'fix bug'],
+        expect.any(Object),
+      );
+    });
+
+    it('should pass --continue flag when continueSession is true', async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+      await executeTool.invoke({ prompt: 'fix bug', continueSession: true });
+
+      expect(execFileAsyncMock).toHaveBeenCalledWith(
+        'agent',
+        ['-p', 'fix bug', '--continue'],
+        expect.any(Object),
+      );
+    });
+
+    it('should not pass --continue flag when continueSession is false', async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+      await executeTool.invoke({ prompt: 'fix bug', continueSession: false });
+
+      expect(execFileAsyncMock).toHaveBeenCalledWith(
+        'agent',
+        ['-p', 'fix bug'],
+        expect.any(Object),
+      );
+    });
+
     it('should return success JSON when command succeeds', async () => {
       execFileAsyncMock.mockResolvedValue({ stdout: 'command output', stderr: '' });
 

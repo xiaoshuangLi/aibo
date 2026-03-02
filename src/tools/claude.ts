@@ -11,7 +11,7 @@ Sends the prompt to Claude Code running locally and returns the result.
 Use this to leverage Claude's autonomous coding capabilities: writing code, debugging, refactoring, explaining code, and more.
 Requires the 'claude' command to be installed locally.`,
       promptFlag: "-p",
-      extraArgs: ["--yolo"],
+      extraArgs: ["--dangerously-skip-permissions"],
     },
     session,
   );

@@ -26,9 +26,11 @@ export interface CliToolConfig {
   toolName: string;
   /** Description of the tool shown to the LLM */
   description: string;
-  /** Extra fixed args appended after the prompt args (e.g. ["--yolo"]) */
+  /** Subcommand args prepended before the prompt flag (e.g. ["subcommand"]) */
+  subcommand?: string[];
+  /** Extra fixed args appended after the prompt args (e.g. ["--verbose"]) */
   extraArgs?: string[];
-  /** Flag used to pass the prompt (e.g. "-p" for claude, "--ai" for cursor) */
+  /** Flag used to pass the prompt (e.g. "-p" for claude/cursor) */
   promptFlag: string;
   /** Additional flags appended at the end (e.g. ["--autopilot"] for copilot) */
   trailingArgs?: string[];
@@ -111,11 +113,11 @@ export function handleCliExecutionError(
  * @param session - Optional session for real-time progress streaming
  */
 export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
-  const { command, toolName, description, promptFlag, extraArgs = [], trailingArgs = [] } = config;
+  const { command, toolName, description, promptFlag, subcommand = [], extraArgs = [], trailingArgs = [] } = config;
 
   return tool(
     async ({ prompt, timeout = 6000000, cwd, args = [] }) => {
-      const execArgs = [promptFlag, prompt, ...args, ...extraArgs, ...trailingArgs];
+      const execArgs = [...subcommand, promptFlag, prompt, ...args, ...extraArgs, ...trailingArgs];
 
       try {
         const promise = execFileAsync(command, execArgs, {

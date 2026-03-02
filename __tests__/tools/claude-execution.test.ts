@@ -29,6 +29,16 @@ describe('claude tool execution', () => {
     execFileAsyncMock.mockReset();
   });
 
+  it('should pass --dangerously-skip-permissions flag to claude', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'write tests' });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--dangerously-skip-permissions');
+    expect(callArgs).not.toContain('--yolo');
+  });
+
   it('should return success JSON when command succeeds', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: 'claude result', stderr: '' });
 
