@@ -40,6 +40,36 @@ describe('copilot tool execution', () => {
     expect(parsed.prompt).toBe('list all running docker containers');
   });
 
+  it('should augment prompt with exit reminder', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'fix the bug' });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    const promptArg = callArgs[1];
+    expect(promptArg).toContain('fix the bug');
+    expect(promptArg).toContain('IMPORTANT');
+    expect(promptArg).toContain('exit immediately');
+  });
+
+  it('should not include --continue flag when continueSession is false', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'task', continueSession: false });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('--continue');
+  });
+
+  it('should include --continue flag when continueSession is true', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'continue the task', continueSession: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--continue');
+  });
+
   it('should return (empty) for empty stdout/stderr', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
 

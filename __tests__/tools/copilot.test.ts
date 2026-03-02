@@ -43,6 +43,7 @@ describe('GitHub Copilot CLI Tool', () => {
         expect(parsed.data.prompt).toBe('fix the bug in src/utils.ts');
         expect(parsed.data.timeout).toBe(6000000);
         expect(parsed.data.args).toEqual([]);
+        expect(parsed.data.continueSession).toBe(false);
       }
     });
 
@@ -55,6 +56,27 @@ describe('GitHub Copilot CLI Tool', () => {
       expect(parsed.success).toBe(true);
       if (parsed.success) {
         expect(parsed.data.args).toEqual(['--no-interactive']);
+      }
+    });
+
+    it('should accept continueSession parameter', () => {
+      const schema = copilotExecuteTool.schema;
+      const parsed = schema.safeParse({
+        prompt: 'continue the previous task',
+        continueSession: true,
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.continueSession).toBe(true);
+      }
+    });
+
+    it('should default continueSession to false', () => {
+      const schema = copilotExecuteTool.schema;
+      const parsed = schema.safeParse({ prompt: 'some task' });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.continueSession).toBe(false);
       }
     });
   });
