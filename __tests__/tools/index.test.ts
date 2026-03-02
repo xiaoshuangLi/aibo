@@ -7,5 +7,5 @@ describe('tools/index', () => {
     // Note: In test environment, composio tools may not be available,
     // so we check if we have at least the non-composio tools
     expect(tools.length).toBeGreaterThanOrEqual(4); // bash, utils, githubFetch, tencentWsaSearchTool
-  }, 10000); // Increase timeout to 10 seconds
+  }, 20000); // Increase timeout to 20 seconds to accommodate Playwright tool loading
 });

@@ -1,4 +1,6 @@
 import * as os from 'os';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { config } from '@/core/config';
 
 /**
@@ -11,10 +13,54 @@ import { config } from '@/core/config';
  */
 
 /**
- * Gets the current system prompt based on the configured language
- * @returns The system prompt string in the configured language
+ * Returns a dynamically-generated section containing key system context information:
+ * current date/time, operating system, hostname, Node.js version, shell, user, home
+ * directory, and working directory.
+ *
+ * This section is always appended to the output of {@link getSystemPrompt}, regardless
+ * of whether the prompt content originates from `aibo.md` or the built-in template.
+ * @returns The formatted context information string
+ */
+export function getContextInfo(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = now.toISOString();
+  const shell = process.env.SHELL ?? process.env.ComSpec ?? 'unknown';
+  let username = 'unknown';
+  try { username = os.userInfo().username; } catch { /* ignore */ }
+
+  return `## 🖥️ ENVIRONMENT CONTEXT
+- Current Date: ${dateStr}
+- Current Time: ${timeStr}
+- Operating System: ${os.platform()} ${os.arch()} (${os.release()})
+- Hostname: ${os.hostname()}
+- Node.js Version: ${process.version}
+- Shell: ${shell}
+- Username: ${username}
+- Home Directory: ${os.homedir()}
+- Working Directory: ${process.cwd()}`;
+}
+
+/**
+ * Gets the current system prompt based on the configured language.
+ * If an `aibo.md` file exists in the current working directory, its content
+ * is returned directly as the system prompt.
+ * The output always includes {@link getContextInfo} appended at the end.
+ * @returns The system prompt string
  */
 export function getSystemPrompt(): string {
+  const contextInfo = getContextInfo();
+
+  const aiboMdPath = join(process.cwd(), 'aibo.md');
+  if (existsSync(aiboMdPath)) {
+    try {
+      const content = readFileSync(aiboMdPath, 'utf8');
+      return content + '\n\n' + contextInfo;
+    } catch {
+      // fall through to default prompt
+    }
+  }
+
   const currentLanguage = config.language?.code;
   const languageName = currentLanguage === 'zh' ? 'Chinese (中文)' : 'English';
   
@@ -33,7 +79,7 @@ ${personaStyle}
 `
     : '';
   
-  return languageEmphasis + personaSection + SYSTEM_PROMPT_EN_CONTENT;
+  return languageEmphasis + personaSection + SYSTEM_PROMPT_EN_CONTENT + '\n\n' + contextInfo;
 }
 
 /**
@@ -119,12 +165,6 @@ await think({ reasoning: "The user wants X. I see three approaches: ..." });
 You are a highly capable autonomous programming assistant designed to help users solve complex software development challenges through systematic problem-solving, comprehensive research, and precise execution.
 
 **Communication Style**: Be professional, clear, and concise. Provide direct, actionable responses that are easy to understand. Maintain a helpful and collaborative tone in every interaction.
-
-## 🖥️ ENVIRONMENT CONTEXT
-- Operating System: ${os.platform()} ${os.arch()}
-- Node.js Version: ${process.version}
-- Current Working Directory: ${process.cwd()}
-- Project Root: ${process.cwd()}
 
 ## 🚀 CORE CAPABILITIES
 1. **Autonomous Programming**: Write, edit, debug, and optimize code across any programming language — directly for simple tasks, via SubAgents for complex ones
@@ -451,12 +491,6 @@ await think({ reasoning: "用户想要X。我看到三种方案：..." });
 你是一个高度能力的自主编程助手，旨在通过系统性问题解决、全面研究和精确执行来帮助用户解决复杂的软件开发挑战。
 
 **交流风格**：保持专业、清晰、简洁的表达。提供直接、可操作的回应，确保易于理解。在每次互动中维持乐于助人且协作的语气。
-
-## 🖥️ 环境上下文
-- 操作系统：${os.platform()} ${os.arch()}
-- Node.js 版本：${process.version}
-- 当前工作目录：${process.cwd()}
-- 项目根目录：${process.cwd()}
 
 ## 🚀 核心能力
 1. **自主编程**：直接编写、编辑、调试和优化代码（简单任务直接做，复杂任务委派给子代理）
