@@ -36,6 +36,32 @@ function formatError(toolName: string, error: unknown): string {
   return JSON.stringify({ success: false, tool: toolName, error: message }, null, 2);
 }
 
+const HTML_MAX_LENGTH = 50_000;
+const TRUNCATION_MARKER = "\n<!-- [truncated] -->";
+
+/**
+ * Strip heavyweight noise from raw HTML before returning it to the LLM:
+ *   – <script> and <style> blocks (often the biggest offenders)
+ *   – HTML comments
+ *   – inline style="…" attributes
+ * Then truncate to HTML_MAX_LENGTH characters so a dense page never blows
+ * the context window.
+ */
+function sanitizeHtml(html: string): string {
+  let result = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\s+style="[^"]*"/gi, "")
+    .replace(/\s+style='[^']*'/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (result.length > HTML_MAX_LENGTH) {
+    result = result.slice(0, HTML_MAX_LENGTH - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
+  }
+  return result;
+}
+
 // -----------------------------------------------------------------------
 // 1. browser_navigate
 // -----------------------------------------------------------------------
@@ -100,8 +126,12 @@ export const browserGetContentTool = tool(
   async ({ type = "text" }) => {
     try {
       const p = await getPage();
-      const content =
-        type === "html" ? await p.content() : (await p.textContent("body")) ?? "";
+      let content: string;
+      if (type === "html") {
+        content = sanitizeHtml(await p.content());
+      } else {
+        content = (await p.textContent("body")) ?? "";
+      }
       return JSON.stringify({ success: true, type, content }, null, 2);
     } catch (e) {
       return formatError("browser_get_content", e);
@@ -110,13 +140,13 @@ export const browserGetContentTool = tool(
   {
     name: "browser_get_content",
     description:
-      "Get the content of the current page. Returns plain text by default (much more compact than HTML). Use type='html' to get the full HTML source when DOM structure is needed.",
+      "Get the content of the current page. Returns plain text by default (most compact). Use type='html' to get a sanitized HTML snapshot (script/style tags stripped, capped at 50 000 chars). For exploring interactive structure, prefer browser_snapshot instead.",
     schema: z.object({
       type: z
         .enum(["text", "html"])
         .optional()
         .describe(
-          "Content type to retrieve: 'text' (default, plain text only) or 'html' (full HTML source)"
+          "Content type to retrieve: 'text' (default, plain text only) or 'html' (sanitized HTML – scripts/styles removed)"
         ),
     }),
   }
@@ -302,7 +332,28 @@ export const browserWaitSelectorTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 11. browser_evaluate
+// 11. browser_snapshot
+// -----------------------------------------------------------------------
+export const browserSnapshotTool = tool(
+  async () => {
+    try {
+      const p = await getPage();
+      const snapshot = await p.locator("body").ariaSnapshot();
+      return JSON.stringify({ success: true, snapshot }, null, 2);
+    } catch (e) {
+      return formatError("browser_snapshot", e);
+    }
+  },
+  {
+    name: "browser_snapshot",
+    description:
+      "Get a compact ARIA accessibility snapshot of the current page. Returns a structured text representation of all semantic and interactive elements — far smaller than raw HTML. Prefer this over browser_get_content when you need to understand page structure or locate elements.",
+    schema: z.object({}),
+  }
+);
+
+// -----------------------------------------------------------------------
+// 12. browser_evaluate
 // -----------------------------------------------------------------------
 
 /**
@@ -378,6 +429,7 @@ export default async function getPlaywrightTools() {
     browserHoverTool,
     browserWaitLoadTool,
     browserWaitSelectorTool,
+    browserSnapshotTool,
     browserEvaluateTool,
   ];
 }

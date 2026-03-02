@@ -3,7 +3,7 @@ import { z } from "zod";
 import axios from "axios";
 import TurndownService from "turndown";
 
-const MAX_CONTENT_LENGTH = 5_000; // 100 KB
+const MAX_CONTENT_LENGTH = 5_000; // ~5 KB
 const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
 
 // Remove script and style elements before converting to markdown
@@ -68,12 +68,12 @@ export const webFetchTool = tool(
     description: `Fetch content from any public URL via HTTP GET.
 Supports HTML pages, JSON APIs, plain text, and other text-based content.
 HTML pages are automatically converted to Markdown to reduce noise and token usage.
-Returns up to 100KB of content (configurable via max_length).
+Returns up to 5KB of content (configurable via max_length).
 Use this to fetch documentation, APIs, web pages, or any public resource.`,
     schema: z.object({
       url: z.string().url().describe("The URL to fetch (must be a valid HTTP/HTTPS URL)"),
       timeout: z.number().optional().describe("Request timeout in milliseconds (default: 15000)"),
-      max_length: z.number().optional().describe("Maximum content length in characters to return (default: 100000)"),
+      max_length: z.number().optional().describe("Maximum content length in characters to return (default: 5000)"),
     }),
   }
 );
