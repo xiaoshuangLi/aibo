@@ -5,7 +5,7 @@ import { createDeepAgent } from 'deepagents';
 import { FilesystemCheckpointer } from '@/infrastructure/checkpoint';
 import getTools from '@/tools';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents';
-import { findSkillsDirectories, buildSystemPromptFromTools } from '@/core/utils';
+import { findSkillsDirectories, buildSystemPromptFromTools, loadAiboMd } from '@/core/utils';
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem';
 import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware } from '@/core/middlewares';
 import { Session } from './session';
@@ -22,7 +22,6 @@ import { SubAgentPromptTemplate } from '@/infrastructure/prompt';
  */
 
 // ==================== 初始化模型 ====================
-const model = createModel();
 
 const backend = new SafeFilesystemBackend({
   rootDir: process.cwd(),
@@ -96,6 +95,14 @@ export async function createAIAgent(session?: Session): Promise<any> {
     return cachedAgent;
   }
 
+  // 读取工作目录下的 aibo.md 配置（自定义系统提示词和模型）
+  const aiboMd = loadAiboMd();
+
+  // 创建模型（aibo.md 中的 model 字段优先于环境变量）
+  const model = aiboMd.model
+    ? createModel(aiboMd.model)
+    : createModel();
+
   // 异步获取工具
   const tools = await getTools(session);
 
@@ -132,7 +139,7 @@ export async function createAIAgent(session?: Session): Promise<any> {
     ? subAgentsWithDefaults 
     : [getDefaultGeneralPurposeSubAgent()];
 
-  const systemPrompt = buildSystemPromptFromTools(tools);
+  const systemPrompt = buildSystemPromptFromTools(tools) + (aiboMd.systemPrompt ? `\n\n${aiboMd.systemPrompt}` : '');
 
   cachedAgent = createDeepAgent({
     model,

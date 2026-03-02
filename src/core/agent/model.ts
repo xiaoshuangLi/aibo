@@ -46,10 +46,14 @@ function detectProvider(modelName: string): string {
 /**
  * Creates a LangChain chat model instance based on the configured model and provider.
  *
+ * @param modelNameOverride - Optional model name override (e.g. from aibo.md frontmatter).
+ *   When provided, it takes precedence over `AIBO_MODEL_NAME`. The provider is
+ *   auto-detected from the model name prefix unless `AIBO_MODEL_PROVIDER` is set.
  * @returns A configured LangChain BaseChatModel instance
  */
-export function createModel() {
-  const { name: modelName, provider: explicitProvider, apiKey, baseURL, azureApiVersion } = config.model;
+export function createModel(modelNameOverride?: string) {
+  const { name: configModelName, provider: explicitProvider, apiKey, baseURL, azureApiVersion } = config.model;
+  const modelName = modelNameOverride ?? configModelName;
   const provider = explicitProvider ?? detectProvider(modelName);
 
   switch (provider) {
