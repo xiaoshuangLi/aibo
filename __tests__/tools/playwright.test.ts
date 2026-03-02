@@ -101,19 +101,27 @@ describe('browserScreenshotTool', () => {
     expect(browserScreenshotTool.schema.shape.headless).toBeDefined();
   });
 
-  test('returns base64 PNG on success', async () => {
+  test('returns image content block on success', async () => {
     const result = await browserScreenshotTool.invoke({ full_page: false });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(true);
-    expect(parsed.format).toBe('png');
-    expect(typeof parsed.base64).toBe('string');
+    expect(Array.isArray(result)).toBe(true);
+    const block = (result as Array<{ type: string; mimeType: string; data: string }>)[0];
+    expect(block.type).toBe('image');
+    expect(block.mimeType).toBe('image/jpeg');
+    expect(typeof block.data).toBe('string');
+  });
+
+  test('uses jpeg format with quality 60', async () => {
+    mockPage.screenshot.mockClear();
+    await browserScreenshotTool.invoke({ full_page: false });
+    expect(mockPage.screenshot).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'jpeg', quality: 60 })
+    );
   });
 
   test('returns error on failure', async () => {
-    
     mockPage.screenshot.mockRejectedValueOnce(new Error('Screenshot failed'));
     const result = await browserScreenshotTool.invoke({});
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toContain('Screenshot failed');
   });

@@ -116,9 +116,9 @@ export const browserScreenshotTool = tool(
   async ({ full_page = false, headless }) => {
     try {
       const p = await getPage(headless);
-      const buffer = await p.screenshot({ fullPage: full_page, type: "png" });
+      const buffer = await p.screenshot({ fullPage: full_page, type: "jpeg", quality: 60 });
       const base64 = buffer.toString("base64");
-      return JSON.stringify({ success: true, format: "png", base64 }, null, 2);
+      return [{ type: "image" as const, mimeType: "image/jpeg", data: base64 }];
     } catch (e) {
       return formatError("browser_screenshot", e);
     }
@@ -126,7 +126,7 @@ export const browserScreenshotTool = tool(
   {
     name: "browser_screenshot",
     description:
-      "Take a screenshot of the current browser page. Returns a base64-encoded PNG image. Required for visual location of elements.",
+      "Take a screenshot of the current browser page. Returns an image for visual inspection of elements.",
     schema: z.object({
       full_page: z
         .boolean()
