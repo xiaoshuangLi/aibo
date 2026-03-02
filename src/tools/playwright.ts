@@ -44,8 +44,10 @@ const SNAPSHOT_TRUNCATION_MARKER = "\n... [snapshot truncated]";
 /**
  * Strip heavyweight noise from raw HTML before returning it to the LLM:
  *   – <script> and <style> blocks (often the biggest offenders)
+ *   – <link rel="stylesheet"> / <link rel="preload" as="style"> tags
  *   – HTML comments
  *   – inline style="…" attributes
+ *   – class="…" / class='…' attributes (CSS class names add no semantic value)
  * Then truncate to HTML_MAX_LENGTH characters so a dense page never blows
  * the context window.
  */
@@ -53,9 +55,13 @@ function sanitizeHtml(html: string, maxLength: number = HTML_MAX_LENGTH): string
   let result = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
+    .replace(/<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\/?>/gi, "")
+    .replace(/<link\b[^>]*\bas\s*=\s*["']style["'][^>]*\/?>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s+style="[^"]*"/gi, "")
     .replace(/\s+style='[^']*'/gi, "")
+    .replace(/\s+class="[^"]*"/gi, "")
+    .replace(/\s+class='[^']*'/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   if (result.length > maxLength) {
@@ -146,7 +152,7 @@ export const browserGetContentTool = tool(
         const limit = max_length ?? HTML_MAX_LENGTH;
         content = sanitizeHtml(await p.content(), limit);
       } else {
-        const raw = (await p.textContent("body")) ?? "";
+        const raw = (await p.innerText("body")) ?? "";
         const limit = max_length ?? HTML_MAX_LENGTH;
         content = raw.length > limit ? raw.slice(0, limit - TRUNCATION_MARKER.length) + TRUNCATION_MARKER : raw;
       }
@@ -158,13 +164,13 @@ export const browserGetContentTool = tool(
   {
     name: "browser_get_content",
     description:
-      "Get the content of the current page. Returns plain text by default (most compact). Use type='html' to get a sanitized HTML snapshot (script/style tags stripped, capped at 50 000 chars). For exploring interactive structure, prefer browser_snapshot instead.",
+      "Get the content of the current page. Returns visible plain text by default (most compact; script and style content excluded). Use type='html' to get a sanitized HTML snapshot (script tags, style tags, stylesheet <link> tags, inline style attributes, and class attributes are all stripped, capped at 50 000 chars). For exploring interactive structure, prefer browser_snapshot instead.",
     schema: z.object({
       type: z
         .enum(["text", "html"])
         .optional()
         .describe(
-          "Content type to retrieve: 'text' (default, plain text only) or 'html' (sanitized HTML – scripts/styles removed)"
+          "Content type to retrieve: 'text' (default, visible plain text only – script/style content excluded) or 'html' (sanitized HTML – script/style/link tags, inline style and class attributes removed)"
         ),
       max_length: z
         .number()
