@@ -39,7 +39,7 @@ describe('cursor tool execution', () => {
 
       expect(execFileAsyncMock).toHaveBeenCalledWith(
         'agent',
-        ['-p', 'fix bug'],
+        ['-p', 'fix bug', '--yolo'],
         expect.any(Object),
       );
     });
@@ -51,7 +51,7 @@ describe('cursor tool execution', () => {
 
       expect(execFileAsyncMock).toHaveBeenCalledWith(
         'agent',
-        ['-p', 'fix bug', '--continue'],
+        ['-p', 'fix bug', '--continue', '--yolo'],
         expect.any(Object),
       );
     });
@@ -63,7 +63,7 @@ describe('cursor tool execution', () => {
 
       expect(execFileAsyncMock).toHaveBeenCalledWith(
         'agent',
-        ['-p', 'fix bug'],
+        ['-p', 'fix bug', '--yolo'],
         expect.any(Object),
       );
     });
