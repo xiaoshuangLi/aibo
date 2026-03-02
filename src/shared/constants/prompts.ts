@@ -1,4 +1,6 @@
 import * as os from 'os';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { config } from '@/core/config';
 
 /**
@@ -11,10 +13,21 @@ import { config } from '@/core/config';
  */
 
 /**
- * Gets the current system prompt based on the configured language
- * @returns The system prompt string in the configured language
+ * Gets the current system prompt based on the configured language.
+ * If an `aibo.md` file exists in the current working directory, its content
+ * is returned directly as the system prompt.
+ * @returns The system prompt string
  */
 export function getSystemPrompt(): string {
+  const aiboMdPath = join(process.cwd(), 'aibo.md');
+  if (existsSync(aiboMdPath)) {
+    try {
+      return readFileSync(aiboMdPath, 'utf8');
+    } catch {
+      // fall through to default prompt
+    }
+  }
+
   const currentLanguage = config.language?.code;
   const languageName = currentLanguage === 'zh' ? 'Chinese (中文)' : 'English';
   

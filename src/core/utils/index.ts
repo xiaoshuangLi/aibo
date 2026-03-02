@@ -1,4 +1,3 @@
-export * from './aibo-md';
 export * from './skills';
 export * from './interactive';
 export * from './messages';
