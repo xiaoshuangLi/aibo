@@ -25,6 +25,7 @@ const mockPage = {
   title: jest.fn().mockResolvedValue('Test Page'),
   screenshot: jest.fn().mockResolvedValue(Buffer.from('png-data')),
   content: jest.fn().mockResolvedValue('<html><body>Hello</body></html>'),
+  textContent: jest.fn().mockResolvedValue('Hello'),
   locator: jest.fn().mockReturnValue(mockLocator),
   keyboard: mockKeyboard,
   waitForLoadState: jest.fn().mockResolvedValue(undefined),
@@ -36,6 +37,7 @@ const mockPage = {
 const mockBrowser = {
   newPage: jest.fn().mockResolvedValue(mockPage),
   isConnected: jest.fn().mockReturnValue(true),
+  close: jest.fn().mockResolvedValue(undefined),
 };
 
 jest.mock('playwright', () => ({
@@ -57,6 +59,7 @@ describe('browserNavigateTool', () => {
     expect(browserNavigateTool.description).toContain('Navigate');
     expect(browserNavigateTool.schema.shape.url).toBeDefined();
     expect(browserNavigateTool.schema.shape.wait_until).toBeDefined();
+    expect(browserNavigateTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on navigation', async () => {
@@ -65,6 +68,17 @@ describe('browserNavigateTool', () => {
     expect(parsed.success).toBe(true);
     expect(parsed.url).toBe('https://example.com');
     expect(parsed.title).toBe('Test Page');
+  });
+
+  test('passes headless=false to chromium.launch when headless state changes', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { chromium } = require('playwright');
+    chromium.launch.mockClear();
+    mockBrowser.close.mockClear();
+    mockBrowser.isConnected.mockReturnValueOnce(false);
+    await browserNavigateTool.invoke({ url: 'https://example.com', headless: false });
+    expect(mockBrowser.close).toHaveBeenCalled();
+    expect(chromium.launch).toHaveBeenCalledWith(expect.objectContaining({ headless: false }));
   });
 
   test('returns error on failure', async () => {
@@ -102,20 +116,31 @@ describe('browserScreenshotTool', () => {
 });
 
 describe('browserGetContentTool', () => {
-  test('has correct name', () => {
+  test('has correct name and schema', () => {
     expect(browserGetContentTool.name).toBe('browser_get_content');
+    expect(browserGetContentTool.schema.shape.type).toBeDefined();
   });
 
-  test('returns HTML content', async () => {
+  test('returns plain text content by default', async () => {
     const result = await browserGetContentTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
+    expect(parsed.type).toBe('text');
+    expect(parsed.content).toBe('Hello');
+    expect(parsed.content).not.toContain('<html>');
+  });
+
+  test('returns HTML content when type="html"', async () => {
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.type).toBe('html');
     expect(parsed.content).toContain('<html>');
   });
 
   test('returns error on failure', async () => {
     
-    mockPage.content.mockRejectedValueOnce(new Error('Page closed'));
+    mockPage.textContent.mockRejectedValueOnce(new Error('Page closed'));
     const result = await browserGetContentTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);

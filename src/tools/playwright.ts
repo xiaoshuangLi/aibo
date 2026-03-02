@@ -9,10 +9,20 @@ type LoadState = "load" | "domcontentloaded" | "networkidle";
 // -----------------------------------------------------------------------
 let browser: Browser | null = null;
 let page: Page | null = null;
+let currentHeadless = true;
 
-async function getPage(): Promise<Page> {
+async function getPage(requestedHeadless?: boolean): Promise<Page> {
+  if (requestedHeadless !== undefined && requestedHeadless !== currentHeadless) {
+    if (browser) {
+      // Ignore close errors – the old browser is being replaced regardless
+      await browser.close().catch(() => {});
+    }
+    browser = null;
+    page = null;
+    currentHeadless = requestedHeadless;
+  }
   if (!browser || !browser.isConnected()) {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: currentHeadless });
   }
   if (!page || page.isClosed()) {
     page = await browser.newPage();
@@ -30,9 +40,9 @@ function formatError(toolName: string, error: unknown): string {
 // 1. browser_navigate
 // -----------------------------------------------------------------------
 export const browserNavigateTool = tool(
-  async ({ url, wait_until = "networkidle" }) => {
+  async ({ url, wait_until = "networkidle", headless }) => {
     try {
-      const p = await getPage();
+      const p = await getPage(headless);
       await p.goto(url, { waitUntil: wait_until as LoadState, timeout: 30000 });
       return JSON.stringify({ success: true, url, title: await p.title() }, null, 2);
     } catch (e) {
@@ -48,6 +58,10 @@ export const browserNavigateTool = tool(
         .enum(["load", "domcontentloaded", "networkidle", "commit"])
         .optional()
         .describe("When to consider navigation complete (default: networkidle)"),
+      headless: z
+        .boolean()
+        .optional()
+        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
     }),
   }
 );
@@ -83,11 +97,12 @@ export const browserScreenshotTool = tool(
 // 3. browser_get_content
 // -----------------------------------------------------------------------
 export const browserGetContentTool = tool(
-  async () => {
+  async ({ type = "text" }) => {
     try {
       const p = await getPage();
-      const content = await p.content();
-      return JSON.stringify({ success: true, content }, null, 2);
+      const content =
+        type === "html" ? await p.content() : (await p.textContent("body")) ?? "";
+      return JSON.stringify({ success: true, type, content }, null, 2);
     } catch (e) {
       return formatError("browser_get_content", e);
     }
@@ -95,8 +110,15 @@ export const browserGetContentTool = tool(
   {
     name: "browser_get_content",
     description:
-      "Get the full HTML content of the current page. Useful for text models that need to understand DOM structure.",
-    schema: z.object({}),
+      "Get the content of the current page. Returns plain text by default (much more compact than HTML). Use type='html' to get the full HTML source when DOM structure is needed.",
+    schema: z.object({
+      type: z
+        .enum(["text", "html"])
+        .optional()
+        .describe(
+          "Content type to retrieve: 'text' (default, plain text only) or 'html' (full HTML source)"
+        ),
+    }),
   }
 );
 
