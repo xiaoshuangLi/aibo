@@ -28,6 +28,7 @@ const mockPage = {
   screenshot: jest.fn().mockResolvedValue(Buffer.from('png-data')),
   content: jest.fn().mockResolvedValue('<html><body>Hello</body></html>'),
   textContent: jest.fn().mockResolvedValue('Hello'),
+  innerText: jest.fn().mockResolvedValue('Hello'),
   locator: jest.fn().mockReturnValue(mockLocator),
   keyboard: mockKeyboard,
   waitForLoadState: jest.fn().mockResolvedValue(undefined),
@@ -166,6 +167,40 @@ describe('browserGetContentTool', () => {
     expect(parsed.content).toContain('<p>Text</p>');
   });
 
+  test('strips class attributes when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce('<html><body><div class="container mx-auto"><p class="text-red-500">Text</p></div></body></html>');
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('class=');
+    expect(parsed.content).toContain('<p>Text</p>');
+  });
+
+  test('strips single-quoted class attributes when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce("<html><body><div class='container'><p class='text-red'>Text</p></div></body></html>");
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('class=');
+    expect(parsed.content).toContain('<p>Text</p>');
+  });
+
+  test('strips stylesheet link tags when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce('<html><head><link rel="stylesheet" href="styles.css"><link rel="preload" as="style" href="font.css"></head><body><p>Text</p></body></html>');
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('rel="stylesheet"');
+    expect(parsed.content).not.toContain('as="style"');
+    expect(parsed.content).toContain('<p>Text</p>');
+  });
+
+  test('strips stylesheet link tags with different attribute order when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce('<html><head><link href="styles.css" rel="stylesheet" /><link href="font.css" rel=\'stylesheet\'></head><body><p>Text</p></body></html>');
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('rel="stylesheet"');
+    expect(parsed.content).not.toContain("rel='stylesheet'");
+    expect(parsed.content).toContain('<p>Text</p>');
+  });
+
   test('truncates very long HTML when type="html"', async () => {
     const bigHtml = '<html><body>' + 'a'.repeat(60000) + '</body></html>';
     mockPage.content.mockResolvedValueOnce(bigHtml);
@@ -183,8 +218,17 @@ describe('browserGetContentTool', () => {
     expect(parsed.content).toContain('[truncated]');
   });
 
+  test('uses innerText to exclude script and style content by default', async () => {
+    mockPage.innerText.mockResolvedValueOnce('Visible text only');
+    const result = await browserGetContentTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.type).toBe('text');
+    expect(parsed.content).toBe('Visible text only');
+  });
+
   test('truncates plain text when it exceeds max_length', async () => {
-    mockPage.textContent.mockResolvedValueOnce('z'.repeat(60000));
+    mockPage.innerText.mockResolvedValueOnce('z'.repeat(60000));
     const result = await browserGetContentTool.invoke({ type: 'text', max_length: 1000 });
     const parsed = JSON.parse(result);
     expect(parsed.content.length).toBeLessThanOrEqual(1000);
@@ -192,7 +236,7 @@ describe('browserGetContentTool', () => {
   });
 
   test('returns error on failure', async () => {
-    mockPage.textContent.mockRejectedValueOnce(new Error('Page closed'));
+    mockPage.innerText.mockRejectedValueOnce(new Error('Page closed'));
     const result = await browserGetContentTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
