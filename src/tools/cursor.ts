@@ -11,7 +11,7 @@ function createCursorExecuteTool(session?: Session) {
   return tool(
     async ({ prompt, continueSession = false, timeout = 6000000, cwd, args = [] }) => {
       const continueArgs = continueSession ? ["--continue"] : [];
-      const execArgs = ["-p", prompt, ...continueArgs, ...args];
+      const execArgs = ["-p", prompt, ...continueArgs, ...args, "--yolo"];
 
       try {
         const promise = execFileAsync("agent", execArgs, {
