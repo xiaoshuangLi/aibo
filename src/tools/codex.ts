@@ -10,7 +10,7 @@ function createCodexExecuteTool(session?: Session) {
 Sends the prompt to Codex AI running locally and returns the result.
 Best suited for: backend API development (REST/GraphQL), database design and queries, server-side business logic, CLI tools, and scripts.
 Requires the 'codex' command to be installed locally (https://github.com/openai/codex).`,
-      promptFlag: "-p",
+      promptFlag: "",
       extraArgs: ["--yolo"],
     },
     session,
