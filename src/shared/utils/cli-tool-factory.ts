@@ -26,7 +26,7 @@ export interface CliToolConfig {
   toolName: string;
   /** Description of the tool shown to the LLM */
   description: string;
-  /** Subcommand args prepended before the prompt flag (e.g. ["agent"] for cursor) */
+  /** Subcommand args prepended before the prompt flag (e.g. ["subcommand"]) */
   subcommand?: string[];
   /** Extra fixed args appended after the prompt args (e.g. ["--verbose"]) */
   extraArgs?: string[];

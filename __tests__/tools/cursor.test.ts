@@ -27,7 +27,7 @@ describe('Cursor CLI Tool', () => {
 
     it('should have correct tool description', () => {
       expect(cursorExecuteTool.description).toContain('Cursor AI CLI');
-      expect(cursorExecuteTool.description).toContain('cursor');
+      expect(cursorExecuteTool.description).toContain('Cursor');
     });
 
     it('should have correct schema', () => {
@@ -40,6 +40,7 @@ describe('Cursor CLI Tool', () => {
         expect(parsed.data.prompt).toBe('add unit tests');
         expect(parsed.data.timeout).toBe(6000000);
         expect(parsed.data.args).toEqual([]);
+        expect(parsed.data.continueSession).toBe(false);
       }
     });
 
@@ -80,7 +81,7 @@ describe('Cursor CLI Tool', () => {
   });
 
   describe('getCursorTools', () => {
-    it('should return empty array when cursor command is not available', async () => {
+    it('should return empty array when agent command is not available', async () => {
       (childProcess.execSync as jest.Mock).mockImplementation(() => {
         throw new Error('command not found');
       });
@@ -89,7 +90,7 @@ describe('Cursor CLI Tool', () => {
       expect(tools).toEqual([]);
     });
 
-    it('should return cursor tools when cursor command is available', async () => {
+    it('should return cursor tools when agent command is available', async () => {
       (childProcess.execSync as jest.Mock).mockReturnValue('');
 
       const tools = await getCursorTools();
