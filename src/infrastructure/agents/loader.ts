@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { SubAgent } from 'deepagents';
 import * as yaml from 'js-yaml';
@@ -34,23 +34,20 @@ import { SubAgentPromptTemplate } from '../prompt';
  * @returns 所有agents目录的路径数组
  */
 function findAllAgentsDirectories(rootDir: string): string[] {
-  const fs = require('fs');
-  const path = require('path');
-  
   const agentsDirs: string[] = [];
   const excludedDirs = new Set(['node_modules', 'dist', 'coverage', '.git', 'build', 'out']);
   
   function walk(currentDir: string) {
     try {
-      if (!fs.existsSync(currentDir)) {
+      if (!existsSync(currentDir)) {
         return;
       }
       
-      const items = fs.readdirSync(currentDir);
+      const items = readdirSync(currentDir);
       
       for (const item of items) {
-        const fullPath = path.join(currentDir, item);
-        const stat = fs.statSync(fullPath);
+        const fullPath = join(currentDir, item);
+        const stat = statSync(fullPath);
         
         if (stat.isDirectory()) {
           // 跳过排除的目录
@@ -168,9 +165,6 @@ function parseFrontmatter(content: string): { frontmatter: Record<string, any>; 
  */
 export function loadSubAgents(rootDir: string): SubAgent[] {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    
     // 查找所有agents目录
     const agentsDirs = findAllAgentsDirectories(rootDir);
     
@@ -184,17 +178,17 @@ export function loadSubAgents(rootDir: string): SubAgent[] {
     // 处理每个agents目录
     for (const agentsDir of agentsDirs) {
       try {
-        if (!fs.existsSync(agentsDir)) {
+        if (!existsSync(agentsDir)) {
           continue;
         }
         
-        const files = fs.readdirSync(agentsDir);
+        const files = readdirSync(agentsDir);
         const markdownFiles = files.filter((file: string) => file.endsWith('.md'));
         
         for (const file of markdownFiles) {
           try {
-            const filePath = path.join(agentsDir, file);
-            const content = fs.readFileSync(filePath, 'utf8');
+            const filePath = join(agentsDir, file);
+            const content = readFileSync(filePath, 'utf8');
             const { frontmatter, body } = parseFrontmatter(content);
             
             // 确保每个文件都有name和description

@@ -123,6 +123,7 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/compact\`   - 🧹 压缩对话（保留知识库，释放上下文）
 • \`/abort\`     - ⏹️  中断当前操作
 • \`/verbose\`   - 📊 切换详细/简洁模式
+• \`/session\`   - 📊 查看会话元数据统计
 • \`/rebot\`     - 🔄 重启并重新构建
 
 📂 **文件管理命令**  
@@ -390,6 +391,67 @@ export async function handleExitCommand(session: any): Promise<boolean> {
   session.end();
   await LspClientManager.shutdownAll();
   process.exit(0);
+  return true;
+}
+
+/**
+ * 处理会话元数据查询命令
+ * 
+ * 中文名称：处理会话元数据查询命令
+ * 
+ * 预期行为：
+ * - 获取当前会话的AI监控元数据
+ * - 如果元数据存在，通过Lark消息系统发送会员元信息
+ * - 如果无元数据，发送提示信息
+ * - 返回true表示命令处理成功
+ * 
+ * 行为分支：
+ * 1. 正常情况：成功获取元数据并发送信息，返回true
+ * 2. 无元数据：发送无数据提示信息，返回true
+ * 3. 无异常情况：该函数不抛出异常，始终返回true
+ * 
+ * @param session - 会话对象，用于通过adapter发送消息
+ * @returns Promise<boolean> - 始终返回true，表示命令处理成功
+ */
+export async function handleSessionCommand(session: any): Promise<boolean> {
+  const sessionManager = SessionManager.getInstance();
+  
+  // 获取当前会话的AI监控元数据并通过Lark消息系统发送统计信息
+  const metadata = sessionManager.getCurrentSessionMetadata();
+  if (metadata) {
+    const formattedInfo = formatSessionMetadataToMarkdown(metadata);
+    
+    // 通过 Lark 消息系统发送使用量统计信息
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { 
+        command: '/session', 
+        result: { 
+          success: true, 
+          message: formattedInfo
+        } 
+      },
+      timestamp: Date.now()
+    });
+  } else {
+    const noDataMessage = "ℹ️ **无会话元数据**\n\n当前会话没有可用的元数据信息。";
+    
+    // 通过 Lark 消息系统发送无数据提示
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { 
+        command: '/session', 
+        result: { 
+          success: true, 
+          message: noDataMessage
+        } 
+      },
+      timestamp: Date.now()
+    });
+    
+    console.log(styled.system(noDataMessage));
+  }
+  
   return true;
 }
 
@@ -1035,6 +1097,9 @@ export function createHandleInternalCommand(session: any): (command: string) => 
         
       case "/abort":
         return await handleAbortCommand(session);
+        
+      case "/session":
+        return await handleSessionCommand(session);
         
       case "/rebot":
         return await handleRebotCommand(session);

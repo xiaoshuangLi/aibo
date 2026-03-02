@@ -173,39 +173,35 @@ describe('LarkAdapter', () => {
   });
 
   describe('setAbortSignal', () => {
-    it('should handle AbortSignal input and create controller', () => {
+    it('should store the provided signal directly', () => {
       const adapter = new LarkAdapter();
       const controller = new AbortController();
       const signal = controller.signal;
       
       adapter.setAbortSignal(signal);
       
-      expect((adapter as any).abortController).toBeDefined();
+      expect((adapter as any).abortSignal).toBe(signal);
     });
 
-    it('should abort existing controller when setting new signal', () => {
+    it('should update stored signal when called again with a new signal', () => {
       const adapter = new LarkAdapter();
-      const oldController = new AbortController();
-      (adapter as any).abortController = oldController;
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
       
-      const newController = new AbortController();
-      adapter.setAbortSignal(newController.signal);
+      adapter.setAbortSignal(controller1.signal);
+      adapter.setAbortSignal(controller2.signal);
       
-      expect(oldController.signal.aborted).toBe(true);
-      expect((adapter as any).abortController).toBeDefined();
+      expect((adapter as any).abortSignal).toBe(controller2.signal);
     });
   });
 
   describe('destroy', () => {
-    it('should destroy adapter and abort controller', () => {
+    it('should destroy adapter', () => {
       const adapter = new LarkAdapter();
-      const controller = new AbortController();
-      (adapter as any).abortController = controller;
       
       adapter.destroy();
       
       expect((adapter as any).isDestroyed).toBe(true);
-      expect(controller.signal.aborted).toBe(true);
       expect(mockConsoleLog).toHaveBeenCalledWith('🔌 飞书适配器已销毁');
     });
 
@@ -292,13 +288,8 @@ describe('LarkAdapter', () => {
       expect(callback).not.toHaveBeenCalled();
     });
 
-    it('should abort current operation when new message arrives', async () => {
+    it('should call callback when new message arrives', async () => {
       const adapter = new LarkAdapter();
-      const originalAbortController = (adapter as any).abortController;
-      
-      // Simulate an active operation
-      const activeAbortController = new AbortController();
-      (adapter as any).abortController = activeAbortController;
       
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
@@ -313,8 +304,6 @@ describe('LarkAdapter', () => {
       
       await (adapter as any).handleUserMessage(testData);
       
-      expect(activeAbortController.signal.aborted).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith('🔄 检测到新用户消息，中断当前操作...');
       expect(callback).toHaveBeenCalledWith('New message');
     });
 
@@ -534,55 +523,45 @@ describe('LarkAdapter', () => {
   });
 
   describe('setAbortSignal', () => {
-    it('should handle AbortController instance', () => {
+    it('should store the signal directly', () => {
       const adapter = new LarkAdapter();
       const newController = new AbortController();
       
       adapter.setAbortSignal(newController.signal);
       
-      expect((adapter as any).abortController).toBeDefined();
+      expect((adapter as any).abortSignal).toBe(newController.signal);
     });
 
-    it('should handle AbortSignal instance', () => {
+    it('should store the AbortSignal reference directly', () => {
       const adapter = new LarkAdapter();
       const controller = new AbortController();
       const signal = controller.signal;
       
       adapter.setAbortSignal(signal);
-      
-      expect((adapter as any).abortController).toBeDefined();
-      expect((adapter as any).abortController).not.toBe(controller);
+
+      expect((adapter as any).abortSignal).toBe(signal);
     });
 
-    it('should abort existing controller when setting new signal', () => {
+    it('should update the stored signal when called again', () => {
       const adapter = new LarkAdapter();
-      const originalController = (adapter as any).abortController;
-      const newController = new AbortController();
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
       
-      // Only test if original controller exists
-      if (originalController) {
-        adapter.setAbortSignal(newController.signal);
-        expect(originalController.signal.aborted).toBe(true);
-      } else {
-        // If no original controller, just verify the new one is set
-        adapter.setAbortSignal(newController.signal);
-        expect((adapter as any).abortController).toBeDefined();
-      }
+      adapter.setAbortSignal(controller1.signal);
+      adapter.setAbortSignal(controller2.signal);
+      
+      expect((adapter as any).abortSignal).toBe(controller2.signal);
     });
   });
 
   describe('destroy', () => {
     it('should destroy adapter only once', () => {
       const adapter = new LarkAdapter();
-      const originalController = (adapter as any).abortController;
       
       adapter.destroy();
       adapter.destroy(); // Call again to test idempotency
       
       expect((adapter as any).isDestroyed).toBe(true);
-      if (originalController) {
-        expect(originalController.signal.aborted).toBe(true);
-      }
       expect(mockConsoleLog).toHaveBeenCalledWith('🔌 飞书适配器已销毁');
     });
   });
@@ -652,8 +631,7 @@ describe('LarkAdapter', () => {
 
     it('should handle stream events', async () => {
       const adapter = new LarkAdapter();
-      // Ensure abortController is not aborted
-      (adapter as any).abortController = new AbortController();
+      // abortSignal is null by default, so chunks are not suppressed
       
       await (adapter as any).handleStreamStart({ initialContent: 'stream start' });
       await (adapter as any).handleStreamChunk({ chunk: 'stream chunk' });

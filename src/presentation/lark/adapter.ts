@@ -29,7 +29,7 @@ type UserMessageCallback = (message: string) => void;
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
   private wsClient: lark.WSClient;
-  private abortController: AbortController | null = null;
+  private abortSignal: AbortSignal | null = null;
   private isDestroyed = false;
   private userMessageCallback: UserMessageCallback | null = null;
   private chatId: string | null = null;
@@ -171,12 +171,6 @@ export class LarkAdapter extends DefaultAdapter {
         return;
       }
 
-      // 如果当前有正在运行的操作，立即中断
-      if (this.abortController && !this.abortController.signal.aborted) {
-        console.log('🔄 检测到新用户消息，中断当前操作...');
-        this.abortController.abort();
-      }
-
       // 如果有用户消息回调，立即调用
       if (this.userMessageCallback) {
         this.userMessageCallback(messageContent);
@@ -289,20 +283,7 @@ export class LarkAdapter extends DefaultAdapter {
    * 设置中断信号
    */
   setAbortSignal(signal: AbortSignal): void {
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    
-    this.abortController = signal instanceof AbortController ? signal : new AbortController();
-    
-    // 如果传入的是 AbortSignal，我们需要创建对应的 controller
-    if (!(signal instanceof AbortController)) {
-      const controller = new AbortController();
-      if (signal.aborted) {
-        controller.abort();
-      }
-      this.abortController = controller;
-    }
+    this.abortSignal = signal;
   }
 
   /**
@@ -319,11 +300,6 @@ export class LarkAdapter extends DefaultAdapter {
     if (this.progressFlushTimer) {
       clearTimeout(this.progressFlushTimer);
       this.progressFlushTimer = null;
-    }
-    
-    // 中断当前操作
-    if (this.abortController) {
-      this.abortController.abort();
     }
     
     // 关闭WebSocket连接
@@ -504,8 +480,8 @@ export class LarkAdapter extends DefaultAdapter {
 
   private async handleStreamChunk(data: { chunk: string }): Promise<void> {
     if (!data?.chunk) return;
-    if (this.abortController?.signal.aborted) return;
-    await this.sendMessage(data.chunk);
+    if (this.abortSignal?.aborted) return;
+    await this.sendMessage(styled.assistant(data.chunk));
   }
 
   private async handleStreamEnd(data: { finalContent?: string }): Promise<void> {
@@ -529,7 +505,7 @@ export class LarkAdapter extends DefaultAdapter {
 
   private async handleSessionEnd(data: { message: string }): Promise<void> {
     if (!data?.message) return;
-    await this.sendMessage(data.message);
+    await this.sendMessage(styled.assistant(data.message));
   }
 
   private async handleCommandExecuted(data: { command: string; result?: any }): Promise<void> {
@@ -541,7 +517,7 @@ export class LarkAdapter extends DefaultAdapter {
 
   private async handleRawText(data: { text: string }): Promise<void> {
     if (data?.text) {
-      await this.sendMessage(data.text);
+      await this.sendMessage(styled.system('📃 原始文本', data.text));
     }
   }
 

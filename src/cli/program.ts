@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import { runInit, isAiboInitRequired, printInitRequired } from '@/cli/init';
 import { runInteract } from '@/cli/interact';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { version } = require('../../package.json') as { version: string };
+
 /**
  * Central Commander.js module for the aibo CLI.
  *
@@ -30,6 +33,7 @@ export function createProgram(): Command {
 
   program
     .description('AI bot with DeepAgents')
+    .version(version, '--version', 'Output the current version')
     .option('--mode <mode>', 'Set interaction mode (console|lark)')
     .option('--type <type>', 'Set lark interaction type (user_chat|group_chat), only effective when --mode=lark')
     .allowUnknownOption();

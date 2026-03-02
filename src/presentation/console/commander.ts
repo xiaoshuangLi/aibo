@@ -50,6 +50,7 @@ export async function handleHelpCommand(): Promise<boolean> {
    /verbose     - 切换详细/简略输出模式
    /new         - 开始新会话（清除对话历史）
    /compact     - 压缩对话历史（保留知识库，开始新会话，适合长对话变慢时使用）
+   /session     - 查看会话元数据统计
    /voice       - 启动语音输入（5秒录音）
    双击空格键   - 开始/结束语音输入（推荐使用）
    Ctrl+C       - 强制中断当前操作（任何时刻可用）
@@ -319,6 +320,74 @@ export async function handleVoiceCommand(session: any, agent: any): Promise<bool
 }
 
 /**
+ * 处理会话元数据查询命令
+ * 
+ * 中文名称：处理会话元数据查询命令
+ * 
+ * 预期行为：
+ * - 获取当前会话的AI监控元数据
+ * - 如果元数据存在，显示模型使用量统计信息
+ * - 如果无元数据，显示提示信息
+ * - 返回true表示命令处理成功
+ * 
+ * 行为分支：
+ * 1. 正常情况：成功获取元数据并显示信息，返回true
+ * 2. 无元数据：显示无数据提示信息，返回true
+ * 3. 无异常情况：该函数不抛出异常，始终返回true
+ * 
+ * @param session - 会话对象，用于获取元数据
+ * @returns Promise<boolean> - 始终返回true，表示命令处理成功
+ */
+export async function handleSessionCommand(session: any): Promise<boolean> {
+  const sessionManager = SessionManager.getInstance();
+  
+  // 获取当前会话的AI监控元数据
+  const metadata = sessionManager.getCurrentSessionMetadata();
+  if (metadata) {
+    // 提取关键信息 - 使用正确的 AITelemetryRecord 结构
+    const model = metadata.model_info?.model_name || '未知模型';
+    const totalTokens = metadata.token_usage?.total_tokens || 0;
+    const promptTokens = metadata.token_usage?.input_tokens || 0;
+    const completionTokens = metadata.token_usage?.output_tokens || 0;
+    const timestamp = metadata.start_time ? new Date(metadata.start_time).toLocaleString('zh-CN') : '未知时间';
+    const sessionId = metadata.metadata?.session_id || '未知会话ID';
+
+    // 格式化Token数量
+    const formatTokenWithUnit = (tokenCount: number): string => {
+      const originalFormatted = tokenCount.toLocaleString();
+      
+      if (tokenCount >= 1_000_000) {
+        const inMillions = tokenCount / 1_000_000;
+        return `${inMillions.toFixed(2)}M (${originalFormatted})`;
+      } else if (tokenCount >= 1_000) {
+        const inThousands = tokenCount / 1_000;
+        return `${inThousands.toFixed(2)}K (${originalFormatted})`;
+      } else {
+        return originalFormatted;
+      }
+    };
+
+    console.log(`
+📊 会话元数据统计
+
+会话信息
+- 会话ID: ${sessionId}
+- 时间戳: ${timestamp}
+
+模型使用
+- 模型: ${model}
+- 总Token数: ${formatTokenWithUnit(totalTokens)}
+- 输入Token: ${formatTokenWithUnit(promptTokens)}
+- 输出Token: ${formatTokenWithUnit(completionTokens)}
+`);
+  } else {
+    console.log(styled.system("ℹ️ 无会话元数据\n\n当前会话没有可用的元数据信息。"));
+  }
+  
+  return true;
+}
+
+/**
  * 处理退出命令
  * 
  * 预期行为：
@@ -437,6 +506,9 @@ export function createHandleInternalCommand(session: any, agent: any): (command:
         
       case "/compact":
         return await handleCompactCommand(session);
+        
+      case "/session":
+        return await handleSessionCommand(session);
         
       case "/voice":
       case "/speech":

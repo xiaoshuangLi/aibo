@@ -40,6 +40,19 @@ describe('createProgram', () => {
     expect(names).toContain('interact');
   });
 
+  it('root command has --version option', () => {
+    const program = createProgram();
+    const helpInfo = program.helpInformation();
+    expect(helpInfo).toContain('--version');
+    expect(helpInfo).toContain('Output the current version');
+  });
+
+  it('root command shows version from package.json', () => {
+    const { version } = require('../../package.json') as { version: string };
+    const program = createProgram();
+    expect((program as any)._version).toBe(version);
+  });
+
   it('root command has --mode option', () => {
     const program = createProgram();
     const helpInfo = program.helpInformation();

@@ -109,7 +109,7 @@ describe('LarkAdapter - Additional Coverage', () => {
   });
 
   describe('setAbortSignal - already aborted signal', () => {
-    it('should abort new controller when signal is already aborted', () => {
+    it('should store the already-aborted signal directly', () => {
       const adapter = new LarkAdapter();
       
       // Create an already-aborted controller
@@ -118,8 +118,8 @@ describe('LarkAdapter - Additional Coverage', () => {
       
       adapter.setAbortSignal(abortedController.signal);
       
-      // The new controller should also be aborted
-      expect((adapter as any).abortController?.signal.aborted).toBe(true);
+      // The stored signal should be aborted
+      expect((adapter as any).abortSignal?.aborted).toBe(true);
     });
   });
 
@@ -262,7 +262,6 @@ describe('LarkAdapter - Additional Coverage', () => {
   describe('handleStreamStart - without initialContent', () => {
     it('should send default message when no initialContent is provided', async () => {
       const adapter = new LarkAdapter();
-      (adapter as any).abortController = new AbortController();
       
       await (adapter as any).handleStreamStart({});
       

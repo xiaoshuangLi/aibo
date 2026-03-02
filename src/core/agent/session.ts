@@ -240,6 +240,14 @@ export class Session {
   }
 
   /**
+   * 设置中断控制器并同步到适配器
+   */
+  setAbortController(controller: AbortController): void {
+    this.abortController = controller;
+    this.adapter.setAbortSignal(controller.signal);
+  }
+
+  /**
    * 销毁会话
    */
   destroy(): void {
