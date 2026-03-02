@@ -57,7 +57,8 @@ export function handleCliExecutionError(
 ): string {
   const err = error as any;
 
-  // Abort/interrupt must be checked before SIGTERM (abort also sends SIGTERM)
+  // Abort/interrupt must be checked before SIGTERM/SIGKILL (AbortController may trigger
+  // these signals via the killSignal option when the abort fires)
   if (err.code === "ABORT_ERR" || err.name === "AbortError") {
     return JSON.stringify(
       {
@@ -74,7 +75,7 @@ export function handleCliExecutionError(
     );
   }
 
-  if (err.signal === "SIGTERM") {
+  if (err.signal === "SIGTERM" || err.signal === "SIGKILL") {
     return JSON.stringify(
       {
         success: false,
@@ -122,6 +123,7 @@ export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
           cwd: cwd || process.cwd(),
           env: process.env,
           signal: session?.abortController?.signal,
+          killSignal: 'SIGKILL',
         });
 
         (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
