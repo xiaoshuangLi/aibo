@@ -9,6 +9,7 @@ import getPlaywrightTools, {
   browserHoverTool,
   browserWaitLoadTool,
   browserWaitSelectorTool,
+  browserSnapshotTool,
   browserEvaluateTool,
 } from '@/tools/playwright';
 const mockKeyboard = { press: jest.fn().mockResolvedValue(undefined) };
@@ -18,6 +19,7 @@ const mockLocator = {
   fill: jest.fn().mockResolvedValue(undefined),
   hover: jest.fn().mockResolvedValue(undefined),
   selectOption: jest.fn().mockResolvedValue(undefined),
+  ariaSnapshot: jest.fn().mockResolvedValue('- heading "Test Page"\n- button "Submit"'),
 };
 
 const mockPage = {
@@ -47,9 +49,9 @@ jest.mock('playwright', () => ({
 }));
 
 describe('getPlaywrightTools', () => {
-  test('returns 11 tools', async () => {
+  test('returns 12 tools', async () => {
     const tools = await getPlaywrightTools();
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
   });
 });
 
@@ -130,20 +132,73 @@ describe('browserGetContentTool', () => {
     expect(parsed.content).not.toContain('<html>');
   });
 
-  test('returns HTML content when type="html"', async () => {
+  test('returns sanitized HTML content when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce(
+      '<html><head><style>body{color:red}</style><script>alert(1)</script></head><body><h1>Title</h1></body></html>'
+    );
     const result = await browserGetContentTool.invoke({ type: 'html' });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
     expect(parsed.type).toBe('html');
-    expect(parsed.content).toContain('<html>');
+    expect(parsed.content).toContain('<h1>Title</h1>');
+    expect(parsed.content).not.toContain('<script>');
+    expect(parsed.content).not.toContain('<style>');
+    expect(parsed.content).not.toContain('alert(1)');
+    expect(parsed.content).not.toContain('color:red');
+  });
+
+  test('strips HTML comments when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce('<html><body><!-- hidden secret --><p>Visible</p></body></html>');
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('<!-- hidden secret -->');
+    expect(parsed.content).toContain('<p>Visible</p>');
+  });
+
+  test('strips inline style attributes when type="html"', async () => {
+    mockPage.content.mockResolvedValueOnce('<html><body><p style="color:red">Text</p></body></html>');
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content).not.toContain('style=');
+    expect(parsed.content).toContain('<p>Text</p>');
+  });
+
+  test('truncates very long HTML when type="html"', async () => {
+    const bigHtml = '<html><body>' + 'a'.repeat(60000) + '</body></html>';
+    mockPage.content.mockResolvedValueOnce(bigHtml);
+    const result = await browserGetContentTool.invoke({ type: 'html' });
+    const parsed = JSON.parse(result);
+    expect(parsed.content.length).toBeLessThanOrEqual(50000);
+    expect(parsed.content).toContain('[truncated]');
   });
 
   test('returns error on failure', async () => {
-    
     mockPage.textContent.mockRejectedValueOnce(new Error('Page closed'));
     const result = await browserGetContentTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('browserSnapshotTool', () => {
+  test('has correct name and schema', () => {
+    expect(browserSnapshotTool.name).toBe('browser_snapshot');
+    expect(browserSnapshotTool.description).toContain('ARIA');
+  });
+
+  test('returns ARIA snapshot on success', async () => {
+    const result = await browserSnapshotTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.snapshot).toContain('heading');
+  });
+
+  test('returns error on failure', async () => {
+    mockLocator.ariaSnapshot.mockRejectedValueOnce(new Error('Snapshot failed'));
+    const result = await browserSnapshotTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('Snapshot failed');
   });
 });
 
