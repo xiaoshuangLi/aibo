@@ -16,8 +16,8 @@ function createCursorExecuteTool(session?: Session) {
 Sends the prompt to Cursor AI running locally and returns the result.
 Use this to leverage Cursor's AI coding capabilities: writing code, debugging, refactoring, and more.
 Requires the 'cursor' command to be installed locally.`,
-      promptFlag: "--ai",
-      extraArgs: ["--yolo"],
+      subcommand: ["agent"],
+      promptFlag: "-p",
     },
     session,
   );

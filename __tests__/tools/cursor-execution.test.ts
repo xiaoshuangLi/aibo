@@ -32,6 +32,18 @@ describe('cursor tool execution', () => {
       executeTool = tools[0];
     });
 
+    it('should invoke cursor with "agent -p <prompt>" args', async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+      await executeTool.invoke({ prompt: 'fix bug' });
+
+      expect(execFileAsyncMock).toHaveBeenCalledWith(
+        'cursor',
+        ['agent', '-p', 'fix bug'],
+        expect.any(Object),
+      );
+    });
+
     it('should return success JSON when command succeeds', async () => {
       execFileAsyncMock.mockResolvedValue({ stdout: 'command output', stderr: '' });
 
