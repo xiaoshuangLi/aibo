@@ -36,39 +36,8 @@ function formatError(toolName: string, error: unknown): string {
   return JSON.stringify({ success: false, tool: toolName, error: message }, null, 2);
 }
 
-const HTML_MAX_LENGTH = 50_000;
-const TRUNCATION_MARKER = "\n<!-- [truncated] -->";
 const SNAPSHOT_MAX_LENGTH = 20_000;
 const SNAPSHOT_TRUNCATION_MARKER = "\n... [snapshot truncated]";
-
-/**
- * Strip heavyweight noise from raw HTML before returning it to the LLM:
- *   – <script> and <style> blocks (often the biggest offenders)
- *   – <link rel="stylesheet"> / <link rel="preload" as="style"> tags
- *   – HTML comments
- *   – inline style="…" attributes
- *   – class="…" / class='…' attributes (CSS class names add no semantic value)
- * Then truncate to HTML_MAX_LENGTH characters so a dense page never blows
- * the context window.
- */
-function sanitizeHtml(html: string, maxLength: number = HTML_MAX_LENGTH): string {
-  let result = html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
-    .replace(/<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\/?>/gi, "")
-    .replace(/<link\b[^>]*\bas\s*=\s*["']style["'][^>]*\/?>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/\s+style="[^"]*"/gi, "")
-    .replace(/\s+style='[^']*'/gi, "")
-    .replace(/\s+class="[^"]*"/gi, "")
-    .replace(/\s+class='[^']*'/gi, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  if (result.length > maxLength) {
-    result = result.slice(0, maxLength - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
-  }
-  return result;
-}
 
 /**
  * Truncate an ARIA snapshot to stay within token budget.
@@ -141,53 +110,7 @@ export const browserScreenshotTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 3. browser_get_content
-// -----------------------------------------------------------------------
-export const browserGetContentTool = tool(
-  async ({ type = "text", max_length, headless }) => {
-    try {
-      const p = await getPage(headless);
-      let content: string;
-      if (type === "html") {
-        const limit = max_length ?? HTML_MAX_LENGTH;
-        content = sanitizeHtml(await p.content(), limit);
-      } else {
-        const raw = (await p.innerText("body")) ?? "";
-        const limit = max_length ?? HTML_MAX_LENGTH;
-        content = raw.length > limit ? raw.slice(0, limit - TRUNCATION_MARKER.length) + TRUNCATION_MARKER : raw;
-      }
-      return JSON.stringify({ success: true, type, content }, null, 2);
-    } catch (e) {
-      return formatError("browser_get_content", e);
-    }
-  },
-  {
-    name: "browser_get_content",
-    description:
-      "Get the content of the current page. Returns visible plain text by default (most compact; script and style content excluded). Use type='html' to get a sanitized HTML snapshot (script tags, style tags, stylesheet <link> tags, inline style attributes, and class attributes are all stripped, capped at 50 000 chars). For exploring interactive structure, prefer browser_snapshot instead.",
-    schema: z.object({
-      type: z
-        .enum(["text", "html"])
-        .optional()
-        .describe(
-          "Content type to retrieve: 'text' (default, visible plain text only – script/style content excluded) or 'html' (sanitized HTML – script/style/link tags, inline style and class attributes removed)"
-        ),
-      max_length: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("Maximum character length of the returned content (default: 50000). Lower values reduce token usage."),
-      headless: z
-        .boolean()
-        .optional()
-        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
-    }),
-  }
-);
-
-// -----------------------------------------------------------------------
-// 4. browser_click
+// 3. browser_click
 // -----------------------------------------------------------------------
 export const browserClickTool = tool(
   async ({ selector, headless }) => {
@@ -218,7 +141,7 @@ export const browserClickTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 5. browser_type
+// 4. browser_type
 // -----------------------------------------------------------------------
 export const browserTypeTool = tool(
   async ({ selector, text, headless }) => {
@@ -247,20 +170,20 @@ export const browserTypeTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 6. browser_press
+// 5. browser_press_key
 // -----------------------------------------------------------------------
-export const browserPressTool = tool(
+export const browserPressKeyTool = tool(
   async ({ key, headless }) => {
     try {
       const p = await getPage(headless);
       await p.keyboard.press(key);
       return JSON.stringify({ success: true, key }, null, 2);
     } catch (e) {
-      return formatError("browser_press", e);
+      return formatError("browser_press_key", e);
     }
   },
   {
-    name: "browser_press",
+    name: "browser_press_key",
     description:
       "Press a keyboard key globally (e.g. Enter, Tab, Escape, ArrowDown). Useful for form submission and keyboard navigation.",
     schema: z.object({
@@ -278,7 +201,7 @@ export const browserPressTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 7. browser_select_option
+// 6. browser_select_option
 // -----------------------------------------------------------------------
 export const browserSelectOptionTool = tool(
   async ({ selector, value, headless }) => {
@@ -306,24 +229,43 @@ export const browserSelectOptionTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 8. browser_hover
+// 7. browser_scroll
 // -----------------------------------------------------------------------
-export const browserHoverTool = tool(
-  async ({ selector, headless }) => {
+export const browserScrollTool = tool(
+  async ({ direction = "down", amount = 500, selector, headless }) => {
     try {
       const p = await getPage(headless);
-      await p.locator(selector).hover({ timeout: 10000 });
-      return JSON.stringify({ success: true, selector }, null, 2);
+      if (selector) {
+        await p.locator(selector).scrollIntoViewIfNeeded({ timeout: 10000 });
+      } else {
+        const deltaX = direction === "right" ? amount : direction === "left" ? -amount : 0;
+        const deltaY = direction === "down" ? amount : direction === "up" ? -amount : 0;
+        await p.evaluate(({ x, y }: { x: number; y: number }) => window.scrollBy(x, y), { x: deltaX, y: deltaY });
+      }
+      return JSON.stringify({ success: true, direction, amount }, null, 2);
     } catch (e) {
-      return formatError("browser_hover", e);
+      return formatError("browser_scroll", e);
     }
   },
   {
-    name: "browser_hover",
+    name: "browser_scroll",
     description:
-      "Hover the mouse over an element. Useful for triggering CSS hover menus, tooltips, or revealing hidden controls.",
+      "Scroll the page or scroll a specific element into view. Use to reveal off-screen content, trigger lazy-loading, or navigate within scrollable containers.",
     schema: z.object({
-      selector: z.string().describe("CSS or semantic selector identifying the element to hover"),
+      direction: z
+        .enum(["up", "down", "left", "right"])
+        .optional()
+        .describe("Direction to scroll (default: down)"),
+      amount: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Number of pixels to scroll (default: 500). Ignored when selector is provided."),
+      selector: z
+        .string()
+        .optional()
+        .describe("CSS or semantic selector of the element to scroll into view. When provided, direction and amount are ignored."),
       headless: z
         .boolean()
         .optional()
@@ -333,68 +275,7 @@ export const browserHoverTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 9. browser_wait_load
-// -----------------------------------------------------------------------
-export const browserWaitLoadTool = tool(
-  async ({ state = "networkidle", headless }) => {
-    try {
-      const p = await getPage(headless);
-      await p.waitForLoadState(state as LoadState, { timeout: 30000 });
-      return JSON.stringify({ success: true, state }, null, 2);
-    } catch (e) {
-      return formatError("browser_wait_load", e);
-    }
-  },
-  {
-    name: "browser_wait_load",
-    description:
-      "Wait for the page to reach a specific load state. Use after navigation or actions that trigger page loads to ensure the page is fully ready.",
-    schema: z.object({
-      state: z
-        .enum(["load", "domcontentloaded", "networkidle"])
-        .optional()
-        .describe("Target load state to wait for (default: networkidle)"),
-      headless: z
-        .boolean()
-        .optional()
-        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
-    }),
-  }
-);
-
-// -----------------------------------------------------------------------
-// 10. browser_wait_selector
-// -----------------------------------------------------------------------
-export const browserWaitSelectorTool = tool(
-  async ({ selector, state = "visible", headless }) => {
-    try {
-      const p = await getPage(headless);
-      await p.waitForSelector(selector, { state: state as "attached" | "detached" | "visible" | "hidden", timeout: 30000 });
-      return JSON.stringify({ success: true, selector, state }, null, 2);
-    } catch (e) {
-      return formatError("browser_wait_selector", e);
-    }
-  },
-  {
-    name: "browser_wait_selector",
-    description:
-      "Wait for an element matching the selector to reach a specific state (visible, hidden, attached, or detached). Prevents TimeoutErrors by ensuring elements exist before interacting with them.",
-    schema: z.object({
-      selector: z.string().describe("CSS or semantic selector to wait for"),
-      state: z
-        .enum(["attached", "detached", "visible", "hidden"])
-        .optional()
-        .describe("Target element state (default: visible)"),
-      headless: z
-        .boolean()
-        .optional()
-        .describe("Run browser in headless mode (default: true). Set to false to show the browser window."),
-    }),
-  }
-);
-
-// -----------------------------------------------------------------------
-// 11. browser_snapshot
+// 8. browser_snapshot
 // -----------------------------------------------------------------------
 export const browserSnapshotTool = tool(
   async ({ max_length = SNAPSHOT_MAX_LENGTH, headless }) => {
@@ -427,7 +308,7 @@ export const browserSnapshotTool = tool(
 );
 
 // -----------------------------------------------------------------------
-// 12. browser_evaluate
+// 9. browser_evaluate
 // -----------------------------------------------------------------------
 
 /**
@@ -493,21 +374,44 @@ export const browserEvaluateTool = tool(
 );
 
 // -----------------------------------------------------------------------
+// 10. browser_close
+// -----------------------------------------------------------------------
+export const browserCloseTool = tool(
+  async () => {
+    try {
+      if (browser) {
+        // Ignore close errors – state is being reset regardless
+        await browser.close().catch(() => {});
+        browser = null;
+        page = null;
+      }
+      return JSON.stringify({ success: true }, null, 2);
+    } catch (e) {
+      return formatError("browser_close", e);
+    }
+  },
+  {
+    name: "browser_close",
+    description:
+      "Close the browser and reset all state. Use when finished with browser tasks or to start fresh with a clean browser session.",
+    schema: z.object({}),
+  }
+);
+
+// -----------------------------------------------------------------------
 // Export aggregator
 // -----------------------------------------------------------------------
 export default async function getPlaywrightTools() {
   return [
     browserNavigateTool,
     browserScreenshotTool,
-    browserGetContentTool,
     browserClickTool,
     browserTypeTool,
-    browserPressTool,
+    browserPressKeyTool,
     browserSelectOptionTool,
-    browserHoverTool,
-    browserWaitLoadTool,
-    browserWaitSelectorTool,
+    browserScrollTool,
     browserSnapshotTool,
     browserEvaluateTool,
+    browserCloseTool,
   ];
 }
