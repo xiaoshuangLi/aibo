@@ -1,16 +1,10 @@
 /**
- * 飞书(Lark)群聊服务 - 管理工作目录对应的群聊
+ * 飞书(Lark)群聊服务 - 管理工作目录对应的群聊以及素材上传
  *
  * 中文名称：飞书群聊服务
  *
- * 负责创建和复用与当前执行命令目录绑定的飞书群聊。
- * 通过群聊描述中是否包含 【`${cwd}`】 来判断是否已创建过对应群聊。
- *
- * 流程：
- * 1. 获取机器人所在的所有群列表
- * 2. 通过描述中包含 【`${cwd}`】 查找已有群聊
- * 3. 如果群聊存在，直接复用
- * 4. 如果不存在，创建群聊（描述中包含 【`${cwd}`】）
+ * 负责创建和复用与当前执行命令目录绑定的飞书群聊，
+ * 以及通过云文档/多维表格实现图片素材的上传与临时下载链接获取。
  *
  * @module chat
  */
@@ -26,6 +20,9 @@ const getChatDescriptionMarker = (cwd: string): string => `【\`${cwd}\`】`;
  */
 export class LarkChatService {
   private client: lark.Client;
+
+  // 素材多维表格 app_token 缓存，避免重复查找/创建
+  private bitableToken: string | null = null;
 
   constructor() {
     const { appId, appSecret } = config.lark;
@@ -139,5 +136,153 @@ export class LarkChatService {
 
     console.log(`💬 创建群聊成功 chat_id=${chatId}`);
     return chatId;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 素材上传：创建文件夹、多维表格、上传文件、获取下载地址
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * 上传 base64 编码的图片，返回素材临时下载地址。
+   *
+   * 流程：
+   * 1. 查找或创建「素材库」文件夹
+   * 2. 在文件夹内查找或创建「素材多维表格」多维表格（app_token 缓存，避免重复创建）
+   * 3. 将图片上传到多维表格，获取 fileToken
+   * 4. 获取素材临时下载链接并返回
+   */
+  async uploadImage(base64: string): Promise<string> {
+    if (!this.bitableToken) {
+      const folderToken = await this.getOrCreateAssetLibraryFolder();
+      this.bitableToken = await this.getOrCreateAssetBitable(folderToken);
+    }
+
+    const fileToken = await this.uploadImageToBitable(base64, this.bitableToken);
+    return this.getTmpDownloadUrl(fileToken);
+  }
+
+  /**
+   * 在根目录中查找名为「素材库」的文件夹；如果不存在则创建。
+   * 返回文件夹的 token。
+   */
+  private async getOrCreateAssetLibraryFolder(): Promise<string> {
+    const FOLDER_NAME = '【素材库】';
+    let pageToken: string | undefined;
+
+    do {
+      const resp = await (this.client.drive.v1.file as any).list({
+        params: {
+          page_size: 200,
+          ...(pageToken ? { page_token: pageToken } : {}),
+        },
+      });
+
+      const files: Array<{ token: string; name: string; type: string }> = resp?.data?.files ?? [];
+      for (const file of files) {
+        if (file.type === 'folder' && file.name === FOLDER_NAME) {
+          return file.token;
+        }
+      }
+
+      pageToken = resp?.data?.has_more ? resp?.data?.next_page_token : undefined;
+    } while (pageToken);
+
+    // 未找到，创建新文件夹
+    const createResp = await (this.client.drive.v1.file as any).createFolder({
+      data: {
+        name: FOLDER_NAME,
+        folder_token: '',
+      },
+    });
+
+    const token: string | undefined = createResp?.data?.token;
+    if (!token) {
+      throw new Error(`创建「${FOLDER_NAME}」文件夹失败，响应: ${JSON.stringify(createResp)}`);
+    }
+    return token;
+  }
+
+  /**
+   * 在指定文件夹中查找名为「素材多维表格」的多维表格；如果不存在则创建。
+   * 返回多维表格的 app_token。
+   */
+  private async getOrCreateAssetBitable(folderToken: string): Promise<string> {
+    const BITABLE_NAME = '【素材多维表格】';
+    let pageToken: string | undefined;
+
+    do {
+      const resp = await (this.client.drive.v1.file as any).list({
+        params: {
+          page_size: 200,
+          folder_token: folderToken,
+          ...(pageToken ? { page_token: pageToken } : {}),
+        },
+      });
+
+      const files: Array<{ token: string; name: string; type: string }> = resp?.data?.files ?? [];
+      for (const file of files) {
+        if (file.type === 'bitable' && file.name === BITABLE_NAME) {
+          return file.token;
+        }
+      }
+
+      pageToken = resp?.data?.has_more ? resp?.data?.next_page_token : undefined;
+    } while (pageToken);
+
+    // 未找到，创建新多维表格
+    const createResp = await (this.client.bitable.v1.app as any).create({
+      data: {
+        name: BITABLE_NAME,
+        folder_token: folderToken,
+      },
+    });
+
+    const appToken: string | undefined = createResp?.data?.app?.app_token;
+    if (!appToken) {
+      throw new Error(`创建「${BITABLE_NAME}」多维表格失败，响应: ${JSON.stringify(createResp)}`);
+    }
+    return appToken;
+  }
+
+  /**
+   * 将 base64 编码的图片上传到指定多维表格，返回 fileToken。
+   */
+  private async uploadImageToBitable(base64: string, appToken: string): Promise<string> {
+    const imageBuffer = Buffer.from(base64, 'base64');
+    const fileName = `image_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+
+    const resp = await (this.client.drive.v1.media as any).uploadAll({
+      data: {
+        file_name: fileName,
+        parent_type: 'bitable_file',
+        parent_node: appToken,
+        size: imageBuffer.length,
+        file: imageBuffer,
+      },
+    });
+
+    const fileToken: string | undefined = resp?.file_token;
+    if (!fileToken) {
+      throw new Error(`上传图片到多维表格失败，响应: ${JSON.stringify(resp)}`);
+    }
+    return fileToken;
+  }
+
+  /**
+   * 通过 fileToken 获取素材临时下载链接。
+   */
+  private async getTmpDownloadUrl(fileToken: string): Promise<string> {
+    const resp = await (this.client.drive.v1.media as any).batchGetTmpDownloadUrl({
+      params: {
+        file_tokens: [fileToken],
+      },
+    });
+
+    const urls: Array<{ file_token: string; tmp_download_url: string }> = resp?.data?.tmp_download_urls ?? [];
+    const entry = urls.find(u => u.file_token === fileToken);
+    if (!entry?.tmp_download_url) {
+      throw new Error(`获取素材临时下载链接失败，响应: ${JSON.stringify(resp)}`);
+    }
+    return entry.tmp_download_url;
   }
 }

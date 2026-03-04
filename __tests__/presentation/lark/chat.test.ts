@@ -3,6 +3,11 @@ import { LarkChatService } from '@/presentation/lark/chat';
 // Mock lark SDK
 const mockChatList = jest.fn();
 const mockChatCreate = jest.fn();
+const mockFileList = jest.fn();
+const mockFileCreateFolder = jest.fn();
+const mockBitableAppCreate = jest.fn();
+const mockMediaUploadAll = jest.fn();
+const mockMediaBatchGetTmpDownloadUrl = jest.fn();
 
 jest.mock('@larksuiteoapi/node-sdk', () => ({
   Client: jest.fn().mockImplementation(() => ({
@@ -10,6 +15,25 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
       chat: {
         list: mockChatList,
         create: mockChatCreate,
+      },
+    },
+    drive: {
+      v1: {
+        file: {
+          list: mockFileList,
+          createFolder: mockFileCreateFolder,
+        },
+        media: {
+          uploadAll: mockMediaUploadAll,
+          batchGetTmpDownloadUrl: mockMediaBatchGetTmpDownloadUrl,
+        },
+      },
+    },
+    bitable: {
+      v1: {
+        app: {
+          create: mockBitableAppCreate,
+        },
       },
     },
   })),
