@@ -69,6 +69,16 @@ function mockStyledFactory() {
 jest.mock('@/presentation/styling/styler', () => ({ styled: mockStyledFactory() }));
 jest.mock('@/presentation/lark/styler', () => ({ styled: mockStyledFactory() }));
 
+// Mock LarkChatService so the adapter's dependency is fully controlled in unit tests
+const mockGetOrCreateChat = jest.fn();
+const mockChatServiceUploadImage = jest.fn();
+jest.mock('@/presentation/lark/chat', () => ({
+  LarkChatService: jest.fn().mockImplementation(() => ({
+    getOrCreateChat: mockGetOrCreateChat,
+    uploadImage: mockChatServiceUploadImage,
+  })),
+}));
+
 describe('LarkAdapter', () => {
   let originalLarkConfig: any;
   
@@ -392,8 +402,12 @@ describe('LarkAdapter', () => {
       expect(callback).toHaveBeenCalledWith('direct message');
     });
 
-    it('with chatId: should ignore messages from a different group', async () => {
-      const adapter = new LarkAdapter('my-group-id');
+    it('with group_chat mode: should ignore messages from a different group', async () => {
+      mockGetOrCreateChat.mockResolvedValue('my-group-id');
+      const originalLarkType = (config as any).interaction?.larkType;
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: 'group_chat' };
+
+      const adapter = new LarkAdapter();
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
 
@@ -408,10 +422,16 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(callback).not.toHaveBeenCalled();
+
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: originalLarkType };
     });
 
-    it('with chatId: should accept messages from the matching group', async () => {
-      const adapter = new LarkAdapter('my-group-id');
+    it('with group_chat mode: should accept messages from the matching group', async () => {
+      mockGetOrCreateChat.mockResolvedValue('my-group-id');
+      const originalLarkType = (config as any).interaction?.larkType;
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: 'group_chat' };
+
+      const adapter = new LarkAdapter();
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
 
@@ -426,6 +446,8 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(callback).toHaveBeenCalledWith('correct group message');
+
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: originalLarkType };
     });
   });
 
