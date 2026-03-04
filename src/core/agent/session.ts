@@ -248,6 +248,15 @@ export class Session {
   }
 
   /**
+   * 上传图片并返回临时访问地址
+   * @param base64 图片的 base64 编码
+   * @returns 上传后的图片临时访问地址
+   */
+  uploadImage(base64: string): Promise<string> {
+    return this.adapter.uploadImage(base64);
+  }
+
+  /**
    * 销毁会话
    */
   destroy(): void {
