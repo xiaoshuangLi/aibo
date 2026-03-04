@@ -11,8 +11,9 @@
  *    **成为从进程**，通过该服务接收转发的飞书消息。
  * 3. 连接失败（服务不是 aibo）→ 端口 +1，重复上述步骤。
  *
- * **服务中断恢复**：从进程检测到 `disconnect` 后重新从 WS_START_PORT
- * 开始探测，竞争成为新主进程并重启飞书长连接，其余进程连接到新主进程。
+ * **服务中断恢复**：从进程检测到 `disconnect` 后通过 scheduleReconnect() 重新发现。
+ * 各进程的重连延迟带有随机抖动（jitter），避免多进程同时断线时争抢同一端口
+ * 造成"惊群"（thundering herd）。只有唯一一个进程能绑定端口，其余的进入从进程逻辑。
  *
  * @module ws-client
  */
@@ -37,8 +38,28 @@ const VERIFY_ACK_EVENT = 'aibo';
 /** 转发飞书消息的事件名 */
 const LARK_EVENT = 'lark:event';
 
-/** 服务中断后重新探测的延迟（毫秒） */
-const RECONNECT_DELAY_MS = 1000;
+/**
+ * isPortFree 和 tryConnect 的安全超时（毫秒）。
+ * 端口探测和握手应在局域网内极快完成，5 秒视为超时并返回失败。
+ */
+const SAFETY_TIMEOUT_MS = 5000;
+
+/**
+ * EADDRINUSE 竞争失败后等待的时长（毫秒），让竞争赢家完成初始化再尝试连接。
+ */
+const POST_CONFLICT_DELAY_MS = 100;
+
+/**
+ * 断线重连的基础延迟（毫秒）。
+ * 实际延迟 = RECONNECT_BASE_MS + [0, RECONNECT_JITTER_MS) 随机抖动。
+ */
+const RECONNECT_BASE_MS = 500;
+
+/**
+ * 断线重连随机抖动上限（毫秒）。
+ * 多进程同时断线时，抖动分散探测时机，降低同时抢占同一端口的概率。
+ */
+const RECONNECT_JITTER_MS = 500;
 
 /** 飞书消息处理回调 */
 export type LarkMessageHandler = (data: any) => Promise<void>;
@@ -54,6 +75,11 @@ export class LarkWsClientManager {
   private ioServer: SocketIOServer | null = null;
   private clientSocket: ClientSocket | null = null;
   private readonly verifiedClients: Set<ServerSocket> = new Set();
+
+  /**
+   * 待执行的重连定时器。非 null 时表示已有重连在排队，防止重复调度。
+   */
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(wsClient: lark.WSClient, messageHandler: LarkMessageHandler) {
     this.wsClient = wsClient;
@@ -91,12 +117,34 @@ export class LarkWsClientManager {
 
   /**
    * 检测端口是否空闲：在 127.0.0.1 上尝试监听，成功则端口空闲。
+   * 超过 SAFETY_TIMEOUT_MS 仍无响应，视为不可用并返回 false。
    */
   private isPortFree(port: number): Promise<boolean> {
     return new Promise(resolve => {
       const server = net.createServer();
-      server.once('error', () => resolve(false));
-      server.once('listening', () => server.close(() => resolve(true)));
+      let settled = false;
+
+      const settle = (result: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+
+      const timer = setTimeout(() => {
+        server.close();
+        settle(false);
+      }, SAFETY_TIMEOUT_MS);
+
+      server.once('error', () => {
+        clearTimeout(timer);
+        settle(false);
+      });
+
+      server.once('listening', () => {
+        clearTimeout(timer);
+        server.close(() => settle(true));
+      });
+
       server.listen(port, '127.0.0.1');
     });
   }
@@ -104,17 +152,18 @@ export class LarkWsClientManager {
   // ─── 从进程逻辑 ───────────────────────────────────────────────────────────────
 
   /**
-   * 尝试连接指定端口的 Socket.IO 服务并完成握手：
-   * - 连接成功后发送 VERIFY_EVENT，收到 VERIFY_ACK_EVENT 则验证通过
-   * - 连接失败（connect_error）或断开则返回 false
+   * 尝试连接指定端口的 Socket.IO 服务并完成 boay/aibo 握手。
+   * 连接失败、断开或 SAFETY_TIMEOUT_MS 内未收到 aibo 应答时返回 false。
    */
   private tryConnect(port: number): Promise<boolean> {
     return new Promise(resolve => {
       let settled = false;
+      let timer: ReturnType<typeof setTimeout>;
 
       const settle = (result: boolean) => {
         if (settled) return;
         settled = true;
+        clearTimeout(timer);
         if (!result) socket.disconnect();
         resolve(result);
       };
@@ -122,7 +171,11 @@ export class LarkWsClientManager {
       const socket = connectIO(`http://127.0.0.1:${port}`, {
         transports: ['websocket'],
         reconnection: false,
+        timeout: SAFETY_TIMEOUT_MS,
       });
+
+      // 安全超时：连接或握手若在 SAFETY_TIMEOUT_MS 内未完成，放弃此端口。
+      timer = setTimeout(() => settle(false), SAFETY_TIMEOUT_MS);
 
       socket.on('connect', () => socket.emit(VERIFY_EVENT));
 
@@ -140,7 +193,7 @@ export class LarkWsClientManager {
   /**
    * 配置已验证的从进程连接：
    * - 监听并分发主进程广播的飞书消息
-   * - 连接断开后重新探测，竞争成为新主进程
+   * - 连接断开后调用 scheduleReconnect() 重新发现主进程
    */
   private setupClientSocket(socket: ClientSocket): void {
     socket.on(LARK_EVENT, (data: any) => {
@@ -153,8 +206,25 @@ export class LarkWsClientManager {
       this.clientSocket = null;
       this.role = 'none';
       console.warn('⚠️ 飞书消息转发服务连接断开，正在重新发现...');
-      setTimeout(() => this.discover(WS_START_PORT), RECONNECT_DELAY_MS);
+      this.scheduleReconnect();
     });
+  }
+
+  /**
+   * 调度一次重新发现，幂等：已有定时器排队时直接返回，不会叠加多个。
+   * 延迟 = RECONNECT_BASE_MS + [0, RECONNECT_JITTER_MS) 随机抖动，
+   * 多进程同时断线时可分散探测时机，避免惊群。
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return;
+
+    const jitter = Math.floor(Math.random() * RECONNECT_JITTER_MS);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.discover(WS_START_PORT).catch(err =>
+        console.error('❌ 重新发现失败:', err)
+      );
+    }, RECONNECT_BASE_MS + jitter);
   }
 
   // ─── 主进程逻辑 ───────────────────────────────────────────────────────────────
@@ -165,7 +235,8 @@ export class LarkWsClientManager {
    * 2. 处理从进程的握手验证
    * 3. 启动飞书 wsClient 长连接
    *
-   * 若端口竞争失败（EADDRINUSE），则以从进程身份重新连接胜出的主进程。
+   * 若端口竞争失败（EADDRINUSE），等待 POST_CONFLICT_DELAY_MS 让赢家完成初始化，
+   * 再以从进程身份连接，避免赢家尚未就绪时立即连接失败。
    */
   private becomeServer(port: number): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -194,16 +265,18 @@ export class LarkWsClientManager {
 
       httpServer.once('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
-          // 端口竞争失败：连接胜出的主进程
-          this.tryConnect(port).then(verified => {
-            if (verified) {
-              this.role = 'client';
-              console.log(`✅ 飞书消息转发服务连接成功（端口 ${port}）`);
-              resolve();
-            } else {
-              this.discover(port + 1).then(resolve, reject);
-            }
-          }, reject);
+          // 等待竞争赢家完成初始化，再以从进程身份接入。
+          setTimeout(() => {
+            this.tryConnect(port).then(verified => {
+              if (verified) {
+                this.role = 'client';
+                console.log(`✅ 飞书消息转发服务连接成功（端口 ${port}）`);
+                resolve();
+              } else {
+                this.discover(port + 1).then(resolve, reject);
+              }
+            }, reject);
+          }, POST_CONFLICT_DELAY_MS);
         } else {
           reject(err);
         }

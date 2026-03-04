@@ -343,24 +343,78 @@ describe('LarkWsClientManager', () => {
 
   describe('EADDRINUSE race in becomeServer', () => {
     it('connects as secondary when http bind fails with EADDRINUSE', async () => {
+      jest.useFakeTimers();
       simulateFreePort();
       const manager = new LarkWsClientManager(mockWsClient, messageHandler);
       const p = manager.start();
 
-      // Let becomeServer() register httpServer handlers
+      // Let becomeServer() register httpServer handlers (isPortFree resolves in microtask)
       await Promise.resolve();
 
       // Another process won the race — fire EADDRINUSE on the http server
       const err = Object.assign(new Error('EADDRINUSE'), { code: 'EADDRINUSE' });
       getHttpOnceHandler('error')?.(err);
 
+      // Advance past POST_CONFLICT_DELAY_MS (100ms) so tryConnect() starts
+      jest.advanceTimersByTime(101);
+
       // tryConnect() is now running; complete the handshake
       getClientHandler('on', 'connect')?.();
       getClientHandler('once', 'aibo')?.();
 
+      jest.useRealTimers();
       await p;
 
       expect(mockWsClientStart).not.toHaveBeenCalled(); // secondary — no long connection
+    });
+  });
+
+  // ─── Safety timeouts and reconnect guard ─────────────────────────────────
+
+  describe('safety timeouts and reconnect guard', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('isPortFree resolves false when the probe server hangs past 5s', async () => {
+      jest.useFakeTimers();
+      // Don't fire 'error' or 'listening' — simulate a hung probe
+      mockNetServer.once.mockImplementation(() => mockNetServer);
+      mockNetServer.close.mockImplementation(() => {});
+
+      const manager = new LarkWsClientManager(mockWsClient, messageHandler);
+      const p = (manager as any).isPortFree(5211);
+
+      jest.advanceTimersByTime(5001);
+
+      await expect(p).resolves.toBe(false);
+    });
+
+    it('tryConnect resolves false when no aibo ack arrives within 5s', async () => {
+      jest.useFakeTimers();
+      // Mock: socket handlers registered but never fired automatically
+      mockClientSocket.on.mockImplementation(() => mockClientSocket);
+      mockClientSocket.once.mockImplementation(() => mockClientSocket);
+
+      const manager = new LarkWsClientManager(mockWsClient, messageHandler);
+      const p = (manager as any).tryConnect(5211);
+
+      jest.advanceTimersByTime(5001);
+
+      await expect(p).resolves.toBe(false);
+    });
+
+    it('scheduleReconnect is idempotent — multiple calls queue only one timer', () => {
+      jest.useFakeTimers();
+      const manager = new LarkWsClientManager(mockWsClient, messageHandler);
+
+      (manager as any).scheduleReconnect();
+      const firstTimer = (manager as any).reconnectTimer;
+      (manager as any).scheduleReconnect(); // no-op
+      (manager as any).scheduleReconnect(); // no-op
+
+      expect(firstTimer).not.toBeNull();
+      expect((manager as any).reconnectTimer).toBe(firstTimer);
     });
   });
 });
