@@ -36,6 +36,26 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
   LoggerLevel: { info: 'info' }
 }));
 
+// Mock LarkWsClientManager — simulate primary role and capture the messageHandler
+// so that registeredCallbacks (used by EventDispatcher tests) are populated.
+jest.mock('@/presentation/lark/ws-client', () => ({
+  LarkWsClientManager: jest.fn().mockImplementation((wsClient: any, messageHandler: any) => ({
+    start: jest.fn().mockImplementation(() => {
+      const larkSdk = require('@larksuiteoapi/node-sdk');
+      wsClient.start({
+        eventDispatcher: new larkSdk.EventDispatcher({}).register({
+          'im.message.receive_v1': async (data: any) => {
+            await messageHandler(data);
+            return { code: 0, msg: 'success' };
+          },
+        }),
+      });
+      console.log('✅ 飞书长连接已启动，等待用户消息...');
+      return Promise.resolve();
+    }),
+  })),
+}));
+
 jest.mock('@/presentation/lark/styler', () => ({
   styled: {
     assistant: jest.fn((text) => `Assistant: ${text}`),

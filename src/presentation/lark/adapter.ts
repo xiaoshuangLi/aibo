@@ -16,6 +16,7 @@ import { SessionManager } from '@/infrastructure/session';
 
 import { styled } from './styler';
 import { LarkChatService } from './chat';
+import { LarkWsClientManager } from './ws-client';
 
 // 飞书配置类型
 interface LarkConfig {
@@ -89,9 +90,15 @@ export class LarkAdapter extends DefaultAdapter {
 
     // 注册事件监听器
     this.setupEventListeners();
-    
-    // 启动长连接
-    this.startLongConnection();
+
+    // 启动长连接（通过 Socket.IO 转发管理器实现多进程消息同步）
+    const wsManager = new LarkWsClientManager(
+      this.wsClient,
+      this.handleUserMessage.bind(this)
+    );
+    wsManager.start().catch(err => {
+      console.error('❌ 启动飞书长连接失败:', err);
+    });
   }
 
   /**
@@ -129,27 +136,6 @@ export class LarkAdapter extends DefaultAdapter {
     this.on('commandExecuted', this.handleCommandExecuted.bind(this));
     this.on('rawText', this.handleRawText.bind(this));
     this.on('toolProgress', this.handleToolProgress.bind(this));
-  }
-
-  /**
-   * 启动长连接接收事件
-   */
-  private startLongConnection(): void {
-    try {
-      this.wsClient.start({
-        eventDispatcher: new lark.EventDispatcher({}).register({
-          'im.message.receive_v1': async (data) => {
-            await this.handleUserMessage(data);
-            return { code: 0, msg: 'success' };
-          }
-        })
-      });
-      
-      console.log('✅ 飞书长连接已启动，等待用户消息...');
-    } catch (error) {
-      console.error('❌ 启动飞书长连接失败:', error);
-      throw error;
-    }
   }
 
   /**
