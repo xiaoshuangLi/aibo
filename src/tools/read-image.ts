@@ -3,7 +3,7 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 
-const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 10 MB
 
 /**
  * Read a local image file and return it as base64-encoded data in image_url format.
