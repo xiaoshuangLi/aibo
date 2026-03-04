@@ -33,7 +33,7 @@ interface ImageUploadMiddlewareOptions {
 export async function processMessagesForImageUpload(
   messages: BaseMessage[],
   uploadFn: (base64: string) => Promise<string>,
-  cache: Map<string, Promise<string>>
+  cache?: Map<string, Promise<string>>
 ): Promise<BaseMessage[]> {
   return Promise.all(
     messages.map(async (msg) => {
@@ -50,10 +50,10 @@ export async function processMessagesForImageUpload(
             part.image_url.url.startsWith('data:image')
           ) {
             const base64 = part.image_url.url;
-            if (!cache.has(base64)) {
-              cache.set(base64, uploadFn(base64));
+            if (!cache?.has?.(base64)) {
+              cache?.set?.(base64, uploadFn(base64));
             }
-            const remoteUrl = await cache.get(base64)!;
+            const remoteUrl = await cache?.get?.(base64)!;
             changed = true;
             return { ...part, image_url: { ...part.image_url, url: remoteUrl } };
           }
@@ -81,7 +81,6 @@ export function createImageUploadMiddleware(
   options: ImageUploadMiddlewareOptions
 ) {
   const { session } = options;
-  const cache = new Map<string, Promise<string>>();
 
   return createMiddleware({
     name: 'ImageUploadMiddleware',
@@ -92,7 +91,6 @@ export function createImageUploadMiddleware(
       const processedMessages = await processMessagesForImageUpload(
         request.messages,
         (base64) => session.uploadImage(base64),
-        cache
       );
       return handler({ ...request, messages: processedMessages });
     },
