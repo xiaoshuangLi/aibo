@@ -87,7 +87,7 @@ export const browserScreenshotTool = tool(
       const p = await getPage(headless);
       const buffer = await p.screenshot({ fullPage: full_page, type: "jpeg", quality: 60 });
       const base64 = buffer.toString("base64");
-      return [{ type: "image" as const, mimeType: "image/jpeg", data: base64 }];
+      return [{ type: "image_url" as const, image_url: { url: 'base64' }}];
     } catch (e) {
       return formatError("browser_screenshot", e);
     }

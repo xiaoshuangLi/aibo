@@ -44,16 +44,24 @@ export async function processMessagesForImageUpload(
       let changed = false;
       const newContent = await Promise.all(
         (msg.content as any[]).map(async (part: any) => {
-          if (
-            part?.type === 'image_url' &&
-            typeof part?.image_url?.url === 'string' &&
-            part.image_url.url.startsWith('data:image')
-          ) {
-            const base64 = part.image_url.url;
-            if (!cache?.has?.(base64)) {
-              cache?.set?.(base64, uploadFn(base64));
+          const type = part?.type;
+          const url = part?.url || part?.image_url?.url;
+
+          const usefulType = type === 'image' || type === 'image_url';
+          const usefulUrl = typeof url === 'string' && !url.startsWith('http');
+
+          if (usefulType && usefulUrl) {
+            let remoteUrl;
+            const base64 = url;
+            if (cache) {
+              if (!cache?.has?.(base64)) {
+                cache?.set?.(base64, uploadFn(base64));
+              }
+              remoteUrl = await cache?.get?.(base64)!;
+            } else {
+              remoteUrl = await uploadFn(base64);
             }
-            const remoteUrl = await cache?.get?.(base64)!;
+
             changed = true;
             return { ...part, image_url: { ...part.image_url, url: remoteUrl } };
           }
@@ -61,11 +69,11 @@ export async function processMessagesForImageUpload(
         })
       );
 
-      if (!changed) {
-        return msg;
+      if (changed) {
+        msg.content = newContent;
       }
 
-      return new (msg.constructor as any)({ ...msg, content: newContent });
+      return msg;
     })
   );
 }

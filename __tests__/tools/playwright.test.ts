@@ -98,10 +98,9 @@ describe('browserScreenshotTool', () => {
   test('returns image content block on success', async () => {
     const result = await browserScreenshotTool.invoke({ full_page: false });
     expect(Array.isArray(result)).toBe(true);
-    const block = (result as Array<{ type: string; mimeType: string; data: string }>)[0];
-    expect(block.type).toBe('image');
-    expect(block.mimeType).toBe('image/jpeg');
-    expect(typeof block.data).toBe('string');
+    const block = (result as Array<{ type: string; image_url: { url: string } }>)[0];
+    expect(block.type).toBe('image_url');
+    expect(typeof block.image_url?.url).toBe('string');
   });
 
   test('uses jpeg format with quality 60', async () => {
