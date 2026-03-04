@@ -35,6 +35,8 @@ export class LarkAdapter extends DefaultAdapter {
   private userMessageCallback: UserMessageCallback | null = null;
   private chatId: string | null = null;
   private chatService: LarkChatService;
+  // Resolves once chatId is initialised (group_chat mode performs an async lookup)
+  private chatIdReady: Promise<void> = Promise.resolve();
   
   // 存储待处理的消息队列（用于处理并发消息）
   private messageQueue: Array<{ content: string; chatId: string }> = [];
@@ -47,7 +49,7 @@ export class LarkAdapter extends DefaultAdapter {
   private static readonly PROGRESS_FLUSH_INTERVAL = 3000; // 3 秒
   private static readonly PROGRESS_FLUSH_SIZE = 800;      // 超过 800 字符立即发送
 
-  constructor(chatId?: string) {
+  constructor() {
     super();
     
     // 验证环境变量
@@ -55,9 +57,6 @@ export class LarkAdapter extends DefaultAdapter {
     if (!larkConfig.appId || !larkConfig.appSecret) {
       throw new Error('Missing required Lark environment variables: AIBO_LARK_APP_ID and AIBO_LARK_APP_SECRET');
     }
-
-    // 存储群聊 ID（chat 模式下使用）
-    this.chatId = chatId ?? null;
 
     // 初始化飞书客户端
     this.client = new lark.Client({
@@ -76,6 +75,17 @@ export class LarkAdapter extends DefaultAdapter {
 
     // 初始化群聊服务（负责文件夹/多维表格/素材上传等操作）
     this.chatService = new LarkChatService();
+
+    // group_chat 模式：异步查找或创建绑定的群聊，完成后才开始过滤消息
+    if (config.interaction.larkType === 'group_chat') {
+      console.log('💬 group_chat 模式：正在获取或创建群聊...');
+      this.chatIdReady = this.chatService.getOrCreateChat()
+        .then(chatId => { this.chatId = chatId; })
+        .catch(err => {
+          console.error('❌ 获取或创建群聊失败:', err);
+          throw err;
+        });
+    }
 
     // 注册事件监听器
     this.setupEventListeners();
@@ -146,6 +156,8 @@ export class LarkAdapter extends DefaultAdapter {
    * 处理用户消息
    */
   private async handleUserMessage(data: any): Promise<void> {
+    // 等待 chatId 初始化完成（group_chat 模式下为异步操作）
+    await this.chatIdReady;
     try {
       const { message } = data;
       const { chat_id: msgChatId, chat_type: chatType, content } = message;

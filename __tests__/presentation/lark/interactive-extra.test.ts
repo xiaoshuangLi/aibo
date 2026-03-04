@@ -82,7 +82,7 @@ describe('startLarkInteractiveMode - success path', () => {
   it('sets up adapter, session, agent and process signal handlers', async () => {
     await startLarkInteractiveMode();
 
-    expect(AdapterMock).toHaveBeenCalledWith(undefined);
+    expect(AdapterMock).toHaveBeenCalledWith();
     expect(SessionMock).toHaveBeenCalledWith(adapter);
     expect(session.start).toHaveBeenCalled();
     expect(createAgentMock).toHaveBeenCalledWith(session);
@@ -140,19 +140,15 @@ describe('startLarkInteractiveMode - success path', () => {
     // (no error → no mockError call)
   });
 
-  it('enters group_chat branch when larkType is group_chat', async () => {
+  it('group_chat mode: LarkAdapter is constructed and no separate LarkChatService call is made', async () => {
     configMock.config.interaction.larkType = 'group_chat';
-    const chatInstance = { getOrCreateChat: jest.fn().mockResolvedValue('gc-123') };
-    ChatServiceMock.mockImplementation(() => chatInstance);
 
     await startLarkInteractiveMode();
 
-    expect(ChatServiceMock).toHaveBeenCalled();
-    expect(chatInstance.getOrCreateChat).toHaveBeenCalled();
-    expect(AdapterMock).toHaveBeenCalledWith('gc-123');
-    expect(mockLog).toHaveBeenCalledWith(
-      expect.stringContaining('group_chat')
-    );
+    // interactive.ts no longer calls LarkChatService directly; the adapter handles it
+    expect(ChatServiceMock).not.toHaveBeenCalled();
+    // LarkAdapter is still constructed with no arguments
+    expect(AdapterMock).toHaveBeenCalledWith();
   });
 });
 
