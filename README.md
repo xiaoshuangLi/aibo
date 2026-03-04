@@ -8,7 +8,7 @@
 - 🔌 **多模型支持**: 兼容 OpenAI、Anthropic Claude、Google Gemini、Mistral、Groq、Ollama、Azure OpenAI 及任意 OpenAI 兼容接口
 - 🤝 **多智能体协作**: 内置 15  个专业 Agent（协调者、架构师、编码者、测试者等），支持并行任务分解与执行
 - 🛠️ **技能扩展（Skills）**: 通过 `skills/` 目录扩展 AI 的专项能力，内置 45+ 技能（代码审查、CI/CD、前端开发、整理代码等）
-- 📄 **项目上下文配置（aibo.md）**: 支持在项目根目录创建 `aibo.md` 文件，提供持久化的项目级指令和上下文，适用于所有会话
+- 📄 **项目上下文配置（AIBO.md）**: 支持在项目根目录创建 `AIBO.md` 文件，提供持久化的项目级指令和上下文，适用于所有会话
 - 🔗 **MCP 工具集成**: 通过 `mcps/` 目录接入 GitHub、Slack 等外部服务，扩展 AI 工具调用范围
 - 🖥️ **本机 CLI 工具集成**: 自动检测并调用本机已安装的编程 CLI 工具（Claude Code、Gemini CLI、Codex、Cursor、GitHub Copilot），将编码子任务委派给这些工具执行
 - 🌐 **浏览器自动化**: 内置 Playwright 浏览器自动化工具集，支持网页导航、交互、内容提取、截图和自动化测试
@@ -43,19 +43,19 @@ AIBO_LANGUAGE=zh
 
 完整变量说明请参阅 **[docs/env.md](docs/env.md)**。
 
-### 📄 项目上下文配置（aibo.md）
+### 📄 项目上下文配置（AIBO.md）
 
-在项目根目录创建 `aibo.md` 文件，可以为 AIBO 提供持久化的项目级指令和上下文。该文件内容会在每次会话启动时自动加载，适用于所有交互场景。
+在项目根目录创建 `AIBO.md` 文件，可以为 AIBO 提供持久化的项目级指令和上下文。该文件内容会在每次会话启动时自动加载，适用于所有交互场景。
 
 ```markdown
-# aibo.md
+# AIBO.md
 你是一个专业的前端开发助手，专注于 React 和 TypeScript 项目。
 - 优先使用函数组件和 hooks
 - 代码必须包含完整的类型定义
 - 遵循项目的 ESLint 规则
 ```
 
-> 💡 **提示**：`aibo.md` 文件支持 Markdown 格式，可以包含项目架构、编码规范、技术栈说明等任何有助于 AI 理解项目上下文的信息。
+> 💡 **提示**：`AIBO.md` 文件支持 Markdown 格式，可以包含项目架构、编码规范、技术栈说明等任何有助于 AI 理解项目上下文的信息。
 
 ### 🖥️ 使用场景
 

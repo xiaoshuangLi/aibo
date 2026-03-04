@@ -18,7 +18,7 @@ import { config } from '@/core/config';
  * directory, and working directory.
  *
  * This section is always appended to the output of {@link getSystemPrompt}, regardless
- * of whether the prompt content originates from `aibo.md` or the built-in template.
+ * of whether the prompt content originates from `AIBO.md` or the built-in template.
  * @returns The formatted context information string
  */
 export function getContextInfo(): string {
@@ -43,7 +43,7 @@ export function getContextInfo(): string {
 
 /**
  * Gets the current system prompt based on the configured language.
- * If an `aibo.md` file exists in the current working directory, its content
+ * If an `AIBO.md` file exists in the current working directory, its content
  * is returned directly as the system prompt.
  * The output always includes {@link getContextInfo} appended at the end.
  * @returns The system prompt string
@@ -51,7 +51,7 @@ export function getContextInfo(): string {
 export function getSystemPrompt(): string {
   const contextInfo = getContextInfo();
 
-  const aiboMdPath = join(process.cwd(), 'aibo.md');
+  const aiboMdPath = join(process.cwd(), 'AIBO.md');
   if (existsSync(aiboMdPath)) {
     try {
       const content = readFileSync(aiboMdPath, 'utf8');

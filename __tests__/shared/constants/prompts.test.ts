@@ -50,9 +50,9 @@ describe('getSystemPrompt', () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  test('includes aibo.md content and context info when file exists', () => {
-    const content = 'You are a custom assistant defined in aibo.md.';
-    writeFileSync(join(TEST_DIR, 'aibo.md'), content);
+  test('includes AIBO.md content and context info when file exists', () => {
+    const content = 'You are a custom assistant defined in AIBO.md.';
+    writeFileSync(join(TEST_DIR, 'AIBO.md'), content);
 
     const { getSystemPrompt } = require('@/shared/constants/prompts');
     const result: string = getSystemPrompt();
@@ -61,8 +61,8 @@ describe('getSystemPrompt', () => {
     expect(result).toContain('Current Date:');
   });
 
-  test('returns default system prompt when aibo.md does not exist', () => {
-    // TEST_DIR has no aibo.md
+  test('returns default system prompt when AIBO.md does not exist', () => {
+    // TEST_DIR has no AIBO.md
     const { getSystemPrompt } = require('@/shared/constants/prompts');
     const result: string = getSystemPrompt();
     expect(result).toContain('CONFIGURED LANGUAGE');
@@ -70,7 +70,7 @@ describe('getSystemPrompt', () => {
     expect(result).toContain('Current Date:');
   });
 
-  test('falls back to default prompt when aibo.md cannot be read', () => {
+  test('falls back to default prompt when AIBO.md cannot be read', () => {
     // Point cwd to a non-existent sub-directory so existsSync returns false
     cwdSpy.mockReturnValue(join(TEST_DIR, 'nonexistent'));
 
