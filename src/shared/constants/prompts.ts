@@ -51,8 +51,16 @@ export function getContextInfo(): string {
 export function getSystemPrompt(): string {
   const contextInfo = getContextInfo();
 
-  const aiboMdPath = join(process.cwd(), 'AIBO.md');
-  if (existsSync(aiboMdPath)) {
+  const aiboMdPaths = [
+    join(process.cwd(), 'AIBO.md'),
+    join(process.cwd(), 'aibo.md'),
+  ];
+
+  const aiboMdPath = aiboMdPaths.find(
+    (item) => existsSync(item),
+  );
+
+  if (aiboMdPath) {
     try {
       const content = readFileSync(aiboMdPath, 'utf8');
       return content + '\n\n' + contextInfo;
