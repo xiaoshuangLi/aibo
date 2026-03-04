@@ -38,7 +38,7 @@ export class LarkAdapter extends DefaultAdapter {
   private chatService: LarkChatService;
   // Resolves once chatId is initialised (group_chat mode performs an async lookup)
   private chatIdReady: Promise<void> = Promise.resolve();
-  
+
   // 存储待处理的消息队列（用于处理并发消息）
   private messageQueue: Array<{ content: string; chatId: string }> = [];
   private isProcessingQueue = false;
@@ -106,6 +106,10 @@ export class LarkAdapter extends DefaultAdapter {
    */
   private getLarkConfig(): LarkConfig {
     return config.lark;
+  }
+
+  public launch(): Promise<void> {
+    return this.chatIdReady;
   }
 
   /**

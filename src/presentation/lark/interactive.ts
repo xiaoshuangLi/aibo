@@ -29,6 +29,8 @@ export async function startLarkInteractiveMode(): Promise<void> {
   try {
     // 创建Lark适配器（group_chat 模式下内部自动获取或创建群聊）
     const larkAdapter = new LarkAdapter();
+
+    await larkAdapter.launch();
     
     // 创建会话
     currentSession = new Session(larkAdapter);
