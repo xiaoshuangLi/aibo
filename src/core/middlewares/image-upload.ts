@@ -63,7 +63,12 @@ export async function processMessagesForImageUpload(
             }
 
             changed = true;
-            return { ...part, image_url: { ...part.image_url, url: remoteUrl } };
+
+            if (part?.image_url) {
+              return { ...part, image_url: { ...part.image_url, url: remoteUrl } };
+            }
+
+            return { ...part, url: remoteUrl };
           }
           return part;
         })
