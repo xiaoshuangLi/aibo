@@ -6,3 +6,4 @@ export * from './diff';
 export * from './interactive';
 export * from './result-formatter';
 export * from './styler';
+export * from './ws-client';
