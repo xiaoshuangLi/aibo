@@ -181,15 +181,22 @@ export class LarkChatService {
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
-   * 通过 image_key 从飞书消息中下载图片，返回图片二进制数据（Buffer）。
+   * 通过消息 ID 和 image_key 从飞书消息中下载图片，返回图片二进制数据（Buffer）。
+   * 使用 im.v1.messageResource.get 接口，file_key 即消息内容里的 image_key。
    */
-  async downloadImage(imageKey: string): Promise<Buffer> {
-    const res = await (this.client as any).im.v1.image.get({
-      path: { image_key: imageKey },
+  async downloadImage(messageId: string, imageKey: string): Promise<Buffer> {
+    const res = await (this.client as any).im.v1.messageResource.get({
+      path: {
+        message_id: messageId,
+        file_key: imageKey,
+      },
+      params: {
+        type: 'image',
+      },
     }) as LarkImageResponse;
     const buffer = res.data;
     if (!buffer) {
-      throw new Error(`下载图片失败，image_key: ${imageKey}`);
+      throw new Error(`下载图片失败，message_id: ${messageId}, image_key: ${imageKey}`);
     }
     return buffer;
   }

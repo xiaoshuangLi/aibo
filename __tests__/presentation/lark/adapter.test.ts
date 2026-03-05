@@ -492,6 +492,7 @@ describe('LarkAdapter', () => {
 
       const testData = {
         message: {
+          message_id: 'om_test_message_id',
           chat_id: 'test-chat-id',
           chat_type: 'p2p',
           content: JSON.stringify({ image_key: 'img_test_key' }),
@@ -501,7 +502,7 @@ describe('LarkAdapter', () => {
 
       await (adapter as any).handleUserMessage(testData);
 
-      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('img_test_key');
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_test_message_id', 'img_test_key');
       expect(mockChatServiceUploadImage).toHaveBeenCalledWith(fakeBuffer.toString('base64'));
       expect(callback).toHaveBeenCalledWith([
         { type: 'image_url', image_url: { url: 'https://example.com/image.png' } },
@@ -519,6 +520,7 @@ describe('LarkAdapter', () => {
 
       const testData = {
         message: {
+          message_id: 'om_queued_message_id',
           chat_id: 'test-chat-id',
           chat_type: 'p2p',
           content: JSON.stringify({ image_key: 'img_queued_key' }),
@@ -542,6 +544,7 @@ describe('LarkAdapter', () => {
 
       const testData = {
         message: {
+          message_id: 'om_no_key_message_id',
           chat_id: 'test-chat-id',
           chat_type: 'p2p',
           content: JSON.stringify({}),
@@ -564,6 +567,7 @@ describe('LarkAdapter', () => {
 
       const testData = {
         message: {
+          message_id: 'om_fail_message_id',
           chat_id: 'test-chat-id',
           chat_type: 'p2p',
           content: JSON.stringify({ image_key: 'img_fail_key' }),

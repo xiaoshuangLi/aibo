@@ -156,7 +156,7 @@ export class LarkAdapter extends DefaultAdapter {
     await this.chatIdReady;
     try {
       const { message } = data;
-      const { chat_id: msgChatId, chat_type: chatType, content, message_type: messageType } = message;
+      const { chat_id: msgChatId, chat_type: chatType, content, message_type: messageType, message_id: messageId } = message;
 
       // 消息过滤：
       // - 有 chatId 时，只处理相同群聊的消息
@@ -179,8 +179,8 @@ export class LarkAdapter extends DefaultAdapter {
           if (!imageKey) {
             return;
           }
-          // 从飞书下载图片
-          const imageBuffer = await this.chatService.downloadImage(imageKey);
+          // 从飞书下载图片（message_id 与 image_key 均为必填）
+          const imageBuffer = await this.chatService.downloadImage(messageId, imageKey);
           // 转换为 base64 后上传，获取可访问的图片地址
           const base64 = imageBuffer.toString('base64');
           const url = await this.chatService.uploadImage(base64);
