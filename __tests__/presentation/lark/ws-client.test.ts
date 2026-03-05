@@ -6,7 +6,7 @@
  * synchronously, making the async discover() chain deterministic.
  */
 
-import { LarkWsClientManager, WS_START_PORT } from '@/presentation/lark/ws-client';
+import { LarkWsClientManager, WS_START_PORT, VERIFY_ACK_EVENT } from '@/presentation/lark/ws-client';
 
 // ─── net mock — drives isPortFree() ──────────────────────────────────────────
 
@@ -138,6 +138,26 @@ describe('LarkWsClientManager', () => {
     expect(WS_START_PORT).toBe(5211);
   });
 
+  it('VERIFY_ACK_EVENT falls back to "aibo" when config.lark.appId is not set', () => {
+    // In the test environment no AIBO_LARK_APP_ID is configured, so the
+    // fallback value must be used.
+    expect(VERIFY_ACK_EVENT).toBe('aibo');
+  });
+
+  it('VERIFY_ACK_EVENT uses config.lark.appId when set', async () => {
+    // Reload the module in isolation with a mocked config that has appId set.
+    let isolatedVerifyAckEvent: string | undefined;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('@/core/config', () => ({
+        config: { lark: { appId: 'my-test-app-id' } },
+      }));
+      // Re-import after the mock is registered
+      const mod = await import('@/presentation/lark/ws-client');
+      isolatedVerifyAckEvent = mod.VERIFY_ACK_EVENT;
+    });
+    expect(isolatedVerifyAckEvent).toBe('my-test-app-id');
+  });
+
   // ─── Primary role (port is free) ─────────────────────────────────────────
 
   describe('primary role — port is free', () => {
@@ -200,12 +220,12 @@ describe('LarkWsClientManager', () => {
       expect(result).toEqual({ code: 0, msg: 'success' });
     });
 
-    it('sends aibo ack when a secondary sends the boay handshake', async () => {
+    it('sends VERIFY_ACK_EVENT ack when a secondary sends the boay handshake', async () => {
       await startAsPrimary();
       const client = createMockServerSocket();
       getIOConnectionHandler()?.(client);
       client.fireOnce('boay');
-      expect(client.emit).toHaveBeenCalledWith('aibo');
+      expect(client.emit).toHaveBeenCalledWith(VERIFY_ACK_EVENT);
     });
 
     it('broadcasts lark:event to verified clients on Lark message', async () => {
@@ -248,8 +268,8 @@ describe('LarkWsClientManager', () => {
       const manager = new LarkWsClientManager(mockWsClient, messageHandler);
       const p = manager.start();
       await Promise.resolve(); // let discover() reach tryConnect() and register handlers
-      getClientHandler('on', 'connect')?.();   // fires connect → socket.emit('boay')
-      getClientHandler('once', 'aibo')?.();    // fires aibo   → settle(true)
+      getClientHandler('on', 'connect')?.();              // fires connect → socket.emit('boay')
+      getClientHandler('once', VERIFY_ACK_EVENT)?.();    // fires ack    → settle(true)
       await p;
       return manager;
     }
@@ -364,7 +384,7 @@ describe('LarkWsClientManager', () => {
 
       // tryConnect() is now running; complete the handshake
       getClientHandler('on', 'connect')?.();
-      getClientHandler('once', 'aibo')?.();
+      getClientHandler('once', VERIFY_ACK_EVENT)?.();
 
       jest.useRealTimers();
       await p;
@@ -394,7 +414,7 @@ describe('LarkWsClientManager', () => {
       await expect(p).resolves.toBe(false);
     });
 
-    it('tryConnect resolves false when no aibo ack arrives within 5s', async () => {
+    it('tryConnect resolves false when no VERIFY_ACK_EVENT arrives within 5s', async () => {
       jest.useFakeTimers();
       // Mock: socket handlers registered but never fired automatically
       mockClientSocket.on.mockImplementation(() => mockClientSocket);
