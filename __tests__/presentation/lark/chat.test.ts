@@ -304,20 +304,34 @@ describe('LarkChatService', () => {
   describe('downloadImage', () => {
     it('should return a Buffer from the Lark API response', async () => {
       const fakeBuffer = Buffer.from('fake-image-bytes');
-      mockMessageResourceGet.mockResolvedValueOnce({ data: fakeBuffer });
+      const fakeStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield fakeBuffer;
+        },
+      };
+      mockMessageResourceGet.mockResolvedValueOnce({
+        getReadableStream: () => fakeStream,
+      });
 
       const service = new LarkChatService();
       const result = await service.downloadImage('om_test_msg_id', 'img_test_key');
 
-      expect(result).toBe(fakeBuffer);
+      expect(result).toEqual(fakeBuffer);
       expect(mockMessageResourceGet).toHaveBeenCalledWith({
         path: { message_id: 'om_test_msg_id', file_key: 'img_test_key' },
         params: { type: 'image' },
       });
     });
 
-    it('should throw when the API response has no data', async () => {
-      mockMessageResourceGet.mockResolvedValueOnce({ data: null });
+    it('should throw when the stream has no data', async () => {
+      const emptyStream = {
+        [Symbol.asyncIterator]: async function* () {
+          // yields nothing
+        },
+      };
+      mockMessageResourceGet.mockResolvedValueOnce({
+        getReadableStream: () => emptyStream,
+      });
 
       const service = new LarkChatService();
       await expect(service.downloadImage('om_test_msg_id', 'img_missing')).rejects.toThrow(
@@ -325,13 +339,11 @@ describe('LarkChatService', () => {
       );
     });
 
-    it('should throw when the API response is empty', async () => {
+    it('should throw when the API response has no getReadableStream method', async () => {
       mockMessageResourceGet.mockResolvedValueOnce({});
 
       const service = new LarkChatService();
-      await expect(service.downloadImage('om_test_msg_id', 'img_empty')).rejects.toThrow(
-        '下载图片失败，message_id: om_test_msg_id, image_key: img_empty'
-      );
+      await expect(service.downloadImage('om_test_msg_id', 'img_empty')).rejects.toThrow(TypeError);
     });
   });
 });
