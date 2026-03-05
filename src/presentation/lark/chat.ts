@@ -204,7 +204,7 @@ export class LarkChatService {
 
     const buffer = Buffer.concat(chunks);
 
-    if (!buffer) {
+    if (!buffer || !chunks.length) {
       throw new Error(`下载图片失败，message_id: ${messageId}, image_key: ${imageKey}`);
     }
     return buffer;
