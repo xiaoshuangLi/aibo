@@ -7,9 +7,11 @@
  * **端口发现流程**（从 WS_START_PORT 开始逐步探测）：
  * 1. 检测端口是否空闲 → 空闲则**成为主进程**：创建 Socket.IO 服务并启动
  *    飞书 wsClient 长连接，将收到的消息广播给所有已连接的从进程。
- * 2. 端口有服务 → **尝试连接**：发送 `boay` 握手事件，收到 `aibo` 回应则
- *    **成为从进程**，通过该服务接收转发的飞书消息。
- * 3. 连接失败（服务不是 aibo）→ 端口 +1，重复上述步骤。
+ * 2. 端口有服务 → **尝试连接**：发送 `boay` 握手事件，收到 `VERIFY_ACK_EVENT`
+ *    (`config.lark.appId` 或回退值 `'aibo'`) 回应则**成为从进程**，通过该服务
+ *    接收转发的飞书消息。多实例部署时各实例使用各自的 `appId` 作为应答事件，
+ *    可在同机上兼容不同应用的转发服务。
+ * 3. 连接失败（服务不属于当前应用）→ 端口 +1，重复上述步骤。
  *
  * **服务中断恢复**：从进程检测到 `disconnect` 后通过 scheduleReconnect() 重新发现。
  * 各进程的重连延迟带有随机抖动（jitter），避免多进程同时断线时争抢同一端口
@@ -34,8 +36,12 @@ export const WS_START_PORT = 5211;
 /** 握手请求事件（从进程 → 主进程） */
 const VERIFY_EVENT = 'boay';
 
-/** 握手应答事件（主进程 → 从进程） */
-const VERIFY_ACK_EVENT = config.lark?.appId || 'aibo';
+/**
+ * 握手应答事件（主进程 → 从进程）。
+ * 优先使用 `config.lark.appId` 作为事件名，使同机运行的不同飞书应用可各自
+ * 独立维护转发服务，互不干扰；未配置时回退到 `'aibo'`。
+ */
+export const VERIFY_ACK_EVENT = config.lark?.appId || 'aibo';
 
 /** 转发飞书消息的事件名 */
 const LARK_EVENT = 'lark:event';
@@ -173,8 +179,8 @@ export class LarkWsClientManager {
   // ─── 从进程逻辑 ───────────────────────────────────────────────────────────────
 
   /**
-   * 尝试连接指定端口的 Socket.IO 服务并完成 boay/aibo 握手。
-   * 连接失败、断开或 SAFETY_TIMEOUT_MS 内未收到 aibo 应答时返回 false。
+   * 尝试连接指定端口的 Socket.IO 服务并完成 `boay`/`VERIFY_ACK_EVENT` 握手。
+   * 连接失败、断开或 SAFETY_TIMEOUT_MS 内未收到应答时返回 false。
    */
   private tryConnect(port: number): Promise<boolean> {
     return new Promise(resolve => {
