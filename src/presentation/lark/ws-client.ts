@@ -87,6 +87,25 @@ export class LarkWsClientManager {
   }
 
   /**
+   * 停止管理器：取消待执行的重连定时器，断开客户端连接，关闭服务端。
+   */
+  stop(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.clientSocket) {
+      this.clientSocket.disconnect();
+      this.clientSocket = null;
+    }
+    if (this.ioServer) {
+      this.ioServer.close();
+      this.ioServer = null;
+    }
+    this.role = 'none';
+  }
+
+  /**
    * 启动端口发现流程，从 WS_START_PORT 开始。
    */
   async start(): Promise<void> {

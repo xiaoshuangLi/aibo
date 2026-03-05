@@ -35,6 +35,11 @@ export class TerminalAdapter extends DefaultAdapter {
       output: process.stdout,
       prompt: "",
     });
+    // Unref stdin so it alone doesn't prevent the process from exiting;
+    // active I/O reads (when readline is really listening) will still keep it alive.
+    if (typeof process.stdin.unref === 'function') {
+      process.stdin.unref();
+    }
     
     // Set raw mode to capture key combinations
     if (process.stdin.isTTY) {
@@ -310,6 +315,10 @@ export class TerminalAdapter extends DefaultAdapter {
     if (this._rl) {
       this._rl.close();
       this._rl = null;
+      // Unref stdin to allow process to exit cleanly
+      if (typeof process.stdin.unref === 'function') {
+        process.stdin.unref();
+      }
     }
     
     if (this.abortController) {

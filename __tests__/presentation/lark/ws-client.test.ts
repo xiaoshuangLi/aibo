@@ -264,12 +264,14 @@ describe('LarkWsClientManager', () => {
     });
 
     it('emits boay after connect', async () => {
+      jest.useFakeTimers();
       simulateOccupiedPort();
       const manager = new LarkWsClientManager(mockWsClient, messageHandler);
       manager.start();
       await Promise.resolve();
       getClientHandler('on', 'connect')?.();
       expect(mockClientSocket.emit).toHaveBeenCalledWith('boay');
+      jest.useRealTimers();
     });
 
     it('does NOT start the Lark long connection', async () => {
@@ -294,10 +296,12 @@ describe('LarkWsClientManager', () => {
 
     it('warns and schedules re-discovery on disconnect', async () => {
       const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      await startAsSecondary();
+      const manager = await startAsSecondary();
       getClientHandler('on', 'disconnect')?.();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('飞书消息转发服务连接断开'));
       spy.mockRestore();
+      // Cancel the reconnect timer so it doesn't keep Jest alive after tests
+      manager.stop();
     });
   });
 
