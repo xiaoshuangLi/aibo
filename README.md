@@ -401,6 +401,7 @@ AIBO 通过 MCP 协议接入外部工具和服务，扩展 AI 的工具调用范
 | `AIBO_MODEL_NAME` | ✅ | 模型名称，如 `gpt-4o`、`claude-opus-4-5` |
 | `AIBO_MODEL_PROVIDER` | 部分必填 | 显式指定服务商，Groq / Ollama / Azure 必须设置 |
 | `AIBO_AZURE_API_VERSION` | 仅 Azure | Azure OpenAI API 版本，默认 `2024-02-15-preview` |
+| `AIBO_CUSTOM_HEADERS` | ❌ | 附加到模型 API 请求的自定义 HTTP 请求头，格式：`Key1:Value1\|Key2:Value2` |
 
 ### ⚙️ 运行时配置
 

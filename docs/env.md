@@ -36,6 +36,7 @@ cp .env.example .env
 | `AIBO_MODEL_NAME` | ✅ | `gpt-4o` | 模型名称，系统会根据前缀自动识别服务商 |
 | `AIBO_MODEL_PROVIDER` | 部分必填 | 自动检测 | 显式指定服务商：`openai` / `anthropic` / `google` / `mistral` / `groq` / `ollama` / `azure`，Groq、Ollama、Azure 必须显式指定 |
 | `AIBO_AZURE_API_VERSION` | 仅 Azure | `2024-02-15-preview` | Azure OpenAI API 版本号 |
+| `AIBO_CUSTOM_HEADERS` | ❌ | — | 附加到模型 API 请求的自定义 HTTP 请求头，格式：`Key1:Value1\|Key2:Value2` |
 
 ### 快速示例
 
@@ -77,6 +78,9 @@ AIBO_AZURE_API_VERSION=2024-02-15-preview
 AIBO_API_KEY=...
 AIBO_BASE_URL=https://api.deepseek.com
 AIBO_MODEL_NAME=deepseek-chat
+
+# 自定义请求头（可选，适用于所有服务商）
+AIBO_CUSTOM_HEADERS=X-App-Name:MyAgent|X-Trace-Id:998877
 ```
 
 ### 如何获取 API Key
