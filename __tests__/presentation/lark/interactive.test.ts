@@ -235,6 +235,28 @@ describe('Lark Interactive Mode', () => {
       expect(controller.signal.aborted).toBe(false);
       expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('取消当前大模型任务'));
     });
+
+    it('should pass image content array directly to agent without command/empty checks', async () => {
+      const imageContent = [{ type: 'image_url' as const, image_url: { url: 'https://example.com/img.png' } }];
+
+      await handleUserMessage(imageContent, mockSession, mockAgent);
+
+      expect(mockAgent.stream).toHaveBeenCalledWith(
+        { messages: [{ role: 'user', content: imageContent }] },
+        expect.objectContaining({ configurable: { thread_id: 'test-session' } })
+      );
+    });
+
+    it('should not attempt exit/empty/command checks for image content', async () => {
+      const imageContent = [{ type: 'image_url' as const, image_url: { url: 'https://example.com/img2.png' } }];
+
+      await handleUserMessage(imageContent, mockSession, mockAgent);
+
+      // Session should not have ended
+      expect(mockSession.end).not.toHaveBeenCalled();
+      // Command handler should not be invoked for non-string input
+      expect(createHandleInternalCommand).not.toHaveBeenCalled();
+    });
   });
 
   describe('startLarkInteractiveMode', () => {

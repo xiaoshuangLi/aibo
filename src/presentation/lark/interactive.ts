@@ -9,7 +9,7 @@
  * @module interactive
  */
 
-import { LarkAdapter } from './adapter';
+import { LarkAdapter, MessageContent } from './adapter';
 import { Session } from '@/core/agent';
 import { createAIAgent } from '@/core/agent';
 import { processStreamChunks } from '@/core/utils';
@@ -42,7 +42,7 @@ export async function startLarkInteractiveMode(): Promise<void> {
     currentAgent = await createAIAgent(currentSession);
     
     // 设置用户消息回调
-    larkAdapter.setUserMessageCallback(async (userMessage: string) => {
+    larkAdapter.setUserMessageCallback(async (userMessage: MessageContent) => {
       await handleUserMessage(userMessage, currentSession!, currentAgent);
     });
     
@@ -75,27 +75,30 @@ export async function startLarkInteractiveMode(): Promise<void> {
  * 处理用户消息
  */
 export async function handleUserMessage(
-  input: string,
+  input: MessageContent,
   session: Session,
   agent: any
 ): Promise<void> {
-  // 检查退出命令
-  if (shouldExitInteractiveMode(input)) {
-    session.end("再见！");
-    return;
-  }
-
-  // 检查空输入
-  if (isEmptyInput(input)) {
-    return;
-  }
-
-  // 检查是否为内部命令
-  if (input.startsWith('/')) {
-    const handleCommand = createHandleInternalCommand(session);
-    const commandHandled = await handleCommand(input);
-    if (commandHandled) {
+  // 仅文本消息可触发退出命令、空输入检查和内部命令
+  if (typeof input === 'string') {
+    // 检查退出命令
+    if (shouldExitInteractiveMode(input)) {
+      session.end("再见！");
       return;
+    }
+
+    // 检查空输入
+    if (isEmptyInput(input)) {
+      return;
+    }
+
+    // 检查是否为内部命令
+    if (input.startsWith('/')) {
+      const handleCommand = createHandleInternalCommand(session);
+      const commandHandled = await handleCommand(input);
+      if (commandHandled) {
+        return;
+      }
     }
   }
 
@@ -132,8 +135,8 @@ export async function handleUserMessage(
       }
     );
 
-    // 处理响应流
-    await processStreamChunks(stream, state, session, input);
+    // 处理响应流（图片消息不传递 userInput，仅文本消息提供上下文）
+    await processStreamChunks(stream, state, session, typeof input === 'string' ? input : undefined);
     
   } catch (error) {
     console.error('❌ 处理用户消息时出错:', error);

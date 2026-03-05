@@ -8,6 +8,7 @@ const mockFileCreateFolder = jest.fn();
 const mockBitableAppCreate = jest.fn();
 const mockMediaUploadAll = jest.fn();
 const mockMediaBatchGetTmpDownloadUrl = jest.fn();
+const mockMessageResourceGet = jest.fn();
 
 jest.mock('@larksuiteoapi/node-sdk', () => ({
   Client: jest.fn().mockImplementation(() => ({
@@ -15,6 +16,11 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
       chat: {
         list: mockChatList,
         create: mockChatCreate,
+      },
+      v1: {
+        messageResource: {
+          get: mockMessageResourceGet,
+        },
       },
     },
     drive: {
@@ -292,6 +298,40 @@ describe('LarkChatService', () => {
 
       const uploadCall = mockMediaUploadAll.mock.calls[0][0];
       expect(uploadCall.data.file_name).toMatch(/\.png$/);
+    });
+  });
+
+  describe('downloadImage', () => {
+    it('should return a Buffer from the Lark API response', async () => {
+      const fakeBuffer = Buffer.from('fake-image-bytes');
+      mockMessageResourceGet.mockResolvedValueOnce({ data: fakeBuffer });
+
+      const service = new LarkChatService();
+      const result = await service.downloadImage('om_test_msg_id', 'img_test_key');
+
+      expect(result).toBe(fakeBuffer);
+      expect(mockMessageResourceGet).toHaveBeenCalledWith({
+        path: { message_id: 'om_test_msg_id', file_key: 'img_test_key' },
+        params: { type: 'image' },
+      });
+    });
+
+    it('should throw when the API response has no data', async () => {
+      mockMessageResourceGet.mockResolvedValueOnce({ data: null });
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('om_test_msg_id', 'img_missing')).rejects.toThrow(
+        '下载图片失败，message_id: om_test_msg_id, image_key: img_missing'
+      );
+    });
+
+    it('should throw when the API response is empty', async () => {
+      mockMessageResourceGet.mockResolvedValueOnce({});
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('om_test_msg_id', 'img_empty')).rejects.toThrow(
+        '下载图片失败，message_id: om_test_msg_id, image_key: img_empty'
+      );
     });
   });
 });
