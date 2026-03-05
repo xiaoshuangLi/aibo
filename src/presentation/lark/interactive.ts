@@ -10,10 +10,8 @@
  */
 
 import { LarkAdapter } from './adapter';
-import { LarkChatService } from './chat';
 import { Session } from '@/core/agent';
 import { createAIAgent } from '@/core/agent';
-import { config } from '@/core/config';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
@@ -29,19 +27,10 @@ export async function startLarkInteractiveMode(): Promise<void> {
   console.log('🚀 启动飞书交互模式...');
   
   try {
-    // 解析 lark 交互类型
-    const larkType = config.interaction.larkType;
+    // 创建Lark适配器（group_chat 模式下内部自动获取或创建群聊）
+    const larkAdapter = new LarkAdapter();
 
-    // chat 模式：获取或创建与当前工作目录绑定的群聊
-    let chatId: string | undefined;
-    if (larkType === 'group_chat') {
-      console.log('💬 group_chat 模式：正在获取或创建群聊...');
-      const chatService = new LarkChatService();
-      chatId = await chatService.getOrCreateChat();
-    }
-
-    // 创建Lark适配器（chat 模式传入 chatId）
-    const larkAdapter = new LarkAdapter(chatId);
+    await larkAdapter.launch();
     
     // 创建会话
     currentSession = new Session(larkAdapter);

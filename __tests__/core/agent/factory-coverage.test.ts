@@ -38,6 +38,9 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       }),
       createSessionOutputCaptureMiddleware: jest.fn().mockReturnValue({
         name: 'capture-middleware', wrapToolCall: jest.fn()
+      }),
+      createImageUploadMiddleware: jest.fn().mockReturnValue({
+        name: 'image-upload-middleware', wrapModelCall: jest.fn()
       })
     }));
 

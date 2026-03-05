@@ -1,15 +1,14 @@
 import getPlaywrightTools, {
   browserNavigateTool,
   browserScreenshotTool,
-  browserGetContentTool,
   browserClickTool,
   browserTypeTool,
-  browserPressTool,
+  browserPressKeyTool,
   browserSelectOptionTool,
-  browserHoverTool,
-  browserWaitLoadTool,
-  browserWaitSelectorTool,
+  browserScrollTool,
+  browserSnapshotTool,
   browserEvaluateTool,
+  browserCloseTool,
 } from '@/tools/playwright';
 const mockKeyboard = { press: jest.fn().mockResolvedValue(undefined) };
 
@@ -18,17 +17,16 @@ const mockLocator = {
   fill: jest.fn().mockResolvedValue(undefined),
   hover: jest.fn().mockResolvedValue(undefined),
   selectOption: jest.fn().mockResolvedValue(undefined),
+  scrollIntoViewIfNeeded: jest.fn().mockResolvedValue(undefined),
+  ariaSnapshot: jest.fn().mockResolvedValue('- heading "Test Page"\n- button "Submit"'),
 };
 
 const mockPage = {
   goto: jest.fn().mockResolvedValue(undefined),
   title: jest.fn().mockResolvedValue('Test Page'),
   screenshot: jest.fn().mockResolvedValue(Buffer.from('png-data')),
-  content: jest.fn().mockResolvedValue('<html><body>Hello</body></html>'),
   locator: jest.fn().mockReturnValue(mockLocator),
   keyboard: mockKeyboard,
-  waitForLoadState: jest.fn().mockResolvedValue(undefined),
-  waitForSelector: jest.fn().mockResolvedValue(undefined),
   evaluate: jest.fn().mockResolvedValue('result'),
   isClosed: jest.fn().mockReturnValue(false),
 };
@@ -36,6 +34,7 @@ const mockPage = {
 const mockBrowser = {
   newPage: jest.fn().mockResolvedValue(mockPage),
   isConnected: jest.fn().mockReturnValue(true),
+  close: jest.fn().mockResolvedValue(undefined),
 };
 
 jest.mock('playwright', () => ({
@@ -45,9 +44,9 @@ jest.mock('playwright', () => ({
 }));
 
 describe('getPlaywrightTools', () => {
-  test('returns 11 tools', async () => {
+  test('returns 10 tools', async () => {
     const tools = await getPlaywrightTools();
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(10);
   });
 });
 
@@ -57,6 +56,7 @@ describe('browserNavigateTool', () => {
     expect(browserNavigateTool.description).toContain('Navigate');
     expect(browserNavigateTool.schema.shape.url).toBeDefined();
     expect(browserNavigateTool.schema.shape.wait_until).toBeDefined();
+    expect(browserNavigateTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on navigation', async () => {
@@ -65,6 +65,17 @@ describe('browserNavigateTool', () => {
     expect(parsed.success).toBe(true);
     expect(parsed.url).toBe('https://example.com');
     expect(parsed.title).toBe('Test Page');
+  });
+
+  test('passes headless=false to chromium.launch when headless state changes', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { chromium } = require('playwright');
+    chromium.launch.mockClear();
+    mockBrowser.close.mockClear();
+    mockBrowser.isConnected.mockReturnValueOnce(false);
+    await browserNavigateTool.invoke({ url: 'https://example.com', headless: false });
+    expect(mockBrowser.close).toHaveBeenCalled();
+    expect(chromium.launch).toHaveBeenCalledWith(expect.objectContaining({ headless: false }));
   });
 
   test('returns error on failure', async () => {
@@ -81,44 +92,79 @@ describe('browserScreenshotTool', () => {
   test('has correct name and schema', () => {
     expect(browserScreenshotTool.name).toBe('browser_screenshot');
     expect(browserScreenshotTool.schema.shape.full_page).toBeDefined();
+    expect(browserScreenshotTool.schema.shape.headless).toBeDefined();
   });
 
-  test('returns base64 PNG on success', async () => {
+  test('returns image content block on success', async () => {
     const result = await browserScreenshotTool.invoke({ full_page: false });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(true);
-    expect(parsed.format).toBe('png');
-    expect(typeof parsed.base64).toBe('string');
+    expect(Array.isArray(result)).toBe(true);
+    const block = (result as Array<{ type: string; image_url: { url: string } }>)[0];
+    expect(block.type).toBe('image_url');
+    expect(typeof block.image_url?.url).toBe('string');
+  });
+
+  test('uses jpeg format with quality 60', async () => {
+    mockPage.screenshot.mockClear();
+    await browserScreenshotTool.invoke({ full_page: false });
+    expect(mockPage.screenshot).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'jpeg', quality: 60 })
+    );
   });
 
   test('returns error on failure', async () => {
-    
     mockPage.screenshot.mockRejectedValueOnce(new Error('Screenshot failed'));
     const result = await browserScreenshotTool.invoke({});
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toContain('Screenshot failed');
   });
 });
 
-describe('browserGetContentTool', () => {
-  test('has correct name', () => {
-    expect(browserGetContentTool.name).toBe('browser_get_content');
+describe('browserSnapshotTool', () => {
+  test('has correct name and schema', () => {
+    expect(browserSnapshotTool.name).toBe('browser_snapshot');
+    expect(browserSnapshotTool.description).toContain('ARIA');
+    expect(browserSnapshotTool.schema.shape.max_length).toBeDefined();
+    expect(browserSnapshotTool.schema.shape.headless).toBeDefined();
   });
 
-  test('returns HTML content', async () => {
-    const result = await browserGetContentTool.invoke({});
+  test('returns ARIA snapshot on success', async () => {
+    const result = await browserSnapshotTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
-    expect(parsed.content).toContain('<html>');
+    expect(parsed.snapshot).toContain('heading');
+  });
+
+  test('truncates very long snapshot to 20000 chars by default', async () => {
+    mockLocator.ariaSnapshot.mockResolvedValueOnce('x'.repeat(25000));
+    const result = await browserSnapshotTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.snapshot.length).toBeLessThanOrEqual(20000);
+    expect(parsed.snapshot).toContain('[snapshot truncated]');
+  });
+
+  test('respects custom max_length for snapshot', async () => {
+    mockLocator.ariaSnapshot.mockResolvedValueOnce('y'.repeat(5000));
+    const result = await browserSnapshotTool.invoke({ max_length: 1000 });
+    const parsed = JSON.parse(result);
+    expect(parsed.snapshot.length).toBeLessThanOrEqual(1000);
+    expect(parsed.snapshot).toContain('[snapshot truncated]');
+  });
+
+  test('does not truncate short snapshot', async () => {
+    const short = '- heading "Hello"\n- button "Submit"';
+    mockLocator.ariaSnapshot.mockResolvedValueOnce(short);
+    const result = await browserSnapshotTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.snapshot).toBe(short);
   });
 
   test('returns error on failure', async () => {
-    
-    mockPage.content.mockRejectedValueOnce(new Error('Page closed'));
-    const result = await browserGetContentTool.invoke({});
+    mockLocator.ariaSnapshot.mockRejectedValueOnce(new Error('Snapshot failed'));
+    const result = await browserSnapshotTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('Snapshot failed');
   });
 });
 
@@ -126,6 +172,7 @@ describe('browserClickTool', () => {
   test('has correct name and schema', () => {
     expect(browserClickTool.name).toBe('browser_click');
     expect(browserClickTool.schema.shape.selector).toBeDefined();
+    expect(browserClickTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on click', async () => {
@@ -150,6 +197,7 @@ describe('browserTypeTool', () => {
     expect(browserTypeTool.name).toBe('browser_type');
     expect(browserTypeTool.schema.shape.selector).toBeDefined();
     expect(browserTypeTool.schema.shape.text).toBeDefined();
+    expect(browserTypeTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on type', async () => {
@@ -168,14 +216,15 @@ describe('browserTypeTool', () => {
   });
 });
 
-describe('browserPressTool', () => {
+describe('browserPressKeyTool', () => {
   test('has correct name and schema', () => {
-    expect(browserPressTool.name).toBe('browser_press');
-    expect(browserPressTool.schema.shape.key).toBeDefined();
+    expect(browserPressKeyTool.name).toBe('browser_press_key');
+    expect(browserPressKeyTool.schema.shape.key).toBeDefined();
+    expect(browserPressKeyTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on key press', async () => {
-    const result = await browserPressTool.invoke({ key: 'Enter' });
+    const result = await browserPressKeyTool.invoke({ key: 'Enter' });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
     expect(parsed.key).toBe('Enter');
@@ -184,7 +233,7 @@ describe('browserPressTool', () => {
   test('returns error on failure', async () => {
     
     mockPage.keyboard.press.mockRejectedValueOnce(new Error('Keyboard error'));
-    const result = await browserPressTool.invoke({ key: 'Enter' });
+    const result = await browserPressKeyTool.invoke({ key: 'Enter' });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
   });
@@ -195,6 +244,7 @@ describe('browserSelectOptionTool', () => {
     expect(browserSelectOptionTool.name).toBe('browser_select_option');
     expect(browserSelectOptionTool.schema.shape.selector).toBeDefined();
     expect(browserSelectOptionTool.schema.shape.value).toBeDefined();
+    expect(browserSelectOptionTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns success on select', async () => {
@@ -213,71 +263,48 @@ describe('browserSelectOptionTool', () => {
   });
 });
 
-describe('browserHoverTool', () => {
+describe('browserScrollTool', () => {
   test('has correct name and schema', () => {
-    expect(browserHoverTool.name).toBe('browser_hover');
-    expect(browserHoverTool.schema.shape.selector).toBeDefined();
+    expect(browserScrollTool.name).toBe('browser_scroll');
+    expect(browserScrollTool.schema.shape.direction).toBeDefined();
+    expect(browserScrollTool.schema.shape.amount).toBeDefined();
+    expect(browserScrollTool.schema.shape.selector).toBeDefined();
+    expect(browserScrollTool.schema.shape.headless).toBeDefined();
   });
 
-  test('returns success on hover', async () => {
-    const result = await browserHoverTool.invoke({ selector: '.menu-item' });
+  test('scrolls down by default using window.scrollBy', async () => {
+    mockPage.evaluate.mockResolvedValueOnce(undefined);
+    const result = await browserScrollTool.invoke({});
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
-    expect(parsed.selector).toBe('.menu-item');
+    expect(parsed.direction).toBe('down');
+    expect(parsed.amount).toBe(500);
+    expect(mockPage.evaluate).toHaveBeenCalled();
+  });
+
+  test('scrolls up when direction is up', async () => {
+    mockPage.evaluate.mockResolvedValueOnce(undefined);
+    const result = await browserScrollTool.invoke({ direction: 'up', amount: 300 });
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    // evaluate called with function + args { x: 0, y: -300 }
+    const callArgs = mockPage.evaluate.mock.calls[mockPage.evaluate.mock.calls.length - 1];
+    expect(callArgs[1]).toEqual({ x: 0, y: -300 });
+  });
+
+  test('scrolls element into view when selector provided', async () => {
+    const result = await browserScrollTool.invoke({ selector: '#footer' });
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(mockLocator.scrollIntoViewIfNeeded).toHaveBeenCalled();
   });
 
   test('returns error on failure', async () => {
-    
-    mockLocator.hover.mockRejectedValueOnce(new Error('ElementNotFound'));
-    const result = await browserHoverTool.invoke({ selector: '#gone' });
+    mockPage.evaluate.mockRejectedValueOnce(new Error('Scroll failed'));
+    const result = await browserScrollTool.invoke({ direction: 'down' });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
-  });
-});
-
-describe('browserWaitLoadTool', () => {
-  test('has correct name and schema', () => {
-    expect(browserWaitLoadTool.name).toBe('browser_wait_load');
-    expect(browserWaitLoadTool.schema.shape.state).toBeDefined();
-  });
-
-  test('returns success with default state', async () => {
-    const result = await browserWaitLoadTool.invoke({});
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(true);
-    expect(parsed.state).toBe('networkidle');
-  });
-
-  test('returns error on timeout', async () => {
-    
-    mockPage.waitForLoadState.mockRejectedValueOnce(new Error('Timeout exceeded'));
-    const result = await browserWaitLoadTool.invoke({ state: 'networkidle' });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(false);
-  });
-});
-
-describe('browserWaitSelectorTool', () => {
-  test('has correct name and schema', () => {
-    expect(browserWaitSelectorTool.name).toBe('browser_wait_selector');
-    expect(browserWaitSelectorTool.schema.shape.selector).toBeDefined();
-    expect(browserWaitSelectorTool.schema.shape.state).toBeDefined();
-  });
-
-  test('returns success when element appears', async () => {
-    const result = await browserWaitSelectorTool.invoke({ selector: '#content' });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(true);
-    expect(parsed.state).toBe('visible');
-  });
-
-  test('returns error on timeout', async () => {
-    
-    mockPage.waitForSelector.mockRejectedValueOnce(new Error('Timeout: #missing not found'));
-    const result = await browserWaitSelectorTool.invoke({ selector: '#missing' });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(false);
-    expect(parsed.error).toContain('#missing');
+    expect(parsed.error).toContain('Scroll failed');
   });
 });
 
@@ -285,6 +312,7 @@ describe('browserEvaluateTool', () => {
   test('has correct name and schema', () => {
     expect(browserEvaluateTool.name).toBe('browser_evaluate');
     expect(browserEvaluateTool.schema.shape.script).toBeDefined();
+    expect(browserEvaluateTool.schema.shape.headless).toBeDefined();
   });
 
   test('returns evaluated result for safe scripts', async () => {
@@ -332,5 +360,27 @@ describe('browserEvaluateTool', () => {
     const result = await browserEvaluateTool.invoke({ script: 'undeclaredVar' });
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('browserCloseTool', () => {
+  test('has correct name', () => {
+    expect(browserCloseTool.name).toBe('browser_close');
+    expect(browserCloseTool.description).toContain('Close the browser');
+  });
+
+  test('closes the browser and returns success', async () => {
+    mockBrowser.close.mockClear();
+    const result = await browserCloseTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(mockBrowser.close).toHaveBeenCalled();
+  });
+
+  test('returns success even when browser is already closed', async () => {
+    // After close, browser is null, so second close should still succeed
+    const result = await browserCloseTool.invoke({});
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
   });
 });
