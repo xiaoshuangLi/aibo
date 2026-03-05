@@ -193,8 +193,17 @@ export class LarkChatService {
       params: {
         type: 'image',
       },
-    }) as LarkImageResponse;
-    const buffer = res.data;
+    });
+
+    const readableStream = res.getReadableStream();
+    const chunks = [];
+
+    for await (const chunk of readableStream) {
+        chunks.push(chunk);
+    }
+
+    const buffer = Buffer.concat(chunks);
+
     if (!buffer) {
       throw new Error(`下载图片失败，message_id: ${messageId}, image_key: ${imageKey}`);
     }
