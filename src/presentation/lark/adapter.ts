@@ -25,8 +25,14 @@ interface LarkConfig {
   receiveId?: string;
 }
 
+// 图片内容类型（兼容 LangChain 多模态消息格式）
+export type ImageContent = { type: "image_url"; image_url: { url: string } };
+
+// 用户消息内容类型：纯文本或图片内容数组
+export type MessageContent = string | ImageContent[];
+
 // 用户消息回调类型
-type UserMessageCallback = (message: string) => void;
+type UserMessageCallback = (message: MessageContent) => void;
 
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
@@ -40,7 +46,7 @@ export class LarkAdapter extends DefaultAdapter {
   private chatIdReady: Promise<void> = Promise.resolve();
 
   // 存储待处理的消息队列（用于处理并发消息）
-  private messageQueue: Array<{ content: string; chatId: string }> = [];
+  private messageQueue: Array<{ content: MessageContent; chatId: string }> = [];
   private isProcessingQueue = false;
 
   // 工具进度流缓冲区（用于批量发送实时进度消息）
@@ -150,7 +156,7 @@ export class LarkAdapter extends DefaultAdapter {
     await this.chatIdReady;
     try {
       const { message } = data;
-      const { chat_id: msgChatId, chat_type: chatType, content } = message;
+      const { chat_id: msgChatId, chat_type: chatType, content, message_type: messageType } = message;
 
       // 消息过滤：
       // - 有 chatId 时，只处理相同群聊的消息
@@ -165,8 +171,36 @@ export class LarkAdapter extends DefaultAdapter {
         }
       }
 
-      // 解析消息内容
-      let messageContent = '';
+      // 处理图片消息
+      if (messageType === 'image') {
+        try {
+          const contentObj = JSON.parse(content);
+          const imageKey: string = contentObj.image_key;
+          if (!imageKey) {
+            return;
+          }
+          // 从飞书下载图片
+          const imageBuffer = await this.chatService.downloadImage(imageKey);
+          // 转换为 base64 后上传，获取可访问的图片地址
+          const base64 = imageBuffer.toString('base64');
+          const url = await this.chatService.uploadImage(base64);
+          // 构造多模态内容数组
+          const imageContent: MessageContent = [{ type: "image_url" as const, image_url: { url } }];
+
+          if (this.userMessageCallback) {
+            this.userMessageCallback(imageContent);
+          } else {
+            this.messageQueue.push({ content: imageContent, chatId: msgChatId });
+            this.processMessageQueue();
+          }
+        } catch (error) {
+          console.error('❌ 处理图片消息失败:', error);
+        }
+        return;
+      }
+
+      // 解析文本消息内容
+      let messageContent: string = '';
       try {
         const contentObj = JSON.parse(content);
         messageContent = contentObj.text || '';

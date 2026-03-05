@@ -8,6 +8,7 @@ const mockFileCreateFolder = jest.fn();
 const mockBitableAppCreate = jest.fn();
 const mockMediaUploadAll = jest.fn();
 const mockMediaBatchGetTmpDownloadUrl = jest.fn();
+const mockImageGet = jest.fn();
 
 jest.mock('@larksuiteoapi/node-sdk', () => ({
   Client: jest.fn().mockImplementation(() => ({
@@ -15,6 +16,11 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
       chat: {
         list: mockChatList,
         create: mockChatCreate,
+      },
+      v1: {
+        image: {
+          get: mockImageGet,
+        },
       },
     },
     drive: {
@@ -292,6 +298,39 @@ describe('LarkChatService', () => {
 
       const uploadCall = mockMediaUploadAll.mock.calls[0][0];
       expect(uploadCall.data.file_name).toMatch(/\.png$/);
+    });
+  });
+
+  describe('downloadImage', () => {
+    it('should return a Buffer from the Lark API response', async () => {
+      const fakeBuffer = Buffer.from('fake-image-bytes');
+      mockImageGet.mockResolvedValueOnce({ data: fakeBuffer });
+
+      const service = new LarkChatService();
+      const result = await service.downloadImage('img_test_key');
+
+      expect(result).toBe(fakeBuffer);
+      expect(mockImageGet).toHaveBeenCalledWith({
+        path: { image_key: 'img_test_key' },
+      });
+    });
+
+    it('should throw when the API response has no data', async () => {
+      mockImageGet.mockResolvedValueOnce({ data: null });
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('img_missing')).rejects.toThrow(
+        '下载图片失败，image_key: img_missing'
+      );
+    });
+
+    it('should throw when the API response is empty', async () => {
+      mockImageGet.mockResolvedValueOnce({});
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('img_empty')).rejects.toThrow(
+        '下载图片失败，image_key: img_empty'
+      );
     });
   });
 });

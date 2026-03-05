@@ -72,10 +72,12 @@ jest.mock('@/presentation/lark/styler', () => ({ styled: mockStyledFactory() }))
 // Mock LarkChatService so the adapter's dependency is fully controlled in unit tests
 const mockGetOrCreateChat = jest.fn();
 const mockChatServiceUploadImage = jest.fn();
+const mockChatServiceDownloadImage = jest.fn();
 jest.mock('@/presentation/lark/chat', () => ({
   LarkChatService: jest.fn().mockImplementation(() => ({
     getOrCreateChat: mockGetOrCreateChat,
     uploadImage: mockChatServiceUploadImage,
+    downloadImage: mockChatServiceDownloadImage,
   })),
 }));
 
@@ -475,6 +477,104 @@ describe('LarkAdapter', () => {
       expect(callback).toHaveBeenCalledWith('correct group message');
 
       (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: originalLarkType };
+    });
+
+    // --- image message tests ---
+
+    it('should download and upload image, then call callback with image_url array', async () => {
+      const fakeBuffer = Buffer.from('fake-image');
+      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/image.png');
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_test_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('img_test_key');
+      expect(mockChatServiceUploadImage).toHaveBeenCalledWith(fakeBuffer.toString('base64'));
+      expect(callback).toHaveBeenCalledWith([
+        { type: 'image_url', image_url: { url: 'https://example.com/image.png' } },
+      ]);
+    });
+
+    it('should queue image content when no callback is set yet', async () => {
+      const fakeBuffer = Buffer.from('img-bytes');
+      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/queued.png');
+
+      const adapter = new LarkAdapter();
+      (adapter as any).userMessageCallback = null;
+      (adapter as any).processMessageQueue = jest.fn();
+
+      const testData = {
+        message: {
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_queued_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect((adapter as any).messageQueue).toHaveLength(1);
+      expect((adapter as any).messageQueue[0]).toEqual({
+        content: [{ type: 'image_url', image_url: { url: 'https://example.com/queued.png' } }],
+        chatId: 'test-chat-id',
+      });
+    });
+
+    it('should ignore image message when image_key is missing', async () => {
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({}),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceDownloadImage).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should log error and not call callback when image download fails', async () => {
+      mockChatServiceDownloadImage.mockRejectedValueOnce(new Error('download failed'));
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_fail_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 处理图片消息失败:', expect.any(Error));
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 

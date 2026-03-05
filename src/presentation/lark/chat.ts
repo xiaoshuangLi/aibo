@@ -44,6 +44,12 @@ function detectImageExtension(buffer: Buffer): string {
   return "png";
 }
 
+/** 飞书图片下载 API 响应体（BinaryResponseBody）结构 */
+interface LarkImageResponse {
+  /** 图片二进制数据 */
+  data: Buffer;
+}
+
 /** 根据工作目录生成用于标识群聊的描述标记，格式如：【`/path/to/cwd`】 */
 const getChatDescriptionMarker = (cwd: string): string => `【\`${cwd}\`】`;
 
@@ -173,6 +179,20 @@ export class LarkChatService {
   // ──────────────────────────────────────────────────────────────────────────
   // 素材上传：创建文件夹、多维表格、上传文件、获取下载地址
   // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * 通过 image_key 从飞书消息中下载图片，返回图片二进制数据（Buffer）。
+   */
+  async downloadImage(imageKey: string): Promise<Buffer> {
+    const res = await (this.client as any).im.v1.image.get({
+      path: { image_key: imageKey },
+    }) as LarkImageResponse;
+    const buffer = res.data;
+    if (!buffer) {
+      throw new Error(`下载图片失败，image_key: ${imageKey}`);
+    }
+    return buffer;
+  }
 
   /**
    * 上传 base64 编码的图片，返回素材临时下载地址。
