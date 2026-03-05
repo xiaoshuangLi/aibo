@@ -47,6 +47,7 @@ const SessionMock = Session as unknown as jest.Mock;
 
 function makeAdapter() {
   return {
+    launch: jest.fn().mockResolvedValue(undefined),
     setUserMessageCallback: jest.fn(),
     setAbortSignal: jest.fn(),
     emit: jest.fn().mockResolvedValue(undefined),

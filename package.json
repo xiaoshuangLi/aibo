@@ -16,9 +16,9 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc && tsc-alias",
-    "test": "jest --verbose=false",
+    "test": "jest --verbose=false --forceExit",
     "test:watch": "jest --verbose=false --watch",
-    "test:coverage": "jest --verbose=false --coverage",
+    "test:coverage": "jest --verbose=false --coverage --forceExit",
     "start": "node dist/main.js",
     "start:console": "AIBO_INTERACTION=console node dist/main.js",
     "start:lark": "AIBO_INTERACTION=lark node dist/main.js",
