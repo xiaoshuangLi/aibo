@@ -15,6 +15,8 @@ import { config } from '@/core/config';
 import { SessionManager } from '@/infrastructure/session';
 
 import { styled } from './styler';
+import { LarkChatService } from './chat';
+import { LarkWsClientManager } from './ws-client';
 
 // 飞书配置类型
 interface LarkConfig {
@@ -23,8 +25,14 @@ interface LarkConfig {
   receiveId?: string;
 }
 
+// 图片内容类型（兼容 LangChain 多模态消息格式）
+export type ImageContent = { type: "image_url"; image_url: { url: string } };
+
+// 用户消息内容类型：纯文本或图片内容数组
+export type MessageContent = string | ImageContent[];
+
 // 用户消息回调类型
-type UserMessageCallback = (message: string) => void;
+type UserMessageCallback = (message: MessageContent) => void;
 
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
@@ -33,9 +41,12 @@ export class LarkAdapter extends DefaultAdapter {
   private isDestroyed = false;
   private userMessageCallback: UserMessageCallback | null = null;
   private chatId: string | null = null;
-  
+  private chatService: LarkChatService;
+  // Resolves once chatId is initialised (group_chat mode performs an async lookup)
+  private chatIdReady: Promise<void> = Promise.resolve();
+
   // 存储待处理的消息队列（用于处理并发消息）
-  private messageQueue: Array<{ content: string; chatId: string }> = [];
+  private messageQueue: Array<{ content: MessageContent; chatId: string }> = [];
   private isProcessingQueue = false;
 
   // 工具进度流缓冲区（用于批量发送实时进度消息）
@@ -45,7 +56,7 @@ export class LarkAdapter extends DefaultAdapter {
   private static readonly PROGRESS_FLUSH_INTERVAL = 3000; // 3 秒
   private static readonly PROGRESS_FLUSH_SIZE = 800;      // 超过 800 字符立即发送
 
-  constructor(chatId?: string) {
+  constructor() {
     super();
     
     // 验证环境变量
@@ -53,9 +64,6 @@ export class LarkAdapter extends DefaultAdapter {
     if (!larkConfig.appId || !larkConfig.appSecret) {
       throw new Error('Missing required Lark environment variables: AIBO_LARK_APP_ID and AIBO_LARK_APP_SECRET');
     }
-
-    // 存储群聊 ID（chat 模式下使用）
-    this.chatId = chatId ?? null;
 
     // 初始化飞书客户端
     this.client = new lark.Client({
@@ -72,11 +80,31 @@ export class LarkAdapter extends DefaultAdapter {
       loggerLevel: lark.LoggerLevel.info,
     });
 
+    // 初始化群聊服务（负责文件夹/多维表格/素材上传等操作）
+    this.chatService = new LarkChatService();
+
+    // group_chat 模式：异步查找或创建绑定的群聊，完成后才开始过滤消息
+    if (config.interaction.larkType === 'group_chat') {
+      console.log('💬 group_chat 模式：正在获取或创建群聊...');
+      this.chatIdReady = this.chatService.getOrCreateChat()
+        .then(chatId => { this.chatId = chatId; })
+        .catch(err => {
+          console.error('❌ 获取或创建群聊失败:', err);
+          throw err;
+        });
+    }
+
     // 注册事件监听器
     this.setupEventListeners();
-    
-    // 启动长连接
-    this.startLongConnection();
+
+    // 启动长连接（通过 Socket.IO 转发管理器实现多进程消息同步）
+    const wsManager = new LarkWsClientManager(
+      this.wsClient,
+      this.handleUserMessage.bind(this)
+    );
+    wsManager.start().catch(err => {
+      console.error('❌ 启动飞书长连接失败:', err);
+    });
   }
 
   /**
@@ -84,6 +112,10 @@ export class LarkAdapter extends DefaultAdapter {
    */
   private getLarkConfig(): LarkConfig {
     return config.lark;
+  }
+
+  public launch(): Promise<void> {
+    return this.chatIdReady;
   }
 
   /**
@@ -117,33 +149,14 @@ export class LarkAdapter extends DefaultAdapter {
   }
 
   /**
-   * 启动长连接接收事件
-   */
-  private startLongConnection(): void {
-    try {
-      this.wsClient.start({
-        eventDispatcher: new lark.EventDispatcher({}).register({
-          'im.message.receive_v1': async (data) => {
-            await this.handleUserMessage(data);
-            return { code: 0, msg: 'success' };
-          }
-        })
-      });
-      
-      console.log('✅ 飞书长连接已启动，等待用户消息...');
-    } catch (error) {
-      console.error('❌ 启动飞书长连接失败:', error);
-      throw error;
-    }
-  }
-
-  /**
    * 处理用户消息
    */
   private async handleUserMessage(data: any): Promise<void> {
+    // 等待 chatId 初始化完成（group_chat 模式下为异步操作）
+    await this.chatIdReady;
     try {
       const { message } = data;
-      const { chat_id: msgChatId, chat_type: chatType, content } = message;
+      const { chat_id: msgChatId, chat_type: chatType, content, message_type: messageType, message_id: messageId } = message;
 
       // 消息过滤：
       // - 有 chatId 时，只处理相同群聊的消息
@@ -158,8 +171,36 @@ export class LarkAdapter extends DefaultAdapter {
         }
       }
 
-      // 解析消息内容
-      let messageContent = '';
+      // 处理图片消息
+      if (messageType === 'image') {
+        try {
+          const contentObj = JSON.parse(content);
+          const imageKey: string = contentObj.image_key;
+          if (!imageKey) {
+            return;
+          }
+          // 从飞书下载图片（message_id 与 image_key 均为必填）
+          const imageBuffer = await this.chatService.downloadImage(messageId, imageKey);
+          // 转换为 base64 后上传，获取可访问的图片地址
+          const base64 = imageBuffer.toString('base64');
+          const url = await this.chatService.uploadImage(base64);
+          // 构造多模态内容数组
+          const imageContent: MessageContent = [{ type: "image_url" as const, image_url: { url } }];
+
+          if (this.userMessageCallback) {
+            this.userMessageCallback(imageContent);
+          } else {
+            this.messageQueue.push({ content: imageContent, chatId: msgChatId });
+            this.processMessageQueue();
+          }
+        } catch (error) {
+          console.error('❌ 处理图片消息失败:', error);
+        }
+        return;
+      }
+
+      // 解析文本消息内容
+      let messageContent: string = '';
       try {
         const contentObj = JSON.parse(content);
         messageContent = contentObj.text || '';
@@ -309,6 +350,14 @@ export class LarkAdapter extends DefaultAdapter {
     } catch (error) {
       console.error('❌ 销毁飞书适配器时出错:', error);
     }
+  }
+
+  /**
+   * 上传图片并返回临时访问地址。
+   * 具体实现委托给 LarkChatService。
+   */
+  async uploadImage(base64: string): Promise<string> {
+    return this.chatService.uploadImage(base64);
   }
 
   // 事件处理器方法

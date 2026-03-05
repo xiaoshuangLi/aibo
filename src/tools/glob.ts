@@ -12,7 +12,10 @@ export const globFilesTool = tool(
   async ({ pattern, cwd, ignore }) => {
     try {
       const workingDir = cwd || process.cwd();
-      const ignorePatterns = ignore || DEFAULT_IGNORE_PATTERNS;
+      // Always preserve default ignore patterns, merge with user-provided ones
+      const ignorePatterns = ignore?.length
+        ? [...DEFAULT_IGNORE_PATTERNS, ...ignore]
+        : DEFAULT_IGNORE_PATTERNS;
 
       const matches = await glob(pattern, {
         cwd: workingDir,

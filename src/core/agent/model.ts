@@ -49,7 +49,7 @@ function detectProvider(modelName: string): string {
  * @returns A configured LangChain BaseChatModel instance
  */
 export function createModel() {
-  const { name: modelName, provider: explicitProvider, apiKey, baseURL, azureApiVersion } = config.model;
+  const { name: modelName, provider: explicitProvider, apiKey, baseURL, azureApiVersion, customHeaders } = config.model;
   const provider = explicitProvider ?? detectProvider(modelName);
 
   switch (provider) {
@@ -58,6 +58,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { anthropicApiKey: apiKey }),
+        ...(customHeaders && { clientOptions: { defaultHeaders: customHeaders } }),
       });
 
     case 'google':
@@ -65,6 +66,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
+        ...(customHeaders && { additionalCustomHeaders: customHeaders }),
       });
 
     case 'mistral':
@@ -72,6 +74,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
+        ...(customHeaders && { headers: customHeaders }),
       });
 
     case 'groq':
@@ -79,6 +82,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
+        ...(customHeaders && { configuration: { defaultHeaders: customHeaders } }),
       });
 
     case 'ollama':
@@ -86,6 +90,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         baseUrl: baseURL ?? 'http://localhost:11434',
+        ...(customHeaders && { headers: customHeaders }),
       });
 
     case 'azure':
@@ -95,15 +100,21 @@ export function createModel() {
         ...(apiKey && { azureOpenAIApiKey: apiKey }),
         ...(baseURL && { azureOpenAIBasePath: baseURL }),
         azureOpenAIApiVersion: azureApiVersion ?? '2024-02-15-preview',
+        ...(customHeaders && { configuration: { defaultHeaders: customHeaders } }),
       });
 
     case 'openai':
-    default:
+    default: {
+      const configuration = {
+        ...(baseURL && { baseURL }),
+        ...(customHeaders && { defaultHeaders: customHeaders }),
+      };
       return new ChatOpenAI({
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
-        ...(baseURL && { configuration: { baseURL } }),
+        ...(Object.keys(configuration).length > 0 && { configuration }),
       });
+    }
   }
 }

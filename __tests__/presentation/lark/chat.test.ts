@@ -3,6 +3,12 @@ import { LarkChatService } from '@/presentation/lark/chat';
 // Mock lark SDK
 const mockChatList = jest.fn();
 const mockChatCreate = jest.fn();
+const mockFileList = jest.fn();
+const mockFileCreateFolder = jest.fn();
+const mockBitableAppCreate = jest.fn();
+const mockMediaUploadAll = jest.fn();
+const mockMediaBatchGetTmpDownloadUrl = jest.fn();
+const mockMessageResourceGet = jest.fn();
 
 jest.mock('@larksuiteoapi/node-sdk', () => ({
   Client: jest.fn().mockImplementation(() => ({
@@ -10,6 +16,30 @@ jest.mock('@larksuiteoapi/node-sdk', () => ({
       chat: {
         list: mockChatList,
         create: mockChatCreate,
+      },
+      v1: {
+        messageResource: {
+          get: mockMessageResourceGet,
+        },
+      },
+    },
+    drive: {
+      v1: {
+        file: {
+          list: mockFileList,
+          createFolder: mockFileCreateFolder,
+        },
+        media: {
+          uploadAll: mockMediaUploadAll,
+          batchGetTmpDownloadUrl: mockMediaBatchGetTmpDownloadUrl,
+        },
+      },
+    },
+    bitable: {
+      v1: {
+        app: {
+          create: mockBitableAppCreate,
+        },
       },
     },
   })),
@@ -180,6 +210,140 @@ describe('LarkChatService', () => {
       const chatId = await service.getOrCreateChat();
 
       expect(chatId).toBe('found-chat');
+    });
+  });
+
+  describe('uploadImage', () => {
+    const setupUploadMocks = (fileToken = 'file-token-123', downloadUrl = 'https://example.com/img.jpg') => {
+      // File list: folder exists
+      mockFileList
+        .mockResolvedValueOnce({
+          data: {
+            files: [{ token: 'folder-token', name: '【素材库】', type: 'folder' }],
+            has_more: false,
+          },
+        })
+        // Bitable exists
+        .mockResolvedValueOnce({
+          data: {
+            files: [{ token: 'bitable-token', name: '【素材多维表格】', type: 'bitable' }],
+            has_more: false,
+          },
+        });
+      mockMediaUploadAll.mockResolvedValueOnce({ file_token: fileToken });
+      mockMediaBatchGetTmpDownloadUrl.mockResolvedValueOnce({
+        data: {
+          tmp_download_urls: [{ file_token: fileToken, tmp_download_url: downloadUrl }],
+        },
+      });
+    };
+
+    it('should use jpg extension for JPEG buffer', async () => {
+      setupUploadMocks();
+      const jpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+      const base64 = jpegBuffer.toString('base64');
+
+      const service = new LarkChatService();
+      await service.uploadImage(base64);
+
+      const uploadCall = mockMediaUploadAll.mock.calls[0][0];
+      expect(uploadCall.data.file_name).toMatch(/\.jpg$/);
+    });
+
+    it('should use png extension for PNG buffer', async () => {
+      setupUploadMocks();
+      const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      const base64 = pngBuffer.toString('base64');
+
+      const service = new LarkChatService();
+      await service.uploadImage(base64);
+
+      const uploadCall = mockMediaUploadAll.mock.calls[0][0];
+      expect(uploadCall.data.file_name).toMatch(/\.png$/);
+    });
+
+    it('should use gif extension for GIF buffer', async () => {
+      setupUploadMocks();
+      const gifBuffer = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+      const base64 = gifBuffer.toString('base64');
+
+      const service = new LarkChatService();
+      await service.uploadImage(base64);
+
+      const uploadCall = mockMediaUploadAll.mock.calls[0][0];
+      expect(uploadCall.data.file_name).toMatch(/\.gif$/);
+    });
+
+    it('should use webp extension for WebP buffer', async () => {
+      setupUploadMocks();
+      const webpBuffer = Buffer.alloc(12);
+      webpBuffer.write('RIFF', 0, 'ascii');
+      webpBuffer.write('WEBP', 8, 'ascii');
+      const base64 = webpBuffer.toString('base64');
+
+      const service = new LarkChatService();
+      await service.uploadImage(base64);
+
+      const uploadCall = mockMediaUploadAll.mock.calls[0][0];
+      expect(uploadCall.data.file_name).toMatch(/\.webp$/);
+    });
+
+    it('should fall back to png extension for unknown buffer format', async () => {
+      setupUploadMocks();
+      const unknownBuffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+      const base64 = unknownBuffer.toString('base64');
+
+      const service = new LarkChatService();
+      await service.uploadImage(base64);
+
+      const uploadCall = mockMediaUploadAll.mock.calls[0][0];
+      expect(uploadCall.data.file_name).toMatch(/\.png$/);
+    });
+  });
+
+  describe('downloadImage', () => {
+    it('should return a Buffer from the Lark API response', async () => {
+      const fakeBuffer = Buffer.from('fake-image-bytes');
+      const fakeStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield fakeBuffer;
+        },
+      };
+      mockMessageResourceGet.mockResolvedValueOnce({
+        getReadableStream: () => fakeStream,
+      });
+
+      const service = new LarkChatService();
+      const result = await service.downloadImage('om_test_msg_id', 'img_test_key');
+
+      expect(result).toEqual(fakeBuffer);
+      expect(mockMessageResourceGet).toHaveBeenCalledWith({
+        path: { message_id: 'om_test_msg_id', file_key: 'img_test_key' },
+        params: { type: 'image' },
+      });
+    });
+
+    it('should throw when the stream has no data', async () => {
+      const emptyStream = {
+        [Symbol.asyncIterator]: async function* () {
+          // yields nothing
+        },
+      };
+      mockMessageResourceGet.mockResolvedValueOnce({
+        getReadableStream: () => emptyStream,
+      });
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('om_test_msg_id', 'img_missing')).rejects.toThrow(
+        '下载图片失败，message_id: om_test_msg_id, image_key: img_missing'
+      );
+    });
+
+    it('should throw when the API response has no getReadableStream method', async () => {
+      mockMessageResourceGet.mockResolvedValueOnce({});
+
+      const service = new LarkChatService();
+      await expect(service.downloadImage('om_test_msg_id', 'img_empty')).rejects.toThrow(TypeError);
     });
   });
 });

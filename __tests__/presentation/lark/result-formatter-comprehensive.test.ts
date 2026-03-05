@@ -157,6 +157,44 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
         expect(result).toContain('```json');
         expect(result).toContain('"error": "not found"');
       });
+
+      it('should handle read_file object with non-string content', () => {
+        // Test with number content
+        let result = formatToolResultByType('read_file', 'filesystem', true, { 
+          content: 12345, 
+          file_path: '/test/file.js' 
+        });
+        expect(result).toContain('**文件信息:**');
+        expect(result).toContain('1 行');
+        expect(result).toContain('12345');
+
+        // Test with boolean content
+        result = formatToolResultByType('read_file', 'filesystem', true, { 
+          content: true, 
+          file_path: '/test/file.js' 
+        });
+        expect(result).toContain('**文件信息:**');
+        expect(result).toContain('1 行');
+        expect(result).toContain('true');
+
+        // Test with null content
+        result = formatToolResultByType('read_file', 'filesystem', true, { 
+          content: null, 
+          file_path: '/test/file.js' 
+        });
+        expect(result).toContain('**文件信息:**');
+        expect(result).toContain('1 行');
+        expect(result).toContain('null');
+
+        // Test with array content
+        result = formatToolResultByType('read_file', 'filesystem', true, { 
+          content: [1, 2, 3], 
+          file_path: '/test/file.js' 
+        });
+        expect(result).toContain('**文件信息:**');
+        expect(result).toContain('1 行');
+        expect(result).toContain('1,2,3');
+      });
     });
 
     describe('write_file/edit_file tools', () => {
@@ -828,6 +866,60 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       });
       expect(result).toContain('❌');
       expect(result).toContain('File not found');
+    });
+
+    it('should handle view_file object with non-string content', () => {
+      // Test with number content
+      let result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 1,
+        start_line: 1,
+        end_line: 1,
+        content: 12345
+      });
+      expect(result).toContain('`/src/index.ts`');
+      expect(result).toContain('共 1 行');
+      expect(result).toContain('12345');
+
+      // Test with boolean content
+      result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 1,
+        start_line: 1,
+        end_line: 1,
+        content: false
+      });
+      expect(result).toContain('`/src/index.ts`');
+      expect(result).toContain('共 1 行');
+      expect(result).toContain('false');
+
+      // Test with null content
+      result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 1,
+        start_line: 1,
+        end_line: 1,
+        content: null
+      });
+      expect(result).toContain('`/src/index.ts`');
+      expect(result).toContain('共 1 行');
+      expect(result).toContain('null');
+
+      // Test with array content
+      result = formatToolResultByType('view_file', 'filesystem', true, {
+        success: true,
+        file_path: '/src/index.ts',
+        total_lines: 1,
+        start_line: 1,
+        end_line: 1,
+        content: [1, 2, 3]
+      });
+      expect(result).toContain('`/src/index.ts`');
+      expect(result).toContain('共 1 行');
+      expect(result).toContain('1,2,3');
     });
   });
 

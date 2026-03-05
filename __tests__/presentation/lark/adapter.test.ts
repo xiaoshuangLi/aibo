@@ -69,6 +69,39 @@ function mockStyledFactory() {
 jest.mock('@/presentation/styling/styler', () => ({ styled: mockStyledFactory() }));
 jest.mock('@/presentation/lark/styler', () => ({ styled: mockStyledFactory() }));
 
+// Mock LarkChatService so the adapter's dependency is fully controlled in unit tests
+const mockGetOrCreateChat = jest.fn();
+const mockChatServiceUploadImage = jest.fn();
+const mockChatServiceDownloadImage = jest.fn();
+jest.mock('@/presentation/lark/chat', () => ({
+  LarkChatService: jest.fn().mockImplementation(() => ({
+    getOrCreateChat: mockGetOrCreateChat,
+    uploadImage: mockChatServiceUploadImage,
+    downloadImage: mockChatServiceDownloadImage,
+  })),
+}));
+
+// Mock LarkWsClientManager — simulate primary role synchronously so adapter
+// tests can still verify wsClient.start() and the startup log message.
+jest.mock('@/presentation/lark/ws-client', () => ({
+  LarkWsClientManager: jest.fn().mockImplementation((wsClient: any) => ({
+    start: jest.fn().mockImplementation(() => {
+      const larkSdk = require('@larksuiteoapi/node-sdk');
+      try {
+        wsClient.start({
+          eventDispatcher: new larkSdk.EventDispatcher({}).register({
+            'im.message.receive_v1': jest.fn(),
+          }),
+        });
+        console.log('✅ 飞书长连接已启动，等待用户消息...');
+        return Promise.resolve();
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }),
+  })),
+}));
+
 describe('LarkAdapter', () => {
   let originalLarkConfig: any;
   
@@ -130,12 +163,18 @@ describe('LarkAdapter', () => {
       expect(mockConsoleLog).toHaveBeenCalledWith('✅ 飞书长连接已启动，等待用户消息...');
     });
 
-    it('should handle startup errors', () => {
+    it('should log startup errors asynchronously', async () => {
       mockWSClient.start.mockImplementationOnce(() => {
         throw new Error('WebSocket connection failed');
       });
-      
-      expect(() => new LarkAdapter()).toThrow('WebSocket connection failed');
+
+      // Constructor no longer throws; errors surface via the async start() rejection
+      expect(() => new LarkAdapter()).not.toThrow();
+
+      // Flush pending microtasks so the rejected promise catch handler runs
+      await Promise.resolve();
+      await Promise.resolve();
+
       expect(mockConsoleError).toHaveBeenCalledWith('❌ 启动飞书长连接失败:', expect.any(Error));
     });
   });
@@ -392,8 +431,12 @@ describe('LarkAdapter', () => {
       expect(callback).toHaveBeenCalledWith('direct message');
     });
 
-    it('with chatId: should ignore messages from a different group', async () => {
-      const adapter = new LarkAdapter('my-group-id');
+    it('with group_chat mode: should ignore messages from a different group', async () => {
+      mockGetOrCreateChat.mockResolvedValue('my-group-id');
+      const originalLarkType = (config as any).interaction?.larkType;
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: 'group_chat' };
+
+      const adapter = new LarkAdapter();
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
 
@@ -408,10 +451,16 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(callback).not.toHaveBeenCalled();
+
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: originalLarkType };
     });
 
-    it('with chatId: should accept messages from the matching group', async () => {
-      const adapter = new LarkAdapter('my-group-id');
+    it('with group_chat mode: should accept messages from the matching group', async () => {
+      mockGetOrCreateChat.mockResolvedValue('my-group-id');
+      const originalLarkType = (config as any).interaction?.larkType;
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: 'group_chat' };
+
+      const adapter = new LarkAdapter();
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
 
@@ -426,6 +475,110 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(callback).toHaveBeenCalledWith('correct group message');
+
+      (config as any).interaction = { ...((config as any).interaction ?? {}), larkType: originalLarkType };
+    });
+
+    // --- image message tests ---
+
+    it('should download and upload image, then call callback with image_url array', async () => {
+      const fakeBuffer = Buffer.from('fake-image');
+      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/image.png');
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_test_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_test_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_test_message_id', 'img_test_key');
+      expect(mockChatServiceUploadImage).toHaveBeenCalledWith(fakeBuffer.toString('base64'));
+      expect(callback).toHaveBeenCalledWith([
+        { type: 'image_url', image_url: { url: 'https://example.com/image.png' } },
+      ]);
+    });
+
+    it('should queue image content when no callback is set yet', async () => {
+      const fakeBuffer = Buffer.from('img-bytes');
+      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/queued.png');
+
+      const adapter = new LarkAdapter();
+      (adapter as any).userMessageCallback = null;
+      (adapter as any).processMessageQueue = jest.fn();
+
+      const testData = {
+        message: {
+          message_id: 'om_queued_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_queued_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect((adapter as any).messageQueue).toHaveLength(1);
+      expect((adapter as any).messageQueue[0]).toEqual({
+        content: [{ type: 'image_url', image_url: { url: 'https://example.com/queued.png' } }],
+        chatId: 'test-chat-id',
+      });
+    });
+
+    it('should ignore image message when image_key is missing', async () => {
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_no_key_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({}),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceDownloadImage).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should log error and not call callback when image download fails', async () => {
+      mockChatServiceDownloadImage.mockRejectedValueOnce(new Error('download failed'));
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_fail_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_fail_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 处理图片消息失败:', expect.any(Error));
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 

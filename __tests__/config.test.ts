@@ -168,4 +168,33 @@ describe('Configuration Module', () => {
 
     expect(testConfig.model.baseURL).toBe('https://new-endpoint.example.com/v1');
   });
+
+  // ── AIBO_CUSTOM_HEADERS ──────────────────────────────────────────────────────
+
+  test('parses AIBO_CUSTOM_HEADERS pipe-separated key:value pairs into an object', () => {
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent|X-Trace-Id:998877';
+
+    const { config: testConfig } = require('../src/core/config');
+
+    expect(testConfig.model.customHeaders).toEqual({
+      'X-App-Name': 'MyAgent',
+      'X-Trace-Id': '998877',
+    });
+  });
+
+  test('parses a single AIBO_CUSTOM_HEADERS entry', () => {
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+
+    const { config: testConfig } = require('../src/core/config');
+
+    expect(testConfig.model.customHeaders).toEqual({ 'X-App-Name': 'MyAgent' });
+  });
+
+  test('customHeaders is undefined when AIBO_CUSTOM_HEADERS is not set', () => {
+    delete process.env.AIBO_CUSTOM_HEADERS;
+
+    const { config: testConfig } = require('../src/core/config');
+
+    expect(testConfig.model.customHeaders).toBeUndefined();
+  });
 });

@@ -19,8 +19,8 @@ describe('editFileTool', () => {
     expect(editFileTool.description).toContain('replacement');
     const schema = editFileTool.schema;
     expect(schema.shape.file_path).toBeDefined();
-    expect(schema.shape.old_str).toBeDefined();
-    expect(schema.shape.new_str).toBeDefined();
+    expect(schema.shape.old_string).toBeDefined();
+    expect(schema.shape.new_string).toBeDefined();
     expect(schema.shape.create_if_missing).toBeDefined();
   });
 
@@ -30,10 +30,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: 'const x = 1;',
-      new_str: 'const x = 42;',
+      old_string: 'const x = 1;',
+      new_string: 'const x = 42;',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     expect(parsed.action).toBe('edited');
 
@@ -48,10 +48,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: 'nonexistent text',
-      new_str: 'replacement',
+      old_string: 'nonexistent text',
+      new_string: 'replacement',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('NOT_FOUND');
   });
@@ -62,10 +62,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: 'foo',
-      new_str: 'bar',
+      old_string: 'foo',
+      new_string: 'bar',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('AMBIGUOUS');
     expect(parsed.occurrences).toBe(2);
@@ -77,11 +77,11 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: '',
-      new_str: content,
+      old_string: '',
+      new_string: content,
       create_if_missing: true,
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     expect(parsed.action).toBe('created');
     expect(fs.existsSync(file)).toBe(true);
@@ -93,11 +93,11 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: '',
-      new_str: 'content',
+      old_string: '',
+      new_string: 'content',
       create_if_missing: true,
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     expect(fs.existsSync(file)).toBe(true);
   });
@@ -105,10 +105,10 @@ describe('editFileTool', () => {
   test('should return FILE_NOT_FOUND when file missing and create_if_missing is false', async () => {
     const result = await editFileTool.invoke({
       file_path: '/nonexistent/path/file.ts',
-      old_str: 'anything',
-      new_str: 'replacement',
+      old_string: 'anything',
+      new_string: 'replacement',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('FILE_NOT_FOUND');
   });
@@ -119,10 +119,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: '',
-      new_str: 'new content',
+      old_string: '',
+      new_string: 'new content',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('EMPTY_OLD_STR');
   });
@@ -133,10 +133,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: file,
-      old_str: '\ndelete this',
-      new_str: '',
+      old_string: '\ndelete this',
+      new_string: '',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     const content = fs.readFileSync(file, 'utf-8');
     expect(content).not.toContain('delete this');
@@ -149,10 +149,10 @@ describe('editFileTool', () => {
 
     const result = await editFileTool.invoke({
       file_path: relPath,
-      old_str: 'original',
-      new_str: 'replaced',
+      old_string: 'original',
+      new_string: 'replaced',
     });
-    const parsed = JSON.parse(result);
+    const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     expect(fs.readFileSync(file, 'utf-8')).toContain('replaced');
   });

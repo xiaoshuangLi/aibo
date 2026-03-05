@@ -9,11 +9,9 @@
  * @module interactive
  */
 
-import { LarkAdapter } from './adapter';
-import { LarkChatService } from './chat';
+import { LarkAdapter, MessageContent } from './adapter';
 import { Session } from '@/core/agent';
 import { createAIAgent } from '@/core/agent';
-import { config } from '@/core/config';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
@@ -29,19 +27,10 @@ export async function startLarkInteractiveMode(): Promise<void> {
   console.log('🚀 启动飞书交互模式...');
   
   try {
-    // 解析 lark 交互类型
-    const larkType = config.interaction.larkType;
+    // 创建Lark适配器（group_chat 模式下内部自动获取或创建群聊）
+    const larkAdapter = new LarkAdapter();
 
-    // chat 模式：获取或创建与当前工作目录绑定的群聊
-    let chatId: string | undefined;
-    if (larkType === 'group_chat') {
-      console.log('💬 group_chat 模式：正在获取或创建群聊...');
-      const chatService = new LarkChatService();
-      chatId = await chatService.getOrCreateChat();
-    }
-
-    // 创建Lark适配器（chat 模式传入 chatId）
-    const larkAdapter = new LarkAdapter(chatId);
+    await larkAdapter.launch();
     
     // 创建会话
     currentSession = new Session(larkAdapter);
@@ -53,7 +42,7 @@ export async function startLarkInteractiveMode(): Promise<void> {
     currentAgent = await createAIAgent(currentSession);
     
     // 设置用户消息回调
-    larkAdapter.setUserMessageCallback(async (userMessage: string) => {
+    larkAdapter.setUserMessageCallback(async (userMessage: MessageContent) => {
       await handleUserMessage(userMessage, currentSession!, currentAgent);
     });
     
@@ -86,27 +75,30 @@ export async function startLarkInteractiveMode(): Promise<void> {
  * 处理用户消息
  */
 export async function handleUserMessage(
-  input: string,
+  input: MessageContent,
   session: Session,
   agent: any
 ): Promise<void> {
-  // 检查退出命令
-  if (shouldExitInteractiveMode(input)) {
-    session.end("再见！");
-    return;
-  }
-
-  // 检查空输入
-  if (isEmptyInput(input)) {
-    return;
-  }
-
-  // 检查是否为内部命令
-  if (input.startsWith('/')) {
-    const handleCommand = createHandleInternalCommand(session);
-    const commandHandled = await handleCommand(input);
-    if (commandHandled) {
+  // 仅文本消息可触发退出命令、空输入检查和内部命令
+  if (typeof input === 'string') {
+    // 检查退出命令
+    if (shouldExitInteractiveMode(input)) {
+      session.end("再见！");
       return;
+    }
+
+    // 检查空输入
+    if (isEmptyInput(input)) {
+      return;
+    }
+
+    // 检查是否为内部命令
+    if (input.startsWith('/')) {
+      const handleCommand = createHandleInternalCommand(session);
+      const commandHandled = await handleCommand(input);
+      if (commandHandled) {
+        return;
+      }
     }
   }
 
@@ -143,8 +135,8 @@ export async function handleUserMessage(
       }
     );
 
-    // 处理响应流
-    await processStreamChunks(stream, state, session, input);
+    // 处理响应流（图片消息不传递 userInput，仅文本消息提供上下文）
+    await processStreamChunks(stream, state, session, typeof input === 'string' ? input : undefined);
     
   } catch (error) {
     console.error('❌ 处理用户消息时出错:', error);

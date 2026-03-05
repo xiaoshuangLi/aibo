@@ -114,6 +114,20 @@ const envSchema = z.object({
   AIBO_LANGUAGE: z.enum(['en', 'zh']).default('en'),
   // Persona / communication style configuration
   AIBO_PERSONA: z.string().default('你的交流风格是魅魔人设：妩媚迷人、温柔体贴、善于撒娇。用甜蜜亲切的语气与用户互动，偶尔使用"主人"等称呼，举止优雅而富有魅力。在保持专业技术能力的同时，让每次对话都充满温情与趣味。'),
+  // Custom request headers for model provider API calls
+  // Format: "Key1:Value1|Key2:Value2"  e.g. "X-App-Name:MyAgent|X-Trace-Id:998877"
+  AIBO_CUSTOM_HEADERS: z.string().optional().transform((val) => {
+    if (!val) return undefined;
+    const headers: Record<string, string> = {};
+    for (const pair of val.split('|')) {
+      const idx = pair.indexOf(':');
+      // Skip pairs without a colon or with an empty key (e.g. ":value")
+      if (idx > 0) {
+        headers[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+      }
+    }
+    return Object.keys(headers).length > 0 ? headers : undefined;
+  }),
   // Lark (Feishu) Configuration
   AIBO_LARK_APP_ID: z.string().optional(),
   AIBO_LARK_APP_SECRET: z.string().optional(),
@@ -146,6 +160,7 @@ const resolvedLarkType = resolveLarkType();
  * @property {string} model.name - The AI model name to use
  * @property {string|undefined} model.provider - Explicit provider override; auto-detected when omitted
  * @property {string|undefined} model.azureApiVersion - Azure OpenAI API version (Azure only)
+ * @property {Record<string,string>|undefined} model.customHeaders - Custom HTTP headers for model API requests
  * @property {Object} langgraph - LangGraph-specific configuration
  * @property {number} langgraph.recursionLimit - Maximum recursion depth allowed
  * @property {'memory'|'sqlite'} langgraph.checkpointerType - Type of checkpointing mechanism
@@ -157,6 +172,7 @@ export const config = {
     name: env.AIBO_MODEL_NAME,
     provider: env.AIBO_MODEL_PROVIDER,
     azureApiVersion: env.AIBO_AZURE_API_VERSION,
+    customHeaders: env.AIBO_CUSTOM_HEADERS,
   },
   langgraph: {
     recursionLimit: env.AIBO_RECURSION_LIMIT,

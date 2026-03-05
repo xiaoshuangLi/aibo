@@ -263,5 +263,147 @@ describe('createModel', () => {
 
     expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-new-key' }));
   });
+
+  // ── AIBO_CUSTOM_HEADERS ────────────────────────────────────────────────────
+
+  test('passes AIBO_CUSTOM_HEADERS as configuration.defaultHeaders to ChatOpenAI', () => {
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent|X-Trace-Id:998877';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: expect.objectContaining({
+          defaultHeaders: { 'X-App-Name': 'MyAgent', 'X-Trace-Id': '998877' },
+        }),
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS and AIBO_BASE_URL together in configuration for ChatOpenAI', () => {
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    process.env.AIBO_BASE_URL = 'https://proxy.example.com/v1';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(ChatOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: {
+          baseURL: 'https://proxy.example.com/v1',
+          defaultHeaders: { 'X-App-Name': 'MyAgent' },
+        },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as clientOptions.defaultHeaders to ChatAnthropic', () => {
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent|X-Trace-Id:998877';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    expect(ChatAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientOptions: { defaultHeaders: { 'X-App-Name': 'MyAgent', 'X-Trace-Id': '998877' } },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as additionalCustomHeaders to ChatGoogleGenerativeAI', () => {
+    process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
+    createModel();
+
+    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        additionalCustomHeaders: { 'X-App-Name': 'MyAgent' },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as headers to ChatMistralAI', () => {
+    process.env.AIBO_MODEL_NAME = 'mistral-large-latest';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatMistralAI } = require('@langchain/mistralai');
+
+    createModel();
+
+    expect(ChatMistralAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: { 'X-App-Name': 'MyAgent' },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as configuration.defaultHeaders to ChatGroq', () => {
+    process.env.AIBO_MODEL_NAME = 'llama-3.3-70b-versatile';
+    process.env.AIBO_MODEL_PROVIDER = 'groq';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatGroq } = require('@langchain/groq');
+
+    createModel();
+
+    expect(ChatGroq).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: { defaultHeaders: { 'X-App-Name': 'MyAgent' } },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as headers to ChatOllama', () => {
+    process.env.AIBO_MODEL_NAME = 'llama3';
+    process.env.AIBO_MODEL_PROVIDER = 'ollama';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatOllama } = require('@langchain/ollama');
+
+    createModel();
+
+    expect(ChatOllama).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: { 'X-App-Name': 'MyAgent' },
+      })
+    );
+  });
+
+  test('passes AIBO_CUSTOM_HEADERS as configuration.defaultHeaders to AzureChatOpenAI', () => {
+    process.env.AIBO_MODEL_NAME = 'my-deployment';
+    process.env.AIBO_MODEL_PROVIDER = 'azure';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
+    const { createModel } = require('@/core/agent/model');
+    const { AzureChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    expect(AzureChatOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: { defaultHeaders: { 'X-App-Name': 'MyAgent' } },
+      })
+    );
+  });
+
+  test('no custom headers when AIBO_CUSTOM_HEADERS is not set', () => {
+    process.env.AIBO_MODEL_NAME = 'gpt-4o';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatOpenAI } = require('@langchain/openai');
+
+    createModel();
+
+    const callArgs = (ChatOpenAI as jest.Mock).mock.calls[0][0];
+    expect(callArgs.configuration).toBeUndefined();
+  });
 });
 

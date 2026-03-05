@@ -79,6 +79,13 @@ export interface Adapter {
   off(eventType: OutputEventType, listener: (data: any) => void): void;
   
   /**
+   * 上传图片并返回临时访问地址
+   * @param base64 图片的 base64 编码
+   * @returns 上传后的图片临时访问地址
+   */
+  uploadImage(base64: string): Promise<string>;
+
+  /**
    * 销毁适配器
    */
   destroy(): void;
@@ -136,5 +143,9 @@ export class DefaultAdapter implements Adapter {
   
   destroy(): void {
     this.listeners.clear();
+  }
+
+  async uploadImage(_base64: string): Promise<string> {
+    throw new Error('uploadImage not implemented');
   }
 }

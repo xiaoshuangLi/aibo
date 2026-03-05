@@ -175,9 +175,11 @@ export const formatFilesystemResult = (name: string, result: any): string => {
     
     case 'read_file':
       if (result.content !== undefined) {
-        const lines = result.content.split('\n').length;
-        const chars = result.content.length;
-        const preview = result.content;
+        // 确保 content 是字符串类型
+        const contentStr = typeof result.content === 'string' ? result.content : String(result.content);
+        const lines = contentStr.split('\n').length;
+        const chars = contentStr.length;
+        const preview = contentStr;
         // 尝试从结果对象中提取文件路径
         const filePath = result.file_path || result.filePath || undefined;
         const fileLang = inferLanguageType(filePath, preview);
@@ -192,16 +194,18 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `❌ **读取失败**: ${result.message || result.error || '未知错误'}`;
       }
       if (result.content !== undefined) {
+        // 确保 content 是字符串类型
+        const contentStr = typeof result.content === 'string' ? result.content : String(result.content);
         const filePath = result.file_path || undefined;
-        const fileLang = inferLanguageType(filePath, result.content);
+        const fileLang = inferLanguageType(filePath, contentStr);
         const fileLangTag = fileLang ? fileLang : '';
-        const totalLines = result.total_lines || result.content.split('\n').length;
+        const totalLines = result.total_lines || contentStr.split('\n').length;
         const startLine = result.start_line || 1;
         const endLine = result.end_line || totalLines;
         const rangeInfo = (startLine === 1 && endLine === totalLines)
           ? `共 ${totalLines} 行`
           : `第 ${startLine}–${endLine} 行 / 共 ${totalLines} 行`;
-        return `**文件:** \`${filePath || '未知'}\` (${rangeInfo})\n\n\`\`\`${fileLangTag}\n${result.content}\n\`\`\``;
+        return `**文件:** \`${filePath || '未知'}\` (${rangeInfo})\n\n\`\`\`${fileLangTag}\n${contentStr}\n\`\`\``;
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     

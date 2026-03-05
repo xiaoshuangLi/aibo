@@ -21,6 +21,7 @@ import getCodexTools from '@/tools/codex';
 import getCopilotTools from '@/tools/copilot';
 import getLocalMcpTools from '@/tools/local-mcp';
 import getPlaywrightTools from '@/tools/playwright';
+import getReadImageTools from '@/tools/read-image';
 import { Session } from '@/core/agent';
 
 /**
@@ -54,6 +55,7 @@ export default async function getTools(session?: Session) {
     copilotTools,
     localMcpTools,
     playwrightTools,
+    readImageTools,
   ] = await Promise.all([
     getBashTools(session),
     getUtilsTools(),
@@ -78,6 +80,7 @@ export default async function getTools(session?: Session) {
     getCopilotTools(session),
     getLocalMcpTools(),
     getPlaywrightTools(),
+    getReadImageTools(),
   ]);
   
   return [
@@ -104,5 +107,6 @@ export default async function getTools(session?: Session) {
     ...copilotTools,
     ...localMcpTools,
     ...playwrightTools,
+    ...readImageTools,
   ];
 }
