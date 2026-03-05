@@ -26,6 +26,8 @@ import type { Socket as ServerSocket } from 'socket.io';
 import { io as connectIO } from 'socket.io-client';
 import type { Socket as ClientSocket } from 'socket.io-client';
 
+import { config } from '@/core/config';
+
 /** 端口发现起始端口 */
 export const WS_START_PORT = 5211;
 
@@ -33,7 +35,7 @@ export const WS_START_PORT = 5211;
 const VERIFY_EVENT = 'boay';
 
 /** 握手应答事件（主进程 → 从进程） */
-const VERIFY_ACK_EVENT = 'aibo';
+const VERIFY_ACK_EVENT = config.lark?.appId || 'aibo';
 
 /** 转发飞书消息的事件名 */
 const LARK_EVENT = 'lark:event';
