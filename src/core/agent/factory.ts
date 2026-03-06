@@ -7,7 +7,12 @@ import getTools from '@/tools';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents';
 import { findSkillsDirectories, buildSystemPromptFromTools } from '@/core/utils';
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem';
-import { createLangChainToolRetryMiddleware, createSessionOutputCaptureMiddleware, createImageUploadMiddleware } from '@/core/middlewares';
+import {
+  createLangChainToolRetryMiddleware,
+  createSessionOutputCaptureMiddleware,
+  createFilterDuplicateToolsMiddleware,
+  createImageUploadMiddleware,
+} from '@/core/middlewares';
 import { Session } from './session';
 import { SubAgentPromptTemplate } from '@/infrastructure/prompt';
 
@@ -101,6 +106,7 @@ export async function createAIAgent(session?: Session): Promise<any> {
 
   // 创建 LangChain 工具重试中间件
   const toolRetryMiddleware = createLangChainToolRetryMiddleware();
+  const filterDuplicateToolsMiddleware = createFilterDuplicateToolsMiddleware()
   
   // 创建会话输出捕获中间件（如果提供了session）
   const imageUploadMiddleware = session ? [createImageUploadMiddleware({ session })] : [];
@@ -124,7 +130,7 @@ export async function createAIAgent(session?: Session): Promise<any> {
     model: agent.model ?? model,
     // 为子代理的middleware添加会话中间件（如果提供了session）
     middleware: session 
-      ? [...(agent.middleware ?? []), toolRetryMiddleware, ...imageUploadMiddleware, ...sessionMiddleware]
+      ? [...(agent.middleware ?? []), toolRetryMiddleware, filterDuplicateToolsMiddleware, ...imageUploadMiddleware, ...sessionMiddleware]
       : (agent.middleware ?? [toolRetryMiddleware]),
   }));
 
@@ -143,7 +149,7 @@ export async function createAIAgent(session?: Session): Promise<any> {
     tools,
     skills: allSkillsDirs,
     subagents: subAgents as any,
-    middleware: session ? [toolRetryMiddleware, ...imageUploadMiddleware] as any : [toolRetryMiddleware] as any,
+    middleware: session ? [toolRetryMiddleware, filterDuplicateToolsMiddleware, ...imageUploadMiddleware] as any : [toolRetryMiddleware] as any,
     interruptOn: { grep: false },
   });
 

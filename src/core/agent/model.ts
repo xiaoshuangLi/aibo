@@ -58,6 +58,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { anthropicApiKey: apiKey }),
+        ...(baseURL && { anthropicApiUrl: baseURL.replace(/\/v[0-9]+$/g, '') }),
         ...(customHeaders && { clientOptions: { defaultHeaders: customHeaders } }),
       });
 

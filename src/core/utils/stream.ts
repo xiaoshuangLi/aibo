@@ -248,7 +248,10 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
 export async function handleAIContent(msg: any, state: StreamState, session: any, userInput?: string) {
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
-  const currentContent = String(msg.content);
+  const source = msg.content?.[0]?.text || msg.content;
+  const currentContent = typeof source === 'object'
+    ? `\`\`\`json\n${JSON.stringify(source, null, 2)}\n\`\`\``
+    : String(source);
 
   if (state.fullResponse && !currentContent.startsWith(state.fullResponse)) {
     state.fullResponse = '';
