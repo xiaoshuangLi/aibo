@@ -3,7 +3,7 @@ jest.mock('dotenv', () => ({ config: jest.fn() }));
 
 describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
   const baseConfig = {
-    model: { apiKey: 'test-key', baseURL: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
+    model: { apiKey: 'test-key', baseUrl: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
     langgraph: { recursionLimit: 100, checkpointerType: 'memory' },
     memory: {},
     output: { verbose: false },

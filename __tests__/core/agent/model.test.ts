@@ -202,7 +202,7 @@ describe('createModel', () => {
     expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-unified-key' }));
   });
 
-  test('passes AIBO_BASE_URL as configuration.baseURL to ChatOpenAI', () => {
+  test('passes AIBO_BASE_URL as configuration.baseUrl to ChatOpenAI', () => {
     process.env.AIBO_BASE_URL = 'https://custom-endpoint.example.com/v1';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model');
@@ -211,11 +211,11 @@ describe('createModel', () => {
     createModel();
 
     expect(ChatOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({ configuration: { baseURL: 'https://custom-endpoint.example.com/v1' } })
+      expect.objectContaining({ configuration: { baseUrl: 'https://custom-endpoint.example.com/v1' } })
     );
   });
 
-  test('no configuration.baseURL when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
+  test('no configuration.baseUrl when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
@@ -248,7 +248,7 @@ describe('createModel', () => {
     createModel();
 
     expect(ChatOpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({ configuration: { baseURL: 'https://legacy-endpoint.example.com/v1' } })
+      expect.objectContaining({ configuration: { baseUrl: 'https://legacy-endpoint.example.com/v1' } })
     );
   });
 
@@ -295,7 +295,7 @@ describe('createModel', () => {
     expect(ChatOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({
         configuration: {
-          baseURL: 'https://proxy.example.com/v1',
+          baseUrl: 'https://proxy.example.com/v1',
           defaultHeaders: { 'X-App-Name': 'MyAgent' },
         },
       })
@@ -317,7 +317,7 @@ describe('createModel', () => {
     );
   });
 
-  test('passes AIBO_CUSTOM_HEADERS as additionalCustomHeaders to ChatGoogleGenerativeAI', () => {
+  test('passes AIBO_CUSTOM_HEADERS as customHeaders to ChatGoogleGenerativeAI', () => {
     process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
     process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
     const { createModel } = require('@/core/agent/model');
@@ -327,7 +327,7 @@ describe('createModel', () => {
 
     expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        additionalCustomHeaders: { 'X-App-Name': 'MyAgent' },
+        customHeaders: { 'X-App-Name': 'MyAgent' },
       })
     );
   });

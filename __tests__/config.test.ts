@@ -48,7 +48,7 @@ describe('Configuration Module', () => {
     const { config: testConfig } = require('../src/core/config');
     
     expect(testConfig.model.apiKey).toBe('sk-custom-key');
-    expect(testConfig.model.baseURL).toBe('https://custom-api.example.com/v1');
+    expect(testConfig.model.baseUrl).toBe('https://custom-api.example.com/v1');
     expect(testConfig.model.name).toBe('gpt-4-turbo');
     expect(testConfig.langgraph.recursionLimit).toBe(500);
     expect(testConfig.langgraph.checkpointerType).toBe('sqlite');
@@ -80,7 +80,7 @@ describe('Configuration Module', () => {
     
     const { config: testConfig } = require('../src/core/config');
     
-    expect(testConfig.model.baseURL).toBe('https://api.openai.com/v1');
+    expect(testConfig.model.baseUrl).toBe('https://api.openai.com/v1');
   });
 
   test('should validate AIBO_RECURSION_LIMIT as positive integer', () => {
@@ -157,7 +157,7 @@ describe('Configuration Module', () => {
 
     const { config: testConfig } = require('../src/core/config');
 
-    expect(testConfig.model.baseURL).toBe('https://legacy-endpoint.example.com/v1');
+    expect(testConfig.model.baseUrl).toBe('https://legacy-endpoint.example.com/v1');
   });
 
   test('AIBO_BASE_URL takes precedence over AIBO_OPENAI_BASE_URL', () => {
@@ -166,7 +166,7 @@ describe('Configuration Module', () => {
 
     const { config: testConfig } = require('../src/core/config');
 
-    expect(testConfig.model.baseURL).toBe('https://new-endpoint.example.com/v1');
+    expect(testConfig.model.baseUrl).toBe('https://new-endpoint.example.com/v1');
   });
 
   // ── AIBO_CUSTOM_HEADERS ──────────────────────────────────────────────────────

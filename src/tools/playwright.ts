@@ -259,7 +259,6 @@ export const browserScrollTool = tool(
       amount: z
         .number()
         .int()
-        .positive()
         .optional()
         .describe("Number of pixels to scroll (default: 500). Ignored when selector is provided."),
       selector: z
@@ -296,7 +295,6 @@ export const browserSnapshotTool = tool(
       max_length: z
         .number()
         .int()
-        .positive()
         .optional()
         .describe("Maximum character length of the returned snapshot (default: 20000). Lower values reduce token usage."),
       headless: z
