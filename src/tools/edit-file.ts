@@ -42,7 +42,7 @@ export const editFileTool = tool(
         // Empty old_string with existing file means append or full replace (use new_string as full content)
         return JSON.stringify({
           success: false,
-          error: "EMPTY_OLD_STR",
+          error: "EMPTY_OLD_STRING",
           message: "old_string is empty but the file already exists. Provide the exact text to replace.",
         }, null, 2);
       }

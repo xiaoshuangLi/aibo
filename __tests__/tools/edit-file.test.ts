@@ -113,7 +113,7 @@ describe('editFileTool', () => {
     expect(parsed.error).toBe('FILE_NOT_FOUND');
   });
 
-  test('should return EMPTY_OLD_STR when editing existing file with empty old_str', async () => {
+  test('should return EMPTY_OLD_STRING when editing existing file with empty old_str', async () => {
     const file = path.join(tmpDir, 'existing.ts');
     fs.writeFileSync(file, 'existing content\n', 'utf-8');
 
@@ -124,7 +124,7 @@ describe('editFileTool', () => {
     });
     const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
-    expect(parsed.error).toBe('EMPTY_OLD_STR');
+    expect(parsed.error).toBe('EMPTY_OLD_STRING');
   });
 
   test('should delete text when new_str is empty', async () => {
