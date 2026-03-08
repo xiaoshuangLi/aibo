@@ -18,7 +18,7 @@ import { inferLanguageType, isErrorContent, formatStringAsCode, formatErrorText 
  */
 export const getToolType = (name: string): string => {
   // 文件系统工具
-  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'glob_files', 'grep', 'grep_files'].includes(name)) {
+  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'grep'].includes(name)) {
     return 'filesystem';
   }
   // 系统/Bash工具
@@ -50,7 +50,7 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task', 'todo_write', 'todo_read'].includes(name)) {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
     return 'task_management';
   }
   // AI代理执行工具
@@ -67,42 +67,43 @@ export const getToolType = (name: string): string => {
 
 /**
  * 格式化文件系统工具结果
+ *
+ * deepagents 内置工具返回值格式：
+ * - glob: 纯字符串，换行分隔的绝对路径，或 "No files found matching pattern '...'"
+ * - grep: 纯字符串，格式为 "\n<file>:\n  <line>: <text>\n  ..."，或 "No matches found..."
+ * - write_file: 纯字符串 "Successfully wrote to '<file>'"，或错误字符串
+ * - edit_file: 纯字符串 "Successfully replaced N occurrence(s) in '<file>'"，或错误字符串
  */
 export const formatFilesystemResult = (name: string, result: any): string => {
-  // 处理字符串输入（非JSON格式）- 这是关键！
+  // 处理字符串输入（deepagents 内置工具均返回字符串）
   if (typeof result === 'string') {
     const trimmed = result.trim();
     if (!trimmed) return '无内容';
     
     switch (name) {
-      case 'ls':
-        if (trimmed.startsWith('/')) {
-          // ls 工具返回的文本按换行符分割成文件列表
-          const lsLines = trimmed.split('\n').filter(line => line.trim());
-          if (lsLines.length === 0) return '目录为空';
-          return lsLines.map(item => `- \`${item}\``).join('\n');
-        }
+      case 'ls': {
+        // ls 工具返回的文本按换行符分割成文件列表
+        const lsLines = trimmed.split('\n').filter(line => line.trim());
+        if (lsLines.length === 0) return '目录为空';
+        return lsLines.map(item => `- \`${item}\``).join('\n');
+      }
 
-        const lang = inferLanguageType(undefined, trimmed);
-        const langTag = lang ? lang : '';
-        return `\`\`\`${langTag}\n${trimmed}\n\`\`\``;
-      
-      case 'grep':
-      case 'grep_files':
-        // 智能解析 grep 工具的输出格式
-        const grepLines = trimmed.split('\n').filter(line => line.trim());
-        if (grepLines.length === 0) return '未找到匹配内容';
-        
-        // 解析内置 grep 工具的特殊格式：文件路径后跟缩进的内容行
+      case 'grep': {
+        // deepagents grep 输出格式："\n<file>:\n  <line>: <text>"
+        // "No matches found for pattern '...'" 表示无结果
+        if (trimmed.startsWith('No matches found')) return `未找到匹配内容`;
+
         const parsedResults: string[] = [];
         let currentFile = '';
-        
+        // Use original result (not trimmed) to preserve leading spaces on content lines
+        const grepLines = result.split('\n');
+
         for (const line of grepLines) {
-          // 检查是否是文件路径行（以冒号结尾，且不以空格开头）
-          if (line.endsWith(':') && !line.startsWith(' ')) {
-            currentFile = line.slice(0, -1); // 移除末尾的冒号
-          } 
-          // 检查是否是内容行（以空格开头，包含行号:内容格式）
+          // 文件路径行：不以空格开头，以冒号结尾，且不为空
+          if (line.length > 0 && !line.startsWith(' ') && line.endsWith(':')) {
+            currentFile = line.slice(0, -1);
+          }
+          // 内容行：以空格开头，包含行号:内容格式
           else if (line.startsWith(' ') && line.includes(':')) {
             const content = line.trim();
             if (currentFile) {
@@ -111,60 +112,56 @@ export const formatFilesystemResult = (name: string, result: any): string => {
               parsedResults.push(`🔹 ${content}`);
             }
           }
-          // 处理其他可能的格式（兼容标准 grep 格式）
-          else if (line.includes(':') && /^\d+:/.test(line.split(':')[1] || '')) {
-            // 标准格式：文件:行号:内容
-            const parts = line.split(':');
-            if (parts.length >= 3) {
-              const file = parts[0];
-              const lineNumber = parts[1];
-              const content = parts.slice(2).join(':');
-              parsedResults.push(`📄 \`${file}\`\n   🔹 第${lineNumber}行: ${content}`);
-            }
-          }
-          // 兜底处理
-          else {
-            parsedResults.push(`🔹 ${line}`);
-          }
         }
-        
+
         if (parsedResults.length === 0) return '未找到匹配内容';
-        
-        const displayResults = parsedResults.slice(0, 10);
-        let resultText = `找到 ${parsedResults.length} 个匹配项:\n\n${displayResults.join('\n\n')}`;
-        
+
+        const shown = parsedResults.slice(0, 10);
+        let resultText = `找到 ${parsedResults.length} 个匹配项:\n\n${shown.join('\n\n')}`;
         if (parsedResults.length > 10) {
           resultText += `\n\n... 还有 ${parsedResults.length - 10} 个匹配项`;
         }
-        
         return resultText;
-      
+      }
+
       case 'read_file':
-      case 'view_file':
+      case 'view_file': {
         // read_file/view_file 工具的字符串结果直接显示
         const lines = trimmed.split('\n').length;
         const chars = trimmed.length;
-        const preview = trimmed;
-        const fileLang = inferLanguageType(undefined, preview);
+        const fileLang = inferLanguageType(undefined, trimmed);
         const fileLangTag = fileLang ? fileLang : '';
-        return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
-      
-      case 'glob':
-      case 'glob_files':
-        // glob 工具返回的文本按换行符分割成文件路径
+        return `**文件内容:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${trimmed}\n\`\`\``;
+      }
+
+      case 'glob': {
+        // deepagents glob 返回换行分隔的绝对路径
+        // "No files found matching pattern '...'" 表示无结果
+        if (trimmed.startsWith('No files found')) return '未找到匹配文件';
         const globLines = trimmed.split('\n').filter(line => line.trim());
         if (globLines.length === 0) return '未找到匹配文件';
-        return `找到 ${globLines.length} 个匹配文件:\n\n` + 
-               globLines.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
-               (globLines.length > 10 ? `\n... 还有 ${globLines.length - 10} 个文件` : '');
-      
+        const shown = globLines.slice(0, 10);
+        const remaining = globLines.length - shown.length;
+        return `找到 ${globLines.length} 个匹配文件:\n\n` +
+               shown.map(file => `- \`${file}\``).join('\n') +
+               (remaining > 0 ? `\n... 还有 ${remaining} 个文件` : '');
+      }
+
+      case 'write_file':
+      case 'edit_file': {
+        // deepagents 返回 "Successfully wrote/replaced..." 或错误字符串
+        if (isErrorContent(trimmed)) {
+          return `❌ 文件操作失败\n${formatStringAsCode(trimmed)}`;
+        }
+        return `✅ ${trimmed}`;
+      }
+
       default:
-        // 其他文件系统工具的字符串结果
         return formatStringAsCode(trimmed);
     }
   }
   
-  // 处理对象/数组输入（JSON格式）
+  // 处理对象/数组输入（兼容旧格式）
   switch (name) {
     case 'ls':
       if (Array.isArray(result)) {
@@ -175,16 +172,13 @@ export const formatFilesystemResult = (name: string, result: any): string => {
     
     case 'read_file':
       if (result.content !== undefined) {
-        // 确保 content 是字符串类型
         const contentStr = typeof result.content === 'string' ? result.content : String(result.content);
         const lines = contentStr.split('\n').length;
         const chars = contentStr.length;
-        const preview = contentStr;
-        // 尝试从结果对象中提取文件路径
         const filePath = result.file_path || result.filePath || undefined;
-        const fileLang = inferLanguageType(filePath, preview);
+        const fileLang = inferLanguageType(filePath, contentStr);
         const fileLangTag = fileLang ? fileLang : '';
-        return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${preview}\n\`\`\``;
+        return `**文件信息:** ${lines} 行, ${chars} 字符\n\n\`\`\`${fileLangTag}\n${contentStr}\n\`\`\``;
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 
@@ -194,7 +188,6 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `❌ **读取失败**: ${result.message || result.error || '未知错误'}`;
       }
       if (result.content !== undefined) {
-        // 确保 content 是字符串类型
         const contentStr = typeof result.content === 'string' ? result.content : String(result.content);
         const filePath = result.file_path || undefined;
         const fileLang = inferLanguageType(filePath, contentStr);
@@ -206,6 +199,24 @@ export const formatFilesystemResult = (name: string, result: any): string => {
           ? `共 ${totalLines} 行`
           : `第 ${startLine}–${endLine} 行 / 共 ${totalLines} 行`;
         return `**文件:** \`${filePath || '未知'}\` (${rangeInfo})\n\n\`\`\`${fileLangTag}\n${contentStr}\n\`\`\``;
+      }
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+
+    case 'glob':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '未找到匹配文件';
+        return `找到 ${result.length} 个匹配文件:\n\n` + 
+               result.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
+               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个文件` : '');
+      }
+      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+    
+    case 'grep':
+      if (Array.isArray(result)) {
+        if (result.length === 0) return '未找到匹配内容';
+        return `找到 ${result.length} 个匹配项:\n\n` + 
+               result.slice(0, 10).map(match => `- ${match}`).join('\n') + 
+               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个匹配项` : '');
       }
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     
@@ -227,60 +238,7 @@ export const formatFilesystemResult = (name: string, result: any): string => {
         return `✅ 文件操作成功\n${detail}`;
       }
       return `❌ 文件操作失败\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-    
-    case 'glob':
-      if (Array.isArray(result)) {
-        if (result.length === 0) return '未找到匹配文件';
-        return `找到 ${result.length} 个匹配文件:\n\n` + 
-               result.slice(0, 10).map(file => `- \`${file}\``).join('\n') + 
-               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个文件` : '');
-      }
-      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
 
-    case 'glob_files':
-      // glob_files 返回 {success, pattern, cwd, count, files}
-      if (result.success === false) {
-        return `❌ **搜索失败**: ${result.error || '未知错误'}`;
-      }
-      if (result.files !== undefined) {
-        const files: string[] = result.files || [];
-        if (files.length === 0) return `未找到匹配模式 \`${result.pattern}\` 的文件`;
-        const shown = files.slice(0, 10);
-        const remaining = files.length - shown.length;
-        return `找到 ${files.length} 个匹配文件 (\`${result.pattern}\`):\n\n` +
-               shown.map(f => `- \`${f}\``).join('\n') +
-               (remaining > 0 ? `\n... 还有 ${remaining} 个文件` : '');
-      }
-      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-    
-    case 'grep':
-      if (Array.isArray(result)) {
-        if (result.length === 0) return '未找到匹配内容';
-        return `找到 ${result.length} 个匹配项:\n\n` + 
-               result.slice(0, 10).map(match => `- ${match}`).join('\n') + 
-               (result.length > 10 ? `\n... 还有 ${result.length - 10} 个匹配项` : '');
-      }
-      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-
-    case 'grep_files':
-      // grep_files 返回 {success, pattern, include, cwd, count, truncated, results}
-      // results 是 [{file, line, content}] 数组
-      if (result.success === false) {
-        return `❌ **搜索失败**: ${result.message || result.error || '未知错误'}`;
-      }
-      if (result.results !== undefined) {
-        const matches: Array<{file: string; line: number; content: string}> = result.results || [];
-        if (matches.length === 0) return `未找到匹配模式 \`${result.pattern}\` 的内容`;
-        const shown = matches.slice(0, 10);
-        const remaining = matches.length - shown.length;
-        const lines = shown.map(m => `📄 \`${m.file}\` 第 ${m.line} 行\n   🔹 ${m.content.trim()}`);
-        let text = `找到 ${result.count || matches.length} 个匹配项 (\`${result.pattern}\`):\n\n` + lines.join('\n\n');
-        if (remaining > 0) text += `\n\n... 还有 ${remaining} 个匹配项`;
-        if (result.truncated) text += `\n\n⚠️ 结果已截断（超过最大数量限制）`;
-        return text;
-      }
-      return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-    
     default:
       return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
   }
@@ -495,9 +453,12 @@ export const formatSearchResult = (result: any): string => {
 
 /**
  * 格式化任务管理工具结果
+ *
+ * deepagents 内置 write_todos 返回字符串：
+ *   "Updated todo list to [{\"content\":\"...\",\"status\":\"...\"}]"
  */
 export const formatTaskManagementResult = (name: string, result: any): string => {
-  if (name === 'write-subagent-todos' || name === 'write_todos') {
+  if (name === 'write-subagent-todos') {
     if (result.todos && Array.isArray(result.todos)) {
       const completed = result.todos.filter((t: any) => t.status === 'completed').length;
       const total = result.todos.length;
@@ -518,10 +479,31 @@ export const formatTaskManagementResult = (name: string, result: any): string =>
              ).join('\n');
     }
   }
-  if (name === 'todo_write') {
-    if (result.success === false) {
-      return `❌ **待办事项更新失败**: ${result.message || result.error || '未知错误'}`;
+  if (name === 'write_todos') {
+    // deepagents 内置 write_todos 返回字符串
+    // "Updated todo list to [{\"content\":\"...\",\"status\":\"...\"}]"
+    if (typeof result === 'string') {
+      const match = result.match(/^Updated todo list to (\[.*\])$/s);
+      if (match) {
+        try {
+          const todos: Array<{content: string; status: string}> = JSON.parse(match[1]);
+          if (todos.length === 0) return '📝 **待办事项列表已清空**';
+          const completed = todos.filter(t => t.status === 'completed').length;
+          const inProgress = todos.filter(t => t.status === 'in_progress').length;
+          const pending = todos.filter(t => t.status === 'pending').length;
+          const header = `📝 **待办事项已更新 (共 ${todos.length} 项: ✅${completed} 🔄${inProgress} ⬜${pending})**\n\n`;
+          const lines = todos.map(todo => {
+            const statusIcon = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⬜';
+            return `- ${statusIcon} ${todo.content}`;
+          });
+          return header + lines.join('\n');
+        } catch {
+          // fall through to default
+        }
+      }
+      return `📝 **${result}**`;
     }
+    // Object format fallback
     if (result.todos && Array.isArray(result.todos)) {
       if (result.todos.length === 0) return '📝 **待办事项列表已清空**';
       const completed = result.todos.filter((t: any) => t.status === 'completed').length;
@@ -529,25 +511,8 @@ export const formatTaskManagementResult = (name: string, result: any): string =>
       return `📝 **待办事项已更新 (${completed}/${total} 完成)**\n\n` +
              result.todos.map((todo: any) => {
                const statusIcon = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⬜';
-               const priorityTag = todo.priority ? ` \`${todo.priority}\`` : '';
-               return `- ${statusIcon} \`#${todo.id}\`${priorityTag} ${todo.content}`;
+               return `- ${statusIcon} ${todo.content}`;
              }).join('\n');
-    }
-  }
-  if (name === 'todo_read') {
-    if (result.todos && Array.isArray(result.todos)) {
-      if (result.todos.length === 0) return '📝 **待办事项列表为空**';
-      const summary = result.summary || {};
-      const notStarted = summary.not_started ?? 0;
-      const inProgress = summary.in_progress ?? 0;
-      const completed = summary.completed ?? 0;
-      const header = `📝 **待办事项 (共 ${result.total || result.todos.length} 项: ✅${completed} 🔄${inProgress} ⬜${notStarted})**\n\n`;
-      const lines = result.todos.map((todo: any) => {
-        const statusIcon = todo.status === 'completed' ? '✅' : todo.status === 'in_progress' ? '🔄' : '⬜';
-        const priorityTag = todo.priority ? ` \`${todo.priority}\`` : '';
-        return `- ${statusIcon} \`#${todo.id}\`${priorityTag} ${todo.content}`;
-      });
-      return header + lines.join('\n');
     }
   }
   return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;

@@ -253,11 +253,12 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
     });
 
     describe('grep tool', () => {
-      it('should format string grep result', () => {
-        const result = formatToolResultByType('grep', 'filesystem', true, 'match1\nmatch2');
+      it('should format deepagents grep result with file:line format', () => {
+        const grepOutput = '\n/src/file.ts:\n  1: match1\n  2: match2';
+        const result = formatToolResultByType('grep', 'filesystem', true, grepOutput);
         expect(result).toContain('找到 2 个匹配项:');
-        expect(result).toContain('🔹 match1');
-        expect(result).toContain('🔹 match2');
+        expect(result).toContain('match1');
+        expect(result).toContain('match2');
       });
 
       it('should handle empty grep string result', () => {
@@ -534,18 +535,22 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
   });
 
   describe('formatToolResultByType - Task Management Tools', () => {
-    it('should format write_todos result with todos array', () => {
-      const result = formatToolResultByType('write_todos', 'task_management', true, {
-        todos: [
-          { content: 'Task 1', status: 'completed' },
-          { content: 'Task 2', status: 'in_progress' },
-          { content: 'Task 3', status: 'pending' }
-        ]
-      });
-      expect(result).toContain('📋 **待办事项更新 (1/3 完成)**');
-      expect(result).toContain('- [✓] Task 1');
-      expect(result).toContain('- [🔄] Task 2');
-      expect(result).toContain('- [ ] Task 3');
+    it('should format write_todos result with deepagents string format', () => {
+      const todos = [
+        { content: 'Task 1', status: 'completed' },
+        { content: 'Task 2', status: 'in_progress' },
+        { content: 'Task 3', status: 'pending' }
+      ];
+      const result = formatToolResultByType('write_todos', 'task_management', true,
+        `Updated todo list to ${JSON.stringify(todos)}`
+      );
+      expect(result).toContain('📝 **待办事项已更新');
+      expect(result).toContain('✅');
+      expect(result).toContain('Task 1');
+      expect(result).toContain('🔄');
+      expect(result).toContain('Task 2');
+      expect(result).toContain('⬜');
+      expect(result).toContain('Task 3');
     });
 
     it('should format write-subagent-todos result', () => {
@@ -814,11 +819,11 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
     it('should return filesystem for view_file', () => {
       expect(getToolType('view_file')).toBe('filesystem');
     });
-    it('should return filesystem for glob_files', () => {
-      expect(getToolType('glob_files')).toBe('filesystem');
+    it('should return filesystem for glob (deepagents built-in)', () => {
+      expect(getToolType('glob')).toBe('filesystem');
     });
-    it('should return filesystem for grep_files', () => {
-      expect(getToolType('grep_files')).toBe('filesystem');
+    it('should return filesystem for grep (deepagents built-in)', () => {
+      expect(getToolType('grep')).toBe('filesystem');
     });
     it('should return web for web_fetch', () => {
       expect(getToolType('web_fetch')).toBe('web');
@@ -923,85 +928,47 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
     });
   });
 
-  describe('formatToolResultByType - glob_files tool (actual name)', () => {
-    it('should format successful glob_files result', () => {
-      const result = formatToolResultByType('glob_files', 'filesystem', true, {
-        success: true,
-        pattern: '**/*.ts',
-        cwd: '/src',
-        count: 3,
-        files: ['a.ts', 'b.ts', 'c.ts']
-      });
+  describe('formatToolResultByType - glob tool (deepagents built-in)', () => {
+    it('should format successful glob result as path list string', () => {
+      const result = formatToolResultByType('glob', 'filesystem', true,
+        '/src/a.ts\n/src/b.ts\n/src/c.ts'
+      );
       expect(result).toContain('找到 3 个匹配文件');
-      expect(result).toContain('`**/*.ts`');
-      expect(result).toContain('- `a.ts`');
+      expect(result).toContain('- `/src/a.ts`');
     });
 
-    it('should format glob_files result with no matches', () => {
-      const result = formatToolResultByType('glob_files', 'filesystem', true, {
-        success: true,
-        pattern: '**/*.xyz',
-        count: 0,
-        files: []
-      });
-      expect(result).toContain('未找到匹配模式');
+    it('should format glob result with no matches (deepagents "No files found" string)', () => {
+      const result = formatToolResultByType('glob', 'filesystem', true,
+        "No files found matching pattern '**/*.xyz'"
+      );
+      expect(result).toBe('未找到匹配文件');
     });
 
-    it('should format failed glob_files result', () => {
-      const result = formatToolResultByType('glob_files', 'filesystem', false, {
-        success: false,
-        error: 'INVALID_PATTERN',
-        pattern: '?!'
-      });
-      expect(result).toContain('❌');
+    it('should format glob with more than 10 files (truncates list)', () => {
+      const files = Array.from({ length: 12 }, (_, i) => `/src/file${i}.ts`).join('\n');
+      const result = formatToolResultByType('glob', 'filesystem', true, files);
+      expect(result).toContain('还有');
     });
   });
 
-  describe('formatToolResultByType - grep_files tool (actual name)', () => {
-    it('should format successful grep_files result', () => {
-      const result = formatToolResultByType('grep_files', 'filesystem', true, {
-        success: true,
-        pattern: 'export',
-        include: '**/*.ts',
-        count: 2,
-        truncated: false,
-        results: [
-          { file: 'src/a.ts', line: 5, content: 'export const foo = 1;' },
-          { file: 'src/b.ts', line: 12, content: 'export default class Bar {}' }
-        ]
-      });
-      expect(result).toContain('找到 2 个匹配项');
-      expect(result).toContain('`export`');
-      expect(result).toContain('`src/a.ts`');
-      expect(result).toContain('第 5 行');
-      expect(result).toContain('export const foo = 1;');
+  describe('formatToolResultByType - grep tool (deepagents built-in)', () => {
+    it('should format successful grep result in deepagents format', () => {
+      const grepOutput = '\n/src/a.ts:\n  5: export const foo = 1;\n/src/b.ts:\n  12: export default class Bar {}';
+      const result = formatToolResultByType('grep', 'filesystem', true, grepOutput);
+      expect(result).toContain('找到');
+      expect(result).toContain('`/src/a.ts`');
     });
 
-    it('should format grep_files result with no matches', () => {
-      const result = formatToolResultByType('grep_files', 'filesystem', true, {
-        success: true,
-        pattern: 'nonexistent',
-        count: 0,
-        truncated: false,
-        results: []
-      });
-      expect(result).toContain('未找到匹配模式');
+    it('should format grep "No matches found" string result', () => {
+      const result = formatToolResultByType('grep', 'filesystem', true,
+        "No matches found for pattern 'nonexistent'"
+      );
+      expect(result).toBe('未找到匹配内容');
     });
 
-    it('should format truncated grep_files result', () => {
-      const results = Array.from({ length: 11 }, (_, i) => ({
-        file: `file${i}.ts`,
-        line: i + 1,
-        content: `content ${i}`
-      }));
-      const result = formatToolResultByType('grep_files', 'filesystem', true, {
-        success: true,
-        pattern: 'test',
-        count: 500,
-        truncated: true,
-        results
-      });
-      expect(result).toContain('⚠️ 结果已截断');
+    it('should format grep result with content line without current file', () => {
+      const result = formatToolResultByType('grep', 'filesystem', true, '  42: some line');
+      expect(result).toContain('🔹');
     });
   });
 

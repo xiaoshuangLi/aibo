@@ -438,12 +438,12 @@ describe('Tool Call Formatter Comprehensive Tests', () => {
       expect(getToolCallTitle('view_file', {})).toBe('📁 工具调用: view_file');
     });
 
-    it('should return correct emoji for glob_files tool', () => {
-      expect(getToolCallTitle('glob_files', {})).toBe('📁 工具调用: glob_files');
+    it('should return correct emoji for glob tool (deepagents built-in)', () => {
+      expect(getToolCallTitle('glob', {})).toBe('📁 工具调用: glob');
     });
 
-    it('should return correct emoji for grep_files tool', () => {
-      expect(getToolCallTitle('grep_files', {})).toBe('📁 工具调用: grep_files');
+    it('should return correct emoji for grep tool (deepagents built-in)', () => {
+      expect(getToolCallTitle('grep', {})).toBe('📁 工具调用: grep');
     });
   });
 
@@ -462,34 +462,32 @@ describe('Tool Call Formatter Comprehensive Tests', () => {
     });
   });
 
-  describe('glob_files tool call formatting', () => {
-    it('should format glob_files with pattern and cwd', () => {
-      const result = formatToolCallArgs('glob_files', { pattern: '**/*.ts', cwd: '/src' });
+  describe('glob tool call formatting (deepagents built-in)', () => {
+    it('should format glob with pattern and path', () => {
+      const result = formatToolCallArgs('glob', { pattern: '**/*.ts', path: '/src' });
       expect(result).toContain('**模式**: `**/*.ts`');
       expect(result).toContain('**路径**: `/src`');
     });
 
-    it('should format glob_files with pattern only', () => {
-      const result = formatToolCallArgs('glob_files', { pattern: '*.json' });
+    it('should format glob with pattern only (uses default path)', () => {
+      const result = formatToolCallArgs('glob', { pattern: '*.json' });
       expect(result).toContain('**模式**: `*.json`');
     });
   });
 
-  describe('grep_files tool call formatting', () => {
-    it('should format grep_files with all parameters', () => {
-      const result = formatToolCallArgs('grep_files', { 
+  describe('grep tool call formatting (deepagents built-in)', () => {
+    it('should format grep with all parameters including glob filter', () => {
+      const result = formatToolCallArgs('grep', { 
         pattern: 'export const', 
-        include: '**/*.ts',
-        cwd: '/src',
-        case_insensitive: true
+        glob: '**/*.ts',
+        path: '/src',
       });
       expect(result).toContain('**搜索模式**: `export const`');
       expect(result).toContain('**文件过滤**: `**/*.ts`');
-      expect(result).toContain('**大小写**: 不敏感');
     });
 
-    it('should format grep_files with pattern only', () => {
-      const result = formatToolCallArgs('grep_files', { pattern: 'TODO' });
+    it('should format grep with pattern only', () => {
+      const result = formatToolCallArgs('grep', { pattern: 'TODO' });
       expect(result).toContain('**搜索模式**: `TODO`');
     });
   });

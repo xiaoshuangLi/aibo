@@ -10,9 +10,10 @@ import {
 
 describe('Tool Result Formatter - Branch Coverage', () => {
   describe('formatFilesystemResult - string results', () => {
-    it('should format ls/view result not starting with / using code block', () => {
-      const result = formatFilesystemResult('ls', 'file1.ts\nfile2.ts\nfile3.ts');
-      expect(result).toContain('```');
+    it('should format ls result as file list', () => {
+      const result = formatFilesystemResult('ls', '/project/file1.ts\n/project/file2.ts\n/project/file3.ts');
+      expect(result).toContain('file1.ts');
+      expect(result).toContain('- `');
     });
 
     it('should format grep result with file path line (ends with :)', () => {
@@ -28,26 +29,27 @@ describe('Tool Result Formatter - Branch Coverage', () => {
       expect(result).toBeDefined();
     });
 
-    it('should format grep result with standard grep format file:linenum:content', () => {
-      const standardGrepOutput = 'file.ts:10:const value = 42;';
-      const result = formatFilesystemResult('grep', standardGrepOutput);
+    it('should format grep result with deepagents format: file path then indented lines', () => {
+      const grepOutput = '\nfile.ts:\n  10: const value = 42;';
+      const result = formatFilesystemResult('grep', grepOutput);
       expect(result).toContain('file.ts');
     });
 
     it('should format grep result with more than 10 matches', () => {
-      const lines = Array.from({ length: 15 }, (_, i) => `result line ${i + 1}`).join('\n');
-      const result = formatFilesystemResult('grep', lines);
+      // Use deepagents grep format with multiple file/line entries
+      const pairs = Array.from({ length: 15 }, (_, i) => `match_file_${i+1}.ts:\n  1: result`).join('\n');
+      const result = formatFilesystemResult('grep', pairs);
       expect(result).toContain('匹配项');
     });
 
-    it('should format default tool string result with newlines', () => {
-      const result = formatFilesystemResult('write_file', 'line1\nline2\nline3');
-      expect(result).toContain('```');
+    it('should format write_file string result as success message', () => {
+      const result = formatFilesystemResult('write_file', "Successfully wrote to '/path/file.ts'");
+      expect(result).toContain('✅');
     });
 
-    it('should format default tool string result without newlines', () => {
-      const result = formatFilesystemResult('write_file', 'single line');
-      expect(result).toContain('`single line`');
+    it('should format edit_file string result as success message', () => {
+      const result = formatFilesystemResult('edit_file', "Successfully replaced 1 occurrence(s) in '/path/file.ts'");
+      expect(result).toContain('✅');
     });
 
     it('should return empty output for empty glob string result', () => {
@@ -62,14 +64,14 @@ describe('Tool Result Formatter - Branch Coverage', () => {
       expect(result).toContain('```json');
     });
 
-    it('should return JSON fallback for glob_files with no files field', () => {
-      const result = formatFilesystemResult('glob_files', { success: true, pattern: '*.ts' });
+    it('should return JSON fallback for glob with empty object result', () => {
+      const result = formatFilesystemResult('glob', { pattern: '*.ts' });
       expect(result).toContain('```json');
     });
 
-    it('should handle glob_files failure', () => {
-      const result = formatFilesystemResult('glob_files', { success: false, error: 'Permission denied' });
-      expect(result).toContain('❌');
+    it('should format glob "No files found" string result as empty', () => {
+      const result = formatFilesystemResult('glob', "No files found matching pattern '*.ts'");
+      expect(result).toBe('未找到匹配文件');
     });
 
     it('should handle grep with more than 10 array items', () => {
@@ -80,16 +82,6 @@ describe('Tool Result Formatter - Branch Coverage', () => {
 
     it('should return JSON fallback for grep with non-array object result', () => {
       const result = formatFilesystemResult('grep', { error: 'not found' });
-      expect(result).toContain('```json');
-    });
-
-    it('should handle grep_files failure', () => {
-      const result = formatFilesystemResult('grep_files', { success: false, message: 'Error' });
-      expect(result).toContain('❌');
-    });
-
-    it('should return JSON fallback for grep_files with no results field', () => {
-      const result = formatFilesystemResult('grep_files', { success: true, pattern: '*.ts' });
       expect(result).toContain('```json');
     });
 

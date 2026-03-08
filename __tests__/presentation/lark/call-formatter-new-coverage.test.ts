@@ -10,7 +10,7 @@ describe('call-formatter - additional coverage', () => {
     expect(result).toContain('*.ts');
   });
 
-  it('glob_files with string arg returns pattern line', () => {
+  it('glob_files with string arg returns pattern line (backward compat)', () => {
     const result = formatToolCallArgs('glob_files', '**/*.js');
     expect(result).toContain('**/*.js');
   });
@@ -94,9 +94,12 @@ describe('call-formatter - additional coverage', () => {
     expect(result).toBe('无参数');
   });
 
-  it('formatToolCallArgs todo_read returns fixed string', () => {
-    const result = formatToolCallArgs('todo_read', {});
-    expect(result).toContain('读取当前待办事项列表');
+  it('formatToolCallArgs write_todos routes to formatTodoWriteToolCall', () => {
+    const result = formatToolCallArgs('write_todos', {
+      todos: [{ status: 'in_progress', content: 'Fix bug' }],
+    });
+    expect(result).toContain('Fix bug');
+    expect(result).toContain('待办事项');
   });
 
   it('formatToolCallArgs agent_runner (claude_execute) with JSON string arg', () => {
@@ -107,9 +110,9 @@ describe('call-formatter - additional coverage', () => {
     expect(result).toContain('refactor module');
   });
 
-  it('formatToolCallArgs todo_write routes to formatTodoWriteToolCall', () => {
-    const result = formatToolCallArgs('todo_write', {
-      todos: [{ id: '1', status: 'not_started', content: 'Fix bug' }],
+  it('formatToolCallArgs write_todos also routes correctly', () => {
+    const result = formatToolCallArgs('write_todos', {
+      todos: [{ status: 'not_started', content: 'Fix bug' }],
     });
     expect(result).toContain('Fix bug');
     expect(result).toContain('待办事项');
