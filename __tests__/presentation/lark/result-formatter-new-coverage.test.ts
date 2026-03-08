@@ -11,8 +11,8 @@ describe('result-formatter - additional coverage', () => {
     expect(result).toContain('🔹');
   });
 
-  it('grep standard file:lineno:content format', () => {
-    const result = formatFilesystemResult('grep', 'src/foo.ts:10:const x = 1;');
+  it('grep deepagents format: file path then indented line', () => {
+    const result = formatFilesystemResult('grep', '\nsrc/foo.ts:\n  10: const x = 1;');
     expect(result).toContain('src/foo.ts');
   });
 
@@ -32,38 +32,32 @@ describe('result-formatter - additional coverage', () => {
     expect(result).toContain('无标题');
   });
 
-  it('formatTaskManagementResult todo_write failure', () => {
-    const result = formatTaskManagementResult('todo_write', { success: false, message: 'bad input' });
-    expect(result).toContain('❌');
-    expect(result).toContain('bad input');
-  });
-
-  it('formatTaskManagementResult todo_write empty todos', () => {
-    const result = formatTaskManagementResult('todo_write', { todos: [] });
-    expect(result).toContain('已清空');
-  });
-
-  it('formatTaskManagementResult todo_write with todos', () => {
-    const result = formatTaskManagementResult('todo_write', {
-      todos: [{ id: '1', status: 'completed', priority: 'high', content: 'Fix bug' }],
-    });
+  it('formatTaskManagementResult write_todos with string result (deepagents format)', () => {
+    const result = formatTaskManagementResult('write_todos', 'Updated todo list to [{"content":"Fix bug","status":"completed"}]');
     expect(result).toContain('Fix bug');
     expect(result).toContain('✅');
   });
 
-  it('formatTaskManagementResult todo_read empty', () => {
-    const result = formatTaskManagementResult('todo_read', { todos: [] });
-    expect(result).toContain('为空');
+  it('formatTaskManagementResult write_todos empty todos string', () => {
+    const result = formatTaskManagementResult('write_todos', 'Updated todo list to []');
+    expect(result).toContain('已清空');
   });
 
-  it('formatTaskManagementResult todo_read with items', () => {
-    const result = formatTaskManagementResult('todo_read', {
-      todos: [{ id: '2', status: 'in_progress', priority: 'medium', content: 'Write tests' }],
-      total: 1,
-      summary: { not_started: 0, in_progress: 1, completed: 0 },
-    });
-    expect(result).toContain('Write tests');
+  it('formatTaskManagementResult write_todos with multiple statuses', () => {
+    const todos = [
+      { content: 'Task 1', status: 'completed' },
+      { content: 'Task 2', status: 'in_progress' },
+      { content: 'Task 3', status: 'pending' },
+    ];
+    const result = formatTaskManagementResult('write_todos', `Updated todo list to ${JSON.stringify(todos)}`);
+    expect(result).toContain('Task 1');
     expect(result).toContain('🔄');
+    expect(result).toContain('⬜');
+  });
+
+  it('formatTaskManagementResult write_todos plain string fallback', () => {
+    const result = formatTaskManagementResult('write_todos', 'some unexpected message');
+    expect(result).toContain('some unexpected message');
   });
 
   it('formatAgentRunnerResult interrupted', () => {

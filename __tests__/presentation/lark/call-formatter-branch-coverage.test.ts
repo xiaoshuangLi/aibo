@@ -24,8 +24,8 @@ describe('Tool Call Formatter - Branch Coverage', () => {
       expect(result).toBe('无参数');
     });
 
-    it('should format grep_files with break to default', () => {
-      const result = formatFilesystemToolCall('grep_files', null);
+    it('should format grep with null args returns 无参数', () => {
+      const result = formatFilesystemToolCall('grep', null);
       expect(result).toBe('无参数');
     });
 

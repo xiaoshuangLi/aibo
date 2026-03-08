@@ -116,6 +116,11 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
           content += `\n\n**新内容**: \n\`\`\`${langTag}\n${args.new_string}\n\`\`\` `;
         }
 
+        // deepagents built-in edit_file uses replace_all flag
+        if (args.replace_all) {
+          content += '\n**替换模式**: 全部替换';
+        }
+
         return content;
       }
       break;
@@ -126,6 +131,7 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
         return `**模式**: \`${args}\``;
       } else if (typeof args === 'object') {
         const pattern = args.pattern || '未知模式';
+        // deepagents built-in glob uses `path` (not `cwd`)
         const path = args.path || args.cwd || '/';
         return `**模式**: \`${pattern}\`\n**路径**: \`${path}\``;
       }
@@ -135,8 +141,9 @@ export const formatFilesystemToolCall = (name: string, args: any): string => {
     case 'grep':
       if (typeof args === 'object') {
         const pattern = args.pattern || '未知模式';
+        // deepagents built-in grep uses `path` (not `cwd`) and `glob` (not `include`)
         const path = args.path || args.cwd || '/';
-        const fileFilter = args.include || args.glob || '所有文件';
+        const fileFilter = args.glob || args.include || '所有文件';
         let content = `**搜索模式**: \`${pattern}\`\n**路径**: \`${path}\`\n**文件过滤**: \`${fileFilter}\``;
         if (args.case_insensitive) {
           content += '\n**大小写**: 不敏感';
@@ -341,7 +348,8 @@ export const formatAgentRunnerToolCall = (name: string, args: any): string => {
 };
 
 /**
- * 格式化 todo_write 工具调用参数
+ * 格式化 write_todos 工具调用参数
+ * deepagents 内置 write_todos 的 todos 项只有 content 和 status（pending/in_progress/completed）
  * @param args - 工具参数
  * @returns 格式化后的内容字符串
  */
@@ -351,10 +359,9 @@ export const formatTodoWriteToolCall = (args: any): string => {
     const todos = args.todos;
     if (todos.length === 0) return '清空待办事项列表';
     const lines = todos.map((t: any) => {
-      const status = t.status || 'not_started';
-      const priority = t.priority ? ` [${t.priority}]` : '';
-      const id = t.id ? `#${t.id} ` : '';
-      return `- ${id}**${status}**${priority}: ${t.content || '(无内容)'}`;
+      const status = t.status || 'pending';
+      const statusIcon = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : '⬜';
+      return `- ${statusIcon} **${status}**: ${t.content || '(无内容)'}`;
     });
     return `📝 **更新待办事项 (${todos.length} 项)**\n\n${lines.join('\n')}`;
   }
@@ -373,11 +380,8 @@ export const formatToolCallArgs = (name: string, args: any): string => {
       if (name === 'task') {
         return formatTaskToolCall(args);
       }
-      if (name === 'todo_write') {
+      if (name === 'write_todos') {
         return formatTodoWriteToolCall(args);
-      }
-      if (name === 'todo_read') {
-        return '读取当前待办事项列表';
       }
       return formatDefaultToolCall(args);
     
