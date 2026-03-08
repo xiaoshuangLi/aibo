@@ -12,6 +12,7 @@ import { createMiddleware, ToolMessage } from 'langchain';
 import { z } from 'zod';
 import { Session } from '@/core/agent';
 import { config } from '@/core/config';
+import { normalizeMessageContent } from '@/core/utils/stream';
 
 /**
  * Configuration options for the session output capture middleware
@@ -82,13 +83,7 @@ export function createSessionOutputCaptureMiddleware(
           let preview: string = 'No output';
           // Check if result is a ToolMessage (has content property)
           if ('content' in result && result.content != null) {
-            if (typeof result.content === 'string') {
-              preview = result.content;
-            } else if (Array.isArray(result.content)) {
-              preview = result.content.join(' ');
-            } else {
-              preview = String(result.content);
-            }
+            preview = normalizeMessageContent(result.content);
           }
           session.logToolResult(toolName, success, preview);
         }
@@ -127,17 +122,11 @@ export function createSessionOutputCaptureMiddleware(
         
         // Log AI response completion
         if (session && typeof session.streamAIContent === 'function') {
-          // Extract the main content from the response
-          let content = '';
-          // Check if response has content property
-          if ('content' in response) {
-            if (typeof response.content === 'string') {
-              content = response.content;
-            } else if (Array.isArray(response.content)) {
-              content = response.content.join(' ');
-            }
-          }
-          await session.streamAIContent(content.toString(), false, true);
+          // Extract the main content from the response using unified normalizer
+          const content = normalizeMessageContent(
+            'content' in response ? response.content : undefined
+          );
+          await session.streamAIContent(content, false, true);
         }
         
         return response;

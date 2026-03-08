@@ -1,4 +1,4 @@
-import { handleAIContent, StreamState } from '@/core/utils/stream';
+import { handleAIContent, normalizeMessageContent, StreamState } from '@/core/utils/stream';
 
 // Mock dependencies
 jest.mock('@/presentation/styling/styler', () => ({
@@ -414,5 +414,169 @@ describe('handleAIContent - Content Processing Enhancement', () => {
       // Should not emit anything for empty content
       expect(mockSession.adapter.emit).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('normalizeMessageContent - unified content normalizer', () => {
+  describe('null / undefined', () => {
+    it('should return empty string for null', () => {
+      expect(normalizeMessageContent(null)).toBe('');
+    });
+
+    it('should return empty string for undefined', () => {
+      expect(normalizeMessageContent(undefined)).toBe('');
+    });
+  });
+
+  describe('string content', () => {
+    it('should return string as-is', () => {
+      expect(normalizeMessageContent('hello')).toBe('hello');
+    });
+
+    it('should return empty string unchanged', () => {
+      expect(normalizeMessageContent('')).toBe('');
+    });
+  });
+
+  describe('Anthropic typed content blocks', () => {
+    it('should extract text from a single text block', () => {
+      const content = [{ type: 'text', text: 'Hello from Anthropic' }];
+      expect(normalizeMessageContent(content)).toBe('Hello from Anthropic');
+    });
+
+    it('should concatenate multiple text blocks', () => {
+      const content = [
+        { type: 'text', text: 'Hello' },
+        { type: 'text', text: ' World' },
+      ];
+      expect(normalizeMessageContent(content)).toBe('Hello World');
+    });
+
+    it('should skip thinking blocks and return only text', () => {
+      const content = [
+        { type: 'thinking', thinking: 'Internal reasoning...' },
+        { type: 'text', text: 'Final response' },
+      ];
+      expect(normalizeMessageContent(content)).toBe('Final response');
+    });
+
+    it('should skip tool_use blocks and return only text', () => {
+      const content = [
+        { type: 'tool_use', id: 'tu_1', name: 'calculator', input: {} },
+        { type: 'text', text: 'Calling calculator' },
+      ];
+      expect(normalizeMessageContent(content)).toBe('Calling calculator');
+    });
+
+    it('should return JSON code block when no text blocks present', () => {
+      const content = [{ type: 'thinking', thinking: 'Just thinking' }];
+      const expected = `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+      expect(normalizeMessageContent(content)).toBe(expected);
+    });
+  });
+
+  describe('plain primitive arrays', () => {
+    it('should join string array with spaces', () => {
+      expect(normalizeMessageContent(['part1', 'part2', 'part3'])).toBe('part1 part2 part3');
+    });
+
+    it('should join number array with spaces', () => {
+      expect(normalizeMessageContent([1, 2, 3])).toBe('1 2 3');
+    });
+  });
+
+  describe('object arrays without type', () => {
+    it('should return first item .text when present', () => {
+      const content = [{ text: 'From text property' }];
+      expect(normalizeMessageContent(content)).toBe('From text property');
+    });
+
+    it('should return JSON code block when first item has no .text', () => {
+      const content = [{ message: 'No text property' }];
+      const expected = `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+      expect(normalizeMessageContent(content)).toBe(expected);
+    });
+  });
+
+  describe('empty array', () => {
+    it('should return JSON code block for empty array', () => {
+      expect(normalizeMessageContent([])).toBe('```json\n[]\n```');
+    });
+  });
+
+  describe('plain objects', () => {
+    it('should return JSON code block for plain object', () => {
+      const obj = { key: 'value' };
+      const expected = `\`\`\`json\n${JSON.stringify(obj, null, 2)}\n\`\`\``;
+      expect(normalizeMessageContent(obj)).toBe(expected);
+    });
+  });
+
+  describe('primitive non-string values', () => {
+    it('should convert number to string', () => {
+      expect(normalizeMessageContent(42)).toBe('42');
+    });
+
+    it('should convert boolean to string', () => {
+      expect(normalizeMessageContent(true)).toBe('true');
+    });
+  });
+});
+
+describe('handleAIContent - Anthropic content block compatibility', () => {
+  let mockSession: any;
+  let mockState: StreamState;
+
+  beforeEach(() => {
+    mockSession = {
+      adapter: {
+        emit: jest.fn()
+      }
+    };
+    mockState = {
+      fullResponse: '',
+      lastToolCall: null,
+      hasDisplayedThinking: false,
+      abortSignal: new AbortController().signal
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should extract text from Anthropic [{type:"text", text:"..."}] blocks', async () => {
+    const msg = {
+      content: [{ type: 'text', text: 'Anthropic text response' }]
+    };
+
+    await handleAIContent(msg, mockState, mockSession);
+
+    expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'aiResponse',
+        data: expect.objectContaining({ content: 'Anthropic text response' }),
+        timestamp: expect.any(Number)
+      })
+    );
+  });
+
+  it('should extract only text blocks when thinking blocks precede them', async () => {
+    const msg = {
+      content: [
+        { type: 'thinking', thinking: 'Let me reason...' },
+        { type: 'text', text: 'Response after thinking' },
+      ]
+    };
+
+    await handleAIContent(msg, mockState, mockSession);
+
+    expect(mockSession.adapter.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'aiResponse',
+        data: expect.objectContaining({ content: 'Response after thinking' }),
+        timestamp: expect.any(Number)
+      })
+    );
   });
 });

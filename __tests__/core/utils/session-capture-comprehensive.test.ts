@@ -155,6 +155,45 @@ describe('SessionOutputCaptureMiddleware - Comprehensive Tests', () => {
       );
     });
 
+    it('should handle Anthropic [{type:"text",text:"..."}] content blocks without [object Object]', async () => {
+      const request = {
+        messages: [{ content: 'user input' }],
+      };
+
+      const handler = jest.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'Anthropic response' }],
+      });
+
+      await middleware.wrapModelCall(request, handler);
+
+      expect(mockSession.streamAIContent).toHaveBeenCalledWith(
+        'Anthropic response',
+        false,
+        true
+      );
+    });
+
+    it('should extract text from Anthropic thinking + text blocks, ignoring thinking', async () => {
+      const request = {
+        messages: [{ content: 'user input' }],
+      };
+
+      const handler = jest.fn().mockResolvedValue({
+        content: [
+          { type: 'thinking', thinking: 'Internal reasoning' },
+          { type: 'text', text: 'Final answer' },
+        ],
+      });
+
+      await middleware.wrapModelCall(request, handler);
+
+      expect(mockSession.streamAIContent).toHaveBeenCalledWith(
+        'Final answer',
+        false,
+        true
+      );
+    });
+
     it('should handle model call error', async () => {
       const request = {
         messages: [{ content: 'user input' }],

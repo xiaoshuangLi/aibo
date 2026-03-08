@@ -13,6 +13,73 @@ import { structuredLog } from '@/shared/utils';
 import { extractMessagesAndTodos, MessagesAndTodos } from './messages';
 
 /**
+ * 统一处理不同大模型返回的消息内容，转换为可读字符串
+ *
+ * 中文名称：统一消息内容转换
+ *
+ * 预期行为：
+ * - null / undefined → 返回空字符串
+ * - 字符串 → 原样返回
+ * - Anthropic 格式数组（含 type 属性的对象数组）→ 拼接所有 type='text' 块的文本
+ * - 纯原始值数组（字符串/数字等）→ 空格拼接
+ * - 含 .text 属性的普通对象数组 → 返回第一个元素的 .text
+ * - 其他对象/数组 → JSON 代码块
+ * - 原始值（number, boolean 等）→ String(value)
+ *
+ * @param content - 来自大模型消息的 content 字段，类型不定
+ * @returns 可读字符串
+ */
+export function normalizeMessageContent(content: any): string {
+  if (content == null) return '';
+
+  if (typeof content === 'string') return content;
+
+  if (Array.isArray(content)) {
+    if (content.length === 0) {
+      return `\`\`\`json\n[]\n\`\`\``;
+    }
+
+    // Anthropic / typed content blocks: [{type: 'text', text: '...'}, {type: 'thinking', thinking: '...'}]
+    const hasTypedBlocks = content.some(
+      (item: any) => item !== null && typeof item === 'object' && 'type' in item
+    );
+    if (hasTypedBlocks) {
+      const textParts = content
+        .filter((item: any) => item?.type === 'text' && typeof item.text === 'string')
+        .map((item: any) => item.text as string);
+      if (textParts.length > 0) {
+        return textParts.join('');
+      }
+      // No 'text' typed blocks — try first item's .text
+      const typedFallbackText = content[0]?.text;
+      if (typeof typedFallbackText === 'string') return typedFallbackText;
+      return `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+    }
+
+    // Plain array of primitives (e.g. ['part1', 'part2'])
+    const allPrimitives = content.every(
+      (item: any) => typeof item !== 'object' || item === null
+    );
+    if (allPrimitives) {
+      return content.join(' ');
+    }
+
+    // Object array with a .text property on the first element
+    const firstText = content[0]?.text;
+    if (typeof firstText === 'string') return firstText;
+
+    // Fallback: render as JSON code block
+    return `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+  }
+
+  if (typeof content === 'object') {
+    return `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+  }
+
+  return String(content);
+}
+
+/**
  * 流状态接口
  * 
  * 中文名称：流状态接口
@@ -248,10 +315,7 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
 export async function handleAIContent(msg: any, state: StreamState, session: any, userInput?: string) {
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
-  const source = msg.content?.[0]?.text || msg.content;
-  const currentContent = typeof source === 'object'
-    ? `\`\`\`json\n${JSON.stringify(source, null, 2)}\n\`\`\``
-    : String(source);
+  const currentContent = normalizeMessageContent(msg.content);
 
   if (state.fullResponse && !currentContent.startsWith(state.fullResponse)) {
     state.fullResponse = '';
