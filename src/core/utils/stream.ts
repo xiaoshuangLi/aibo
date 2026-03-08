@@ -13,6 +13,231 @@ import { structuredLog } from '@/shared/utils';
 import { extractMessagesAndTodos, MessagesAndTodos } from './messages';
 
 /**
+ * 所有已知的 LangChain 内容块类型
+ *
+ * 覆盖 @langchain/core 标准类型以及各提供商的特有格式：
+ * - text / text-plain               — 文本类（所有提供商）
+ * - reasoning                        — 推理类（OpenAI o 系列，DeepSeek-R1）
+ * - thinking / redacted_thinking     — 推理类（Anthropic Claude 3.7+）
+ * - tool_use / tool_call / *         — 工具调用类
+ * - image_url / image / video / audio / file — 多模态类
+ * - non_standard                     — 提供商私有格式
+ */
+type KnownBlockType =
+  | 'text'
+  | 'text-plain'
+  | 'reasoning'
+  | 'thinking'
+  | 'redacted_thinking'
+  | 'tool_use'
+  | 'tool_call'
+  | 'tool_call_chunk'
+  | 'invalid_tool_call'
+  | 'server_tool_call'
+  | 'server_tool_call_chunk'
+  | 'server_tool_call_result'
+  | 'image_url'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'file'
+  | 'non_standard';
+
+/** A single content block with a `type` discriminant and arbitrary additional fields */
+interface TypedContentBlock {
+  type: string;
+  [key: string]: unknown;
+}
+
+/**
+ * 将包含 type 属性的内容块数组统一转换为可读字符串
+ *
+ * 支持 LangChain v1 标准内容块以及各主流大模型的特有格式：
+ *
+ * 文本类（提取文本）：
+ *   - text          — 标准文本块（所有提供商）
+ *   - text-plain    — 纯文本文件块（新标准多模态）
+ *
+ * 内部推理类（跳过，不显示）：
+ *   - reasoning          — OpenAI o 系列 / DeepSeek-R1（标准 LangChain 推理块）
+ *   - thinking           — Anthropic Claude 3.7+ 扩展思考块
+ *   - redacted_thinking  — Anthropic 已编辑的思考块
+ *
+ * 工具调用类（跳过，由 handleToolCall 处理）：
+ *   - tool_use / tool_call / tool_call_chunk / invalid_tool_call
+ *   - server_tool_call / server_tool_call_chunk / server_tool_call_result
+ *
+ * 多模态类（显示占位符）：
+ *   - image_url  — 旧版 OpenAI 图片 → '[Image]'
+ *   - image      — 标准图片块      → '[Image]'
+ *   - video                        → '[Video]'
+ *   - audio                        → '[Audio]'
+ *   - file                         → '[File]'
+ *
+ * 非标准类：
+ *   - non_standard — 提供商私有格式，尝试读取 .value.text
+ *   - 未知类型     — 尝试读取 .text，否则跳过
+ *
+ * @param blocks - 含 type 属性的内容块数组
+ * @returns 拼接后的可读字符串
+ */
+function normalizeTypedContentBlocks(blocks: TypedContentBlock[]): string {
+  const parts: string[] = [];
+
+  for (const block of blocks) {
+    if (block == null || typeof block !== 'object') {
+      if (block != null) parts.push(String(block));
+      continue;
+    }
+
+    const type = block.type as KnownBlockType | string;
+
+    switch (type) {
+      // ── Text content (primary output) ─────────────────────────────────
+      case 'text':
+        // Standard text block: ChatOpenAI, AzureChatOpenAI, ChatAnthropic,
+        // ChatGoogleGenerativeAI, ChatMistralAI, ChatGroq, ChatOllama
+        if (typeof block.text === 'string') parts.push(block.text);
+        break;
+
+      case 'text-plain':
+        // Plain-text file block (new standard multimodal)
+        if (typeof block.text === 'string') parts.push(block.text);
+        else parts.push('[File]');
+        break;
+
+      // ── Internal / reasoning content (skip from display) ──────────────
+      case 'reasoning':
+        // OpenAI o-series (o1, o3-mini) reasoning summary.
+        // Also used by DeepSeek-R1 via ChatOllama / ChatGroq.
+        // These are internal thoughts — not shown to the user.
+        break;
+
+      case 'thinking':
+        // Anthropic Claude 3.7+ extended thinking blocks.
+        // These are internal thoughts — not shown to the user.
+        break;
+
+      case 'redacted_thinking':
+        // Anthropic redacted thinking (content censored for safety).
+        break;
+
+      // ── Tool-related content (skip — handled by handleToolCall) ────────
+      case 'tool_use':
+        // Anthropic legacy tool-use block in content array.
+        break;
+
+      case 'tool_call':
+      case 'tool_call_chunk':
+      case 'invalid_tool_call':
+      case 'server_tool_call':
+      case 'server_tool_call_chunk':
+      case 'server_tool_call_result':
+        // Standard LangChain v1 tool-call content blocks.
+        break;
+
+      // ── Multimodal content (human-readable placeholder) ───────────────
+      case 'image_url':
+        // Legacy OpenAI multimodal: { type: 'image_url', image_url: { url } }
+        parts.push('[Image]');
+        break;
+
+      case 'image':
+        // Standard multimodal image block (new @langchain/core format)
+        parts.push('[Image]');
+        break;
+
+      case 'video':
+        parts.push('[Video]');
+        break;
+
+      case 'audio':
+        parts.push('[Audio]');
+        break;
+
+      case 'file':
+        parts.push('[File]');
+        break;
+
+      // ── Non-standard / provider-specific content ──────────────────────
+      case 'non_standard':
+        // { type: 'non_standard', value: Record<string, any> }
+        // Try to extract text from the inner value object.
+        if (block.value != null && typeof block.value === 'object') {
+          const innerText = (block.value as Record<string, unknown>).text;
+          if (typeof innerText === 'string') parts.push(innerText);
+        }
+        break;
+
+      default:
+        // Unknown typed block — best-effort: try .text property.
+        if (typeof block.text === 'string') parts.push(block.text);
+        break;
+    }
+  }
+
+  return parts.join('');
+}
+
+/**
+ * 统一处理不同大模型返回的消息内容，转换为可读字符串
+ *
+ * 中文名称：统一消息内容转换
+ *
+ * 预期行为：
+ * - null / undefined → 返回空字符串
+ * - 字符串 → 原样返回
+ * - 含 type 属性的对象数组（LangChain 标准内容块）→ normalizeTypedContentBlocks
+ * - 纯原始值数组（字符串/数字等）→ 空格拼接
+ * - 含 .text 属性的普通对象数组 → 返回第一个元素的 .text
+ * - 其他对象/数组 → JSON 代码块
+ * - 原始值（number, boolean 等）→ String(value)
+ *
+ * @param content - 来自大模型消息的 content 字段，类型不定
+ * @returns 可读字符串
+ */
+export function normalizeMessageContent(content: any): string {
+  if (content == null) return '';
+
+  if (typeof content === 'string') return content;
+
+  if (Array.isArray(content)) {
+    if (content.length === 0) {
+      return `\`\`\`json\n[]\n\`\`\``;
+    }
+
+    // Typed content blocks: LangChain v1+ standard and provider-specific formats
+    const hasTypedBlocks = content.some(
+      (item: any) => item !== null && typeof item === 'object' && 'type' in item
+    );
+    if (hasTypedBlocks) {
+      return normalizeTypedContentBlocks(content);
+    }
+
+    // Plain array of primitives (e.g. ['part1', 'part2'])
+    const allPrimitives = content.every(
+      (item: any) => typeof item !== 'object' || item === null
+    );
+    if (allPrimitives) {
+      return content.join(' ');
+    }
+
+    // Object array with a .text property on the first element (legacy format)
+    const firstText = content[0]?.text;
+    if (typeof firstText === 'string') return firstText;
+
+    // Fallback: render as JSON code block
+    return `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+  }
+
+  if (typeof content === 'object') {
+    return `\`\`\`json\n${JSON.stringify(content, null, 2)}\n\`\`\``;
+  }
+
+  return String(content);
+}
+
+/**
  * 流状态接口
  * 
  * 中文名称：流状态接口
@@ -248,10 +473,7 @@ export async function handleTextToolResult(result: string, lastToolCall: any, se
 export async function handleAIContent(msg: any, state: StreamState, session: any, userInput?: string) {
   if (!msg.content || msg.tool_call_id || state.abortSignal.aborted) return;
 
-  const source = msg.content?.[0]?.text || msg.content;
-  const currentContent = typeof source === 'object'
-    ? `\`\`\`json\n${JSON.stringify(source, null, 2)}\n\`\`\``
-    : String(source);
+  const currentContent = normalizeMessageContent(msg.content);
 
   if (state.fullResponse && !currentContent.startsWith(state.fullResponse)) {
     state.fullResponse = '';
