@@ -48,7 +48,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       '.html', '.css', '.scss', '.sass', '.less', '.xml', '.csv', '.sql',
       '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go', '.rs', '.rb',
       '.php', '.swift', '.kt', '.gradle', '.properties', '.env', '.gitignore',
-      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log', '.example'
+      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log', '.example', 'mjs'
     ]);
 
     // Blocked extensions for binary files, models, and sensitive content
