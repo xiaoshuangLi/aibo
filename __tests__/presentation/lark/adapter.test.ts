@@ -646,6 +646,84 @@ describe('LarkAdapter', () => {
       
       await expect((adapter as any).sendMessage('Test')).rejects.toThrow('Lark adapter is destroyed');
     });
+
+    it('should send up to 5 messages without delay', async () => {
+      jest.useFakeTimers();
+      mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
+      const adapter = new LarkAdapter();
+
+      // Send 5 messages simultaneously; all should resolve without any timer
+      const promises = Array.from({ length: 5 }, (_, i) =>
+        (adapter as any).sendMessage(`msg-${i}`)
+      );
+
+      // Flush microtasks so the queue processor advances
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      jest.runAllTimers();
+      await Promise.all(promises);
+
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(5);
+      jest.useRealTimers();
+    });
+
+    it('should delay the 6th message to respect the 5-per-second rate limit', async () => {
+      jest.useFakeTimers();
+      mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
+      const adapter = new LarkAdapter();
+
+      // Pre-fill 5 timestamps within the last second so the next send must wait
+      const now = Date.now();
+      (adapter as any).sendTimestamps = [now - 400, now - 300, now - 200, now - 100, now - 50];
+
+      let sixthResolved = false;
+      const sixthPromise = (adapter as any).sendMessage('msg-6').then(() => {
+        sixthResolved = true;
+      });
+
+      // Advance queue processor so it hits the rate-limit wait
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The 6th message has not been sent yet
+      expect(sixthResolved).toBe(false);
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(0);
+
+      // Advance time past the window so the oldest timestamp is evicted
+      jest.advanceTimersByTime(1000);
+
+      // Allow the deferred setTimeout inside processSendQueue to fire
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await sixthPromise;
+
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(1);
+      expect(sixthResolved).toBe(true);
+      jest.useRealTimers();
+    });
+
+    it('destroy should resolve pending queued messages without sending them', async () => {
+      mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
+      const adapter = new LarkAdapter();
+
+      // Manually block the queue processor so items pile up
+      (adapter as any).isSendingQueue = true;
+      const p1 = (adapter as any).sendMessage('queued-1');
+      const p2 = (adapter as any).sendMessage('queued-2');
+
+      expect((adapter as any).sendQueue).toHaveLength(2);
+
+      // Destroying should drain and resolve all pending promises
+      adapter.destroy();
+
+      await expect(p1).resolves.toBeUndefined();
+      await expect(p2).resolves.toBeUndefined();
+      expect(mockLarkClient.im.message.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('requestUserInput', () => {
