@@ -66,7 +66,7 @@ export function formatSessionMetadataToMarkdown(metadata: any): string {
 
   try {
     // 提取关键信息 - 支持 AITelemetryRecord 嵌套结构
-    const model = metadata.model_info?.model_name || metadata.model || '未知模型';
+    const model = config.model?.name || '未知模型';
     const totalTokens = metadata.token_usage?.total_tokens || metadata.totalTokens || 0;
     const promptTokens = metadata.token_usage?.input_tokens || metadata.promptTokens || 0;
     const completionTokens = metadata.token_usage?.output_tokens || metadata.completionTokens || 0;
