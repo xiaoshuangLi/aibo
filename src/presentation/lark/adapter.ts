@@ -56,6 +56,13 @@ export class LarkAdapter extends DefaultAdapter {
   private static readonly PROGRESS_FLUSH_INTERVAL = 3000; // 3 秒
   private static readonly PROGRESS_FLUSH_SIZE = 800;      // 超过 800 字符立即发送
 
+  // 发出消息速率限制队列 - 每秒最多向即时通讯发送5条
+  private sendQueue: Array<{ fn: () => Promise<void>; resolve: () => void; reject: (err: unknown) => void }> = [];
+  private isSendingQueue = false;
+  private sendTimestamps: number[] = [];
+  private static readonly SEND_RATE_LIMIT = 5;     // 每秒最多5条
+  private static readonly SEND_RATE_WINDOW = 1000; // 1秒窗口（毫秒）
+
   constructor() {
     super();
     
@@ -247,13 +254,61 @@ export class LarkAdapter extends DefaultAdapter {
   }
 
   /**
-   * 发送消息到指定接收ID
+   * 发送消息到指定接收ID（经过速率限制队列，每秒最多5条）
    */
   async sendMessage(content: string, msgType: string = 'text'): Promise<void> {
     if (this.isDestroyed) {
       throw new Error('Lark adapter is destroyed');
     }
 
+    return new Promise<void>((resolve, reject) => {
+      this.sendQueue.push({ fn: () => this._doSendMessage(content, msgType), resolve, reject });
+      this.processSendQueue();
+    });
+  }
+
+  /**
+   * 处理发出消息的速率限制队列（每秒最多5条）
+   */
+  private async processSendQueue(): Promise<void> {
+    if (this.isSendingQueue) return;
+    this.isSendingQueue = true;
+
+    try {
+      while (this.sendQueue.length > 0) {
+        // 移除超出1秒窗口的旧时间戳
+        const now = Date.now();
+        this.sendTimestamps = this.sendTimestamps.filter(
+          t => now - t < LarkAdapter.SEND_RATE_WINDOW
+        );
+
+        if (this.sendTimestamps.length >= LarkAdapter.SEND_RATE_LIMIT) {
+          // 计算需要等待的时间，直到最早的时间戳滑出1秒窗口
+          const waitTime = LarkAdapter.SEND_RATE_WINDOW - (now - this.sendTimestamps[0]);
+          if (waitTime > 0) {
+            await new Promise<void>(r => setTimeout(r, waitTime));
+          }
+          continue;
+        }
+
+        const { fn, resolve, reject } = this.sendQueue.shift()!;
+        this.sendTimestamps.push(Date.now());
+        try {
+          await fn();
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      }
+    } finally {
+      this.isSendingQueue = false;
+    }
+  }
+
+  /**
+   * 实际执行向飞书发送消息的逻辑（由速率限制队列调用）
+   */
+  private async _doSendMessage(content: string, _msgType: string = 'text'): Promise<void> {
     const larkConfig = this.getLarkConfig();
 
     // chat 模式：发送到群聊；user 模式：发送到用户
@@ -341,6 +396,12 @@ export class LarkAdapter extends DefaultAdapter {
     if (this.progressFlushTimer) {
       clearTimeout(this.progressFlushTimer);
       this.progressFlushTimer = null;
+    }
+
+    // 清空发出消息队列，解析所有待处理的 Promise（静默丢弃）
+    if (this.sendQueue.length > 0) {
+      const pending = this.sendQueue.splice(0);
+      pending.forEach(({ resolve }) => resolve());
     }
     
     // 关闭WebSocket连接
