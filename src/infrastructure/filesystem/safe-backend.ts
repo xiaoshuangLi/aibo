@@ -29,7 +29,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }) {
     // Set reasonable defaults
     const maxFileSizeMb = options.maxFileSizeMb ?? 10; // 10MB default instead of 1000MB
-    const maxDepth = options.maxDepth ?? 5; // Limit directory depth
+    const maxDepth = options.maxDepth ?? 10; // Limit directory depth
     
     super({
       rootDir: options.rootDir,
