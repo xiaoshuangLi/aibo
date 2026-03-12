@@ -32,7 +32,7 @@ const model = createModel();
 const backend = new SafeFilesystemBackend({
   rootDir: process.cwd(),
   maxFileSizeMb: 10, // Reduced from 1000MB to 10MB
-  maxDepth: 5, // Limit directory traversal depth
+  maxDepth: 10, // Limit directory traversal depth
 });
 
 // 缓存的代理实例
