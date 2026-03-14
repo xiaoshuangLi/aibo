@@ -11,6 +11,7 @@
 import { HumanMessage } from "langchain";
 import { structuredLog } from '@/shared/utils';
 import { extractMessagesAndTodos, MessagesAndTodos } from './messages';
+import { SessionManager } from '@/infrastructure/session';
 
 /**
  * 所有已知的 LangChain 内容块类型
@@ -657,6 +658,31 @@ export async function processStreamChunks(
       session.adapter?.emit({
         type: 'errorMessage',
         data: { message: "⚠️ 操作已被用户中断" },
+        timestamp: Date.now()
+      });
+    } else if (typeof error.message === 'string' && error.message.includes('Cannot change both systemPrompt and systemMessage')) {
+      // This error occurs when the conversation is too long and the SummarizationMiddleware
+      // triggers, causing a conflict in the langchain middleware chain.
+      // Recovery: reset the session so the next message starts with a fresh context.
+      structuredLog('error', 'Interactive mode error', {
+        component: 'interactive',
+        error: error.message,
+        stack: error.stack
+      });
+      try {
+        const sessionManager = SessionManager.getInstance();
+        session.threadId = sessionManager.clearCurrentSession();
+      } catch (resetError) {
+        structuredLog('error', 'Failed to reset session after middleware error', {
+          component: 'interactive',
+          error: (resetError as Error).message
+        });
+      }
+      session.adapter?.emit({
+        type: 'errorMessage',
+        data: {
+          message: `⚠️ 对话过长导致上下文冲突，已自动重置会话 (新 ID: ${session.threadId})。请重新发送您的问题。`
+        },
         timestamp: Date.now()
       });
     } else {

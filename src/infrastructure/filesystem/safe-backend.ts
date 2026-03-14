@@ -126,26 +126,58 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }
 
   /**
+   * Redirect deepagents-generated absolute paths to within the project root.
+   *
+   * Deepagents middleware writes files to hard-coded absolute paths such as
+   * `/conversation_history/<session>.md` (SummarizationMiddleware) and
+   * `/large_tool_results/<id>` (FilesystemMiddleware tool-result eviction).
+   * These paths are outside the project root and are rejected by our safety
+   * checks.  This method detects those well-known prefixes and maps them
+   * into `<projectRoot>/.data/<relative>` so writes succeed and the files
+   * stay within the workspace.
+   */
+  redirectDeepagentsPath(filePath: string): string {
+    const REDIRECTED_PREFIXES = ['/conversation_history/', '/large_tool_results/'];
+
+    if (path.isAbsolute(filePath)) {
+      for (const prefix of REDIRECTED_PREFIXES) {
+        if (filePath.startsWith(prefix)) {
+          // Strip leading '/' and place under .data/
+          const relativePart = filePath.slice(1);
+          return path.join(this.projectRoot, '.data', relativePart);
+        }
+      }
+    }
+    return filePath;
+  }
+
+  /**
    * Enhanced read operation with safety checks
    */
   async read(filePath: string, offset?: number, limit?: number): Promise<string> {
     try {
+      // Redirect deepagents absolute paths to within the project root
+      const effectivePath = this.redirectDeepagentsPath(filePath);
+      const resolvedEffective = path.isAbsolute(effectivePath)
+        ? effectivePath
+        : path.resolve(this.projectRoot, effectivePath);
+
       // Security checks
-      if (!this.isWithinProjectRoot(filePath)) {
+      if (!this.isWithinProjectRoot(resolvedEffective)) {
         throw new Error(`Access denied: ${filePath} is outside project root`);
       }
 
-      if (!this.isWithinDepthLimit(filePath)) {
+      if (!this.isWithinDepthLimit(resolvedEffective)) {
         throw new Error(`Access denied: ${filePath} exceeds maximum depth limit of ${this.maxDepth}`);
       }
 
-      if (!this.isAllowedExtension(filePath)) {
+      if (!this.isAllowedExtension(resolvedEffective)) {
         throw new Error(`Access denied: ${filePath} has a blocked file extension`);
       }
 
       // Call parent read method with offset and limit parameters
       // The parent class will handle the file size check internally
-      return await super.read(filePath, offset, limit);
+      return await super.read(resolvedEffective, offset, limit);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Access denied')) {
         throw error;
@@ -312,11 +344,15 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async write(filePath: string, content: string): Promise<WriteResult> {
     try {
+      // Redirect deepagents absolute paths (e.g. /conversation_history/, /large_tool_results/)
+      // to within the project root under .data/ before resolving.
+      const effectiveFilePath = this.redirectDeepagentsPath(filePath);
+
       // Resolve relative paths against projectRoot to avoid CWD-based resolution issues
       // (e.g. on macOS where process.chdir resolves symlinks differently than path.resolve)
-      const resolvedPath = path.isAbsolute(filePath)
-        ? filePath
-        : path.resolve(this.projectRoot, filePath);
+      const resolvedPath = path.isAbsolute(effectiveFilePath)
+        ? effectiveFilePath
+        : path.resolve(this.projectRoot, effectiveFilePath);
 
       // Security checks
       if (!this.isWithinProjectRoot(resolvedPath)) {
@@ -344,7 +380,9 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       await fs.promises.writeFile(resolvedPath, content, 'utf-8');
 
       return { 
-        path: filePath, 
+        // Return the resolved path so callers (e.g. SummarizationMiddleware) store the
+        // correct, accessible path rather than the original deepagents absolute path.
+        path: resolvedPath, 
         filesUpdate: null 
       };
     } catch (error) {

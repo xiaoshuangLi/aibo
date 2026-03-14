@@ -185,4 +185,80 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
       expect(jpgFiles.length).toBe(0);
     });
   });
+
+  describe('redirectDeepagentsPath', () => {
+    it('should redirect /conversation_history/ to .data/conversation_history/', () => {
+      const filePath = '/conversation_history/session_abc123.md';
+      const result = safeBackend.redirectDeepagentsPath(filePath);
+      expect(result).toBe(path.join(tempDir, '.data', 'conversation_history', 'session_abc123.md'));
+    });
+
+    it('should redirect /large_tool_results/ to .data/large_tool_results/', () => {
+      const filePath = '/large_tool_results/call_xyz789';
+      const result = safeBackend.redirectDeepagentsPath(filePath);
+      expect(result).toBe(path.join(tempDir, '.data', 'large_tool_results', 'call_xyz789'));
+    });
+
+    it('should not redirect paths within the project root', () => {
+      const filePath = path.join(tempDir, 'some', 'file.ts');
+      const result = safeBackend.redirectDeepagentsPath(filePath);
+      expect(result).toBe(filePath);
+    });
+
+    it('should not redirect relative paths', () => {
+      const filePath = 'relative/file.ts';
+      const result = safeBackend.redirectDeepagentsPath(filePath);
+      expect(result).toBe(filePath);
+    });
+
+    it('should not redirect unrelated absolute paths', () => {
+      const filePath = '/tmp/some-other-file.txt';
+      const result = safeBackend.redirectDeepagentsPath(filePath);
+      expect(result).toBe(filePath);
+    });
+  });
+
+  describe('write with deepagents path redirect', () => {
+    it('should write /conversation_history/ path to .data/conversation_history/', async () => {
+      const filePath = '/conversation_history/session_test.md';
+      const result = await safeBackend.write(filePath, '# Summary\nTest content');
+      expect(result.error).toBeUndefined();
+      // The returned path should be the redirected path within project root
+      expect(result.path).toBe(path.join(tempDir, '.data', 'conversation_history', 'session_test.md'));
+      // Verify the file was actually written at the redirected location
+      const written = await fs.promises.readFile(
+        path.join(tempDir, '.data', 'conversation_history', 'session_test.md'),
+        'utf-8'
+      );
+      expect(written).toBe('# Summary\nTest content');
+    });
+
+    it('should write /large_tool_results/ path to .data/large_tool_results/', async () => {
+      const filePath = '/large_tool_results/call_abc';
+      const result = await safeBackend.write(filePath, 'large tool output');
+      expect(result.error).toBeUndefined();
+      expect(result.path).toBe(path.join(tempDir, '.data', 'large_tool_results', 'call_abc'));
+      const written = await fs.promises.readFile(
+        path.join(tempDir, '.data', 'large_tool_results', 'call_abc'),
+        'utf-8'
+      );
+      expect(written).toBe('large tool output');
+    });
+  });
+
+  describe('read with deepagents path redirect', () => {
+    it('should read /conversation_history/ path from .data/conversation_history/', async () => {
+      // Pre-create the redirected file
+      const targetDir = path.join(tempDir, '.data', 'conversation_history');
+      await fs.promises.mkdir(targetDir, { recursive: true });
+      await fs.promises.writeFile(
+        path.join(targetDir, 'session_test.md'),
+        '# Stored Summary'
+      );
+
+      const content = await safeBackend.read('/conversation_history/session_test.md');
+      // The parent read() method adds line numbers (cat -n style)
+      expect(content).toContain('# Stored Summary');
+    });
+  });
 });
