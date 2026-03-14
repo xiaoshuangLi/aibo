@@ -18,14 +18,6 @@ jest.mock('@/shared/utils/logging', () => ({
   structuredLog: jest.fn()
 }));
 
-jest.mock('@/infrastructure/session', () => ({
-  SessionManager: {
-    getInstance: () => ({
-      clearCurrentSession: jest.fn().mockReturnValue('new-thread-id')
-    })
-  }
-}));
-
 describe('Stream Handler', () => {
   let mockState: StreamState;
   let mockSession: any;
@@ -198,7 +190,7 @@ describe('Stream Handler', () => {
         .resolves.not.toThrow();
     });
 
-    it('should auto-reset session on systemPrompt/systemMessage conflict error', async () => {
+    it('should treat the systemPrompt/systemMessage conflict error as a standard error', async () => {
       const emitMock = jest.fn().mockResolvedValue(undefined);
       const session: any = {
         threadId: 'old-thread-id',
@@ -217,15 +209,15 @@ describe('Stream Handler', () => {
 
       const result = await processStreamChunks(mockStream, mockState, session, 'hello');
 
-      // Session threadId should be updated to the new value returned by clearCurrentSession
-      expect(session.threadId).toBe('new-thread-id');
+      // Session threadId should NOT be changed (proactive summarization prevents this error)
+      expect(session.threadId).toBe('old-thread-id');
 
-      // Should emit an error message informing the user about the reset
+      // Should emit a generic error message
       expect(emitMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'errorMessage',
           data: expect.objectContaining({
-            message: expect.stringContaining('已自动重置会话')
+            message: expect.stringContaining('发生错误')
           })
         })
       );

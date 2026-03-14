@@ -2,6 +2,7 @@
 
 // Mock deepagents BEFORE any imports
 jest.mock('deepagents', () => ({
+  createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' }),
   createDeepAgent: jest.fn(() => ({
     stream: jest.fn().mockImplementation(async () => {
       // Return a mock async iterable that yields test data
@@ -144,6 +145,7 @@ jest.mock('../src/presentation/console/input', () => ({
 
 // Mock deepagents to return a proper agent with stream method
 jest.mock('deepagents', () => ({
+  createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' }),
   createDeepAgent: jest.fn(() => ({
     stream: jest.fn().mockImplementation(async () => {
       // Return a mock async iterable that yields test data
@@ -187,6 +189,7 @@ jest.mock('../src/core/config', () => ({
 }));
 
 jest.mock('deepagents', () => ({
+  createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' }),
   createDeepAgent: jest.fn(() => ({
     stream: jest.fn().mockImplementation(async () => {
       // Return a mock async iterable that yields test data

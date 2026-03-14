@@ -76,7 +76,8 @@ describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
     }));
 
     jest.doMock('deepagents', () => ({
-      createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() })
+      createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() }),
+      createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' })
     }));
 
     jest.doMock('@/infrastructure/filesystem/safe-backend', () => ({
@@ -133,6 +134,7 @@ describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
     
     // 验证middleware数组包含正确的中间件（没有session时只有toolRetryMiddleware）
     expect(createDeepAgentCall.middleware).toEqual([
+      expect.objectContaining({ name: 'ProactiveSummarizationMiddleware' }),
       expect.objectContaining({ name: 'LangChainToolRetryMiddleware' })
     ]);
   });
@@ -159,6 +161,7 @@ describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
     
     // 验证middleware数组包含正确的中间件顺序
     expect(createDeepAgentCall.middleware).toEqual([
+      expect.objectContaining({ name: 'ProactiveSummarizationMiddleware' }),
       expect.objectContaining({ name: 'LangChainToolRetryMiddleware' }),
       expect.objectContaining({ name: 'FilterDuplicateToolsMiddleware' }),
       expect.objectContaining({ name: 'ImageUploadMiddleware' })
@@ -275,11 +278,12 @@ describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
     expect(createDeepAgent).toHaveBeenCalled();
     const createDeepAgentCall = (createDeepAgent as jest.Mock).mock.calls[0][0];
     
-    // 验证主代理的中间件顺序：toolRetry -> filterDuplicateTools -> imageUpload
+    // 验证主代理的中间件顺序：proactiveSummarization -> toolRetry -> filterDuplicateTools -> imageUpload
     const mainMiddleware = createDeepAgentCall.middleware;
-    expect(mainMiddleware[0]).toEqual(expect.objectContaining({ name: 'LangChainToolRetryMiddleware' }));
-    expect(mainMiddleware[1]).toEqual(expect.objectContaining({ name: 'FilterDuplicateToolsMiddleware' }));
-    expect(mainMiddleware[2]).toEqual(expect.objectContaining({ name: 'ImageUploadMiddleware' }));
+    expect(mainMiddleware[0]).toEqual(expect.objectContaining({ name: 'ProactiveSummarizationMiddleware' }));
+    expect(mainMiddleware[1]).toEqual(expect.objectContaining({ name: 'LangChainToolRetryMiddleware' }));
+    expect(mainMiddleware[2]).toEqual(expect.objectContaining({ name: 'FilterDuplicateToolsMiddleware' }));
+    expect(mainMiddleware[3]).toEqual(expect.objectContaining({ name: 'ImageUploadMiddleware' }));
   });
 
   it('should create FilterDuplicateToolsMiddleware only once per agent creation', async () => {

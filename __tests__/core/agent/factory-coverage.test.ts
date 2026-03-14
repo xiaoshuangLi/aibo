@@ -57,7 +57,8 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
     }));
 
     jest.doMock('deepagents', () => ({
-      createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() })
+      createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() }),
+      createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' })
     }));
 
     jest.doMock('@/infrastructure/filesystem/safe-backend', () => ({
@@ -273,7 +274,7 @@ describe('buildCodingAgentHint', () => {
       getDefaultGeneralPurposeSubAgent: jest.fn().mockReturnValue({ name: 'general-purpose' }),
     }));
     jest.doMock('@/core/utils/skills', () => ({ findSkillsDirectories: jest.fn().mockReturnValue([]) }));
-    jest.doMock('deepagents', () => ({ createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() }) }));
+    jest.doMock('deepagents', () => ({ createDeepAgent: jest.fn().mockReturnValue({ stream: jest.fn() }), createSummarizationMiddleware: jest.fn().mockReturnValue({ name: 'ProactiveSummarizationMiddleware' }) }));
     jest.doMock('@/infrastructure/filesystem/safe-backend', () => ({ SafeFilesystemBackend: jest.fn().mockImplementation(() => ({})) }));
     jest.doMock('@langchain/langgraph', () => ({ MemorySaver: jest.fn().mockImplementation(() => ({})) }));
     jest.doMock('@/infrastructure/checkpoint/checkpointer', () => ({ FilesystemCheckpointer: jest.fn().mockImplementation(() => ({})) }));

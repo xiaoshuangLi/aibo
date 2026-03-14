@@ -152,15 +152,23 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }
 
   /**
+   * Redirect and resolve a file path to an absolute path within the project root.
+   * Applies `redirectDeepagentsPath` first, then resolves relative paths against
+   * `projectRoot` to avoid CWD-based resolution issues (e.g. macOS symlinks).
+   */
+  private resolveEffectivePath(filePath: string): string {
+    const effective = this.redirectDeepagentsPath(filePath);
+    return path.isAbsolute(effective)
+      ? effective
+      : path.resolve(this.projectRoot, effective);
+  }
+
+  /**
    * Enhanced read operation with safety checks
    */
   async read(filePath: string, offset?: number, limit?: number): Promise<string> {
     try {
-      // Redirect deepagents absolute paths to within the project root
-      const effectivePath = this.redirectDeepagentsPath(filePath);
-      const resolvedEffective = path.isAbsolute(effectivePath)
-        ? effectivePath
-        : path.resolve(this.projectRoot, effectivePath);
+      const resolvedEffective = this.resolveEffectivePath(filePath);
 
       // Security checks
       if (!this.isWithinProjectRoot(resolvedEffective)) {
@@ -345,14 +353,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   async write(filePath: string, content: string): Promise<WriteResult> {
     try {
       // Redirect deepagents absolute paths (e.g. /conversation_history/, /large_tool_results/)
-      // to within the project root under .data/ before resolving.
-      const effectiveFilePath = this.redirectDeepagentsPath(filePath);
-
-      // Resolve relative paths against projectRoot to avoid CWD-based resolution issues
-      // (e.g. on macOS where process.chdir resolves symlinks differently than path.resolve)
-      const resolvedPath = path.isAbsolute(effectiveFilePath)
-        ? effectiveFilePath
-        : path.resolve(this.projectRoot, effectiveFilePath);
+      // and resolve to an absolute path within the project root.
+      const resolvedPath = this.resolveEffectivePath(filePath);
 
       // Security checks
       if (!this.isWithinProjectRoot(resolvedPath)) {

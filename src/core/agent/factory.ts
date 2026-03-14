@@ -1,7 +1,7 @@
 import { config } from '@/core/config';
 import { MemorySaver } from "@langchain/langgraph";
 import { createModel } from './model';
-import { createDeepAgent } from 'deepagents';
+import { createDeepAgent, createSummarizationMiddleware } from 'deepagents';
 import { FilesystemCheckpointer } from '@/infrastructure/checkpoint';
 import getTools from '@/tools';
 import { loadSubAgents, getDefaultGeneralPurposeSubAgent } from '@/infrastructure/agents';
@@ -34,6 +34,17 @@ const backend = new SafeFilesystemBackend({
   maxFileSizeMb: 10, // Reduced from 1000MB to 10MB
   maxDepth: 10, // Limit directory traversal depth
 });
+
+// Proactive summarization trigger threshold in tokens.
+//
+// Chosen to be well below every common model's context window (GPT-4o = 128k,
+// Claude = 200k) yet high enough that routine conversations never trigger early.
+// For models WITHOUT a langchain profile the built-in SummarizationMiddleware
+// defaults to FALLBACK_TRIGGER = 170,000 tokens — far above the actual context
+// limit — so it relies on a ContextOverflowError emergency path that contains a
+// known bug (contaminated shared `currentSystemMessage` on retry).  Our outer
+// middleware fires proactively at 80 k tokens, preventing that path entirely.
+const PROACTIVE_SUMMARIZATION_TRIGGER_TOKENS = 80_000;
 
 // 缓存的代理实例
 let cachedAgent: ReturnType<typeof createDeepAgent>;
@@ -141,6 +152,31 @@ export async function createAIAgent(session?: Session): Promise<any> {
 
   const systemPrompt = buildSystemPromptFromTools(tools);
 
+  // Proactive summarization middleware (outermost wrapModelCall = runs first).
+  //
+  // Why this is needed:
+  //   createDeepAgent's built-in SummarizationMiddleware uses a FALLBACK_TRIGGER of
+  //   170,000 tokens for models without a langchain profile (custom/Chinese LLMs, etc.).
+  //   That threshold is never reached proactively; instead the base handler throws a
+  //   ContextOverflowError, which triggers an "emergency summarization" retry path.
+  //   During that retry the shared `currentSystemMessage` variable has been mutated by
+  //   the previous (failed) inner-middleware chain call, causing the error:
+  //     "Cannot change both systemPrompt and systemMessage in the same request."
+  //
+  // By placing our own SummarizationMiddleware as an outer (custom) middleware we
+  // guarantee proactive summarization fires BEFORE the base handler is ever called
+  // with an over-large context.  The inner built-in middleware then sees a compact
+  // history and its emergency path is never triggered.
+  const proactiveSummarizationMiddleware = createSummarizationMiddleware({
+    model,
+    backend,
+    // Fire at PROACTIVE_SUMMARIZATION_TRIGGER_TOKENS — well within every model's
+    // context window regardless of whether langchain has a registered profile for it.
+    trigger: { type: 'tokens', value: PROACTIVE_SUMMARIZATION_TRIGGER_TOKENS },
+    // Keep the last 20 messages after summarization so recent context is preserved.
+    keep: { type: 'messages', value: 20 },
+  });
+
   cachedAgent = createDeepAgent({
     model,
     backend,
@@ -149,7 +185,9 @@ export async function createAIAgent(session?: Session): Promise<any> {
     tools,
     skills: allSkillsDirs,
     subagents: subAgents as any,
-    middleware: session ? [toolRetryMiddleware, filterDuplicateToolsMiddleware, ...imageUploadMiddleware] as any : [toolRetryMiddleware] as any,
+    middleware: session
+      ? [proactiveSummarizationMiddleware, toolRetryMiddleware, filterDuplicateToolsMiddleware, ...imageUploadMiddleware] as any
+      : [proactiveSummarizationMiddleware, toolRetryMiddleware] as any,
     interruptOn: { grep: false },
   });
 
