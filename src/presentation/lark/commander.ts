@@ -132,7 +132,7 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/acp <代理名> <会话名>\` - 🔗 进入带命名会话的 ACP 直传模式
 • \`/acp stop\`             - ⏹️  退出 ACP 直传模式
 • \`/acp status\`           - 📊 查看当前 ACP 直传状态
-  代理名支持：codex / claude / gemini / cursor / copilot
+  代理名支持：codex / claude / gemini / cursor / copilot / pi / openclaw / kimi / opencode / kiro / kilocode / qwen / droid
 
 📂 **文件管理命令**  
 • \`/show-files\` - 📋 查看工作区改动文件

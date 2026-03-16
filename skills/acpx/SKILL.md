@@ -27,6 +27,12 @@ Prefer `acpx_execute` over the individual CLI tools (`codex_execute`, `claude_ex
 | `copilot`    | GitHub Copilot (`copilot --acp --stdio`) |
 | `pi`         | Pi Coding Agent |
 | `openclaw`   | OpenClaw ACP bridge |
+| `kimi`       | Kimi Coding Agent |
+| `opencode`   | OpenCode CLI |
+| `kiro`       | Kiro Agent |
+| `kilocode`   | KiloCode Agent |
+| `qwen`       | Qwen Coding Agent |
+| `droid`      | Droid Agent |
 
 Unknown names are treated as raw ACP server commands.
 

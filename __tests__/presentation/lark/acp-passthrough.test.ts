@@ -166,7 +166,7 @@ describe('handleAcpCommand', () => {
   });
 
   it('should support all known built-in agents', async () => {
-    const agents = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw'];
+    const agents = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw', 'kimi', 'opencode', 'kiro', 'kilocode', 'qwen', 'droid'];
     for (const agent of agents) {
       clearAcpPassthroughState();
       const result = await handleAcpCommand(mockSession, [agent]);

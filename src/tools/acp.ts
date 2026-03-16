@@ -29,7 +29,7 @@ const acpSchema = z.object({
   agent: z
     .string()
     .describe(
-      'The ACP-compatible coding agent to use. Built-in names: "codex", "claude", "gemini", "cursor", "copilot", "pi", "openclaw". Unknown names are treated as raw commands.',
+      'The ACP-compatible coding agent to use. Built-in names: "codex", "claude", "gemini", "cursor", "copilot", "pi", "openclaw", "kimi", "opencode", "kiro", "kilocode", "qwen", "droid". Unknown names are treated as raw commands.',
     ),
   prompt: z
     .string()
@@ -192,7 +192,7 @@ function createAcpExecuteTool(session?: Session) {
 
 acpx is a headless CLI client for ACP that avoids PTY scraping. It supports persistent multi-turn sessions, one-shot execution, named parallel sessions, and cooperative cancellation.
 
-Supported built-in agents: "codex", "claude", "gemini", "cursor", "copilot", "pi", "openclaw", and any custom ACP server via raw command name.
+Supported built-in agents: "codex", "claude", "gemini", "cursor", "copilot", "pi", "openclaw", "kimi", "opencode", "kiro", "kilocode", "qwen", "droid", and any custom ACP server via raw command name.
 
 Use this tool to:
 - Send prompts to ACP-compatible coding agents with persistent session continuity

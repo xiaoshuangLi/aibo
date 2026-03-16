@@ -48,7 +48,7 @@
     "@types/turndown": "^5.0.6",
     "axios": "^1.13.5",
     "commander": "^9.5.0",
-    "deepagents": "^1.7.2",
+    "deepagents": "^1.8.3",
     "dotenv": "^17.2.4",
     "glob": "^11.1.0",
     "js-yaml": "^4.1.1",
