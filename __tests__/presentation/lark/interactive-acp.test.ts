@@ -53,10 +53,14 @@ describe('handleAcpPassthrough', () => {
   const mockLogToolProgress = jest.fn();
   const mockLogToolResult = jest.fn();
   const mockAbortController = { signal: {} };
+  const mockLogAcpResponse = jest.fn();
+  const mockLogSystemMessage = jest.fn();
   const mockSession = {
     logToolCall: mockLogToolCall,
     logToolProgress: mockLogToolProgress,
     logToolResult: mockLogToolResult,
+    logAcpResponse: mockLogAcpResponse,
+    logSystemMessage: mockLogSystemMessage,
     abortController: mockAbortController,
   } as any;
 
@@ -66,6 +70,8 @@ describe('handleAcpPassthrough', () => {
     mockLogToolCall.mockClear();
     mockLogToolProgress.mockClear();
     mockLogToolResult.mockClear();
+    mockLogAcpResponse.mockClear();
+    mockLogSystemMessage.mockClear();
   });
 
   afterEach(() => {
@@ -101,28 +107,19 @@ describe('handleAcpPassthrough', () => {
     expect(callArgs).toContain('backend');
   });
 
-  it('should log tool call before executing', async () => {
+  it('should log ACP response on success (not tool call/result)', async () => {
     setAcpPassthroughState({ agent: 'codex' });
     execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
 
     await handleAcpPassthrough('task', mockSession);
 
-    expect(mockLogToolCall).toHaveBeenCalledWith(
-      'acpx[codex]',
-      expect.objectContaining({ agent: 'codex', prompt: 'task' }),
-    );
+    // New behaviour: response is shown as an ACP-titled card, not a tool call
+    expect(mockLogAcpResponse).toHaveBeenCalledWith('codex', 'ok');
+    expect(mockLogToolCall).not.toHaveBeenCalled();
+    expect(mockLogToolResult).not.toHaveBeenCalled();
   });
 
-  it('should log tool result on success', async () => {
-    setAcpPassthroughState({ agent: 'codex' });
-    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
-
-    await handleAcpPassthrough('task', mockSession);
-
-    expect(mockLogToolResult).toHaveBeenCalledWith('acpx[codex]', true, expect.any(String));
-  });
-
-  it('should log tool result on failure', async () => {
+  it('should log ACP response on failure', async () => {
     setAcpPassthroughState({ agent: 'codex' });
     const err: any = new Error('failed');
     err.code = 'ENOENT';
@@ -132,7 +129,8 @@ describe('handleAcpPassthrough', () => {
 
     await handleAcpPassthrough('task', mockSession);
 
-    expect(mockLogToolResult).toHaveBeenCalledWith('acpx[codex]', false, expect.any(String));
+    expect(mockLogAcpResponse).toHaveBeenCalledWith('codex', expect.stringContaining('❌'));
+    expect(mockLogToolResult).not.toHaveBeenCalled();
   });
 
   it('should include --cwd flag when cwd is set in passthrough state', async () => {
@@ -144,6 +142,38 @@ describe('handleAcpPassthrough', () => {
     const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
     expect(callArgs).toContain('--cwd');
     expect(callArgs).toContain('/project/dir');
+  });
+
+  it('should exit passthrough mode when user says "退出acp"', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+
+    await handleAcpPassthrough('退出acp', mockSession);
+
+    // ACP should be cleared
+    expect(getAcpPassthroughState()).toBeNull();
+    // acpx should NOT be invoked for the exit command
+    expect(execFileAsyncMock).not.toHaveBeenCalled();
+    // User should be notified
+    expect(mockLogSystemMessage).toHaveBeenCalledWith(expect.stringContaining('已退出'));
+  });
+
+  it('should exit passthrough mode when user says "exit acp"', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+
+    await handleAcpPassthrough('exit acp', mockSession);
+
+    expect(getAcpPassthroughState()).toBeNull();
+    expect(execFileAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it('should forward non-exit messages to acpx normally', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await handleAcpPassthrough('write a hello world', mockSession);
+
+    expect(execFileAsyncMock).toHaveBeenCalled();
+    expect(getAcpPassthroughState()).not.toBeNull();
   });
 });
 
@@ -162,6 +192,7 @@ describe('handleUserMessage with ACP passthrough', () => {
       logToolCall: mockLogToolCall,
       logToolProgress: mockLogToolProgress,
       logToolResult: mockLogToolResult,
+      logAcpResponse: jest.fn(),
       logSystemMessage: mockLogSystemMessage,
       end: mockEnd,
       isRunning: false,

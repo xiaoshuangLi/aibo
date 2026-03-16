@@ -34,8 +34,37 @@ let currentSession: Session | null = null;
 let currentAgent: any = null;
 
 /**
- * 将用户输入直传到 acpx ACP 会话，并把输出流回 Session。
- * 
+ * Patterns that signal the user wants to exit ACP passthrough mode.
+ * These are matched case-insensitively against the trimmed input string.
+ */
+const ACP_EXIT_PATTERNS: RegExp[] = [
+  /退出\s*acp/i,
+  /关闭\s*acp/i,
+  /停止\s*acp/i,
+  /结束\s*acp/i,
+  /exit\s*acp/i,
+  /stop\s*acp/i,
+  /quit\s*acp/i,
+  /close\s*acp/i,
+  /退出.*透传/i,
+  /停止.*透传/i,
+  /关闭.*透传/i,
+];
+
+/**
+ * Return true when the input is an intent to leave ACP passthrough mode.
+ */
+function isAcpExitIntent(input: string): boolean {
+  const trimmed = input.trim();
+  return ACP_EXIT_PATTERNS.some((re) => re.test(trimmed));
+}
+
+/**
+ * 将用户输入直传到 acpx ACP 会话，并把输出以 ACP 风格回送到 Session。
+ *
+ * 当 input 匹配退出意图时，会自动清除直传状态并通知用户，而不会将消息
+ * 发送给 acpx。
+ *
  * @param input   用户输入的文本
  * @param session 当前会话（用于日志和进度上报）
  */
@@ -46,8 +75,14 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   }
 
   const { agent, sessionName, cwd } = state;
-  const toolName = `acpx[${agent}]`;
   const timeout = 6000000;
+
+  // Detect natural-language exit intent before forwarding to ACP.
+  if (isAcpExitIntent(input)) {
+    clearAcpPassthroughState();
+    session.logSystemMessage(`✅ 已退出 ACP [${agent}] 直传模式，恢复正常 AI 对话。`);
+    return;
+  }
 
   // 构建 acpx 参数：
   //   acpx --approve-all --format text [--cwd <cwd>] <agent> [-s <name>] <prompt>
@@ -56,8 +91,6 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   execArgs.push(agent);
   if (sessionName) execArgs.push('-s', sessionName);
   execArgs.push(input);
-
-  session.logToolCall(toolName, { agent, sessionName, prompt: input });
 
   try {
     const promise = execFileAsync('acpx', execArgs, {
@@ -69,21 +102,20 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     });
 
     (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-      session.logToolProgress(toolName, data.toString());
+      session.logToolProgress(`acpx[${agent}]`, data.toString());
     });
 
     const { stdout } = await promise;
-
-    session.logToolResult(toolName, true, stdout ? stdout.slice(0, 200) : '(empty)');
+    session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
     const errJson = handleCliExecutionError(error, 'acpx', input, timeout);
-    let preview: string;
+    let message: string;
     try {
-      preview = JSON.parse(errJson)?.message || errJson;
+      message = JSON.parse(errJson)?.message || errJson;
     } catch {
-      preview = errJson;
+      message = errJson;
     }
-    session.logToolResult(toolName, false, preview);
+    session.logAcpResponse(agent, `❌ 错误: ${message}`);
   }
 }
 
@@ -197,6 +229,9 @@ export async function handleUserMessage(
   // 设置会话为运行状态
   session.isRunning = true;
   
+  // 记录调用前的 ACP 状态，用于检测是否在本次 LLM 响应中激活了直传模式
+  const acpStateBeforeStream = getAcpPassthroughState();
+
   // 创建新的中断控制器（在 try 外部，以便 finally 能访问并比较）
   const abortController = new AbortController();
   session.setAbortController(abortController);
@@ -223,6 +258,20 @@ export async function handleUserMessage(
 
     // 处理响应流（图片消息不传递 userInput，仅文本消息提供上下文）
     await processStreamChunks(stream, state, session, typeof input === 'string' ? input : undefined);
+
+    // 如果本次 LLM 响应激活了 ACP 直传模式（工具调用 acpx_execute 的副作用），
+    // 向 Lark 发送提示，告知后续消息将直接转发给 ACP。
+    const acpStateAfterStream = getAcpPassthroughState();
+    if (!acpStateBeforeStream && acpStateAfterStream) {
+      const { agent: acpAgent, sessionName, cwd } = acpStateAfterStream;
+      const sessionInfo = sessionName ? `，会话: \`${sessionName}\`` : '';
+      const cwdInfo = cwd ? `，目录: \`${cwd}\`` : '';
+      session.logSystemMessage(
+        `🔗 **ACP [${acpAgent}] 直传模式已激活**${sessionInfo}${cwdInfo}\n\n` +
+        `后续所有 Lark 消息将直接转发给 \`${acpAgent}\`，不再经过 AI 大模型处理。\n` +
+        `说「退出 acp」或输入 \`/acp stop\` 可退出直传模式。`,
+      );
+    }
     
   } catch (error) {
     console.error('❌ 处理用户消息时出错:', error);

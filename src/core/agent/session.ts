@@ -218,6 +218,22 @@ export class Session {
   }
 
   /**
+   * 记录 ACP 直传响应。
+   * 在 Lark 界面中会以 "🔗 ACP [agentName]" 为标题展示，
+   * 视觉上区分透传消息与普通 AI 回复。
+   *
+   * @param agentName - ACP 代理名称（如 "codex"、"claude"）
+   * @param response  - 编程工具返回的响应内容
+   */
+  logAcpResponse(agentName: string, response: string): void {
+    this.adapter.emit({
+      type: 'acpResponse',
+      data: { agentName, response },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
    * 记录错误消息
    */
   logErrorMessage(message: string): void {

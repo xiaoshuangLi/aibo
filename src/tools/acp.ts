@@ -4,6 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
 import { isCliCommandAvailable, handleCliExecutionError } from "@/shared/utils";
+import { setAcpSessionState } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
@@ -76,12 +77,25 @@ const acpSchema = z.object({
     .optional()
     .default([])
     .describe("Additional acpx CLI arguments to pass through."),
+  start_passthrough: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "When true, activates Lark ACP passthrough mode after this call. " +
+      "All subsequent Lark messages will be forwarded directly to this agent session " +
+      "until the user says 'exit acp' / '退出acp'. " +
+      "Use this when the user explicitly wants to enter a direct conversation with the coding tool.",
+    ),
 });
 
 /**
  * Build the acpx argv for a given set of tool inputs.
+ *
+ * Accepts the *input* type (before Zod defaults are applied) so callers don't
+ * need to supply optional fields such as `start_passthrough`.
  */
-export function buildAcpxArgs(input: z.infer<typeof acpSchema>): string[] {
+export function buildAcpxArgs(input: z.input<typeof acpSchema>): string[] {
   const {
     agent,
     prompt,
@@ -153,6 +167,7 @@ function createAcpExecuteTool(session?: Session) {
   return tool(
     async (input) => {
       const { timeout = 6000000 } = input;
+      const startPassthrough = (input as any).start_passthrough === true;
       const execArgs = buildAcpxArgs(input as z.infer<typeof acpSchema>);
 
       try {
@@ -170,6 +185,17 @@ function createAcpExecuteTool(session?: Session) {
 
         const { stdout, stderr } = await promise;
 
+        // Activate Lark passthrough mode as a side effect when requested.
+        // From this point, all Lark messages will be forwarded directly to the
+        // running ACP session without going through the LLM.
+        if (startPassthrough) {
+          setAcpSessionState({
+            agent: (input as any).agent,
+            sessionName: (input as any).session_name,
+            cwd: (input as any).cwd,
+          });
+        }
+
         return JSON.stringify(
           {
             success: true,
@@ -178,6 +204,7 @@ function createAcpExecuteTool(session?: Session) {
             agent: (input as any).agent,
             mode: (input as any).mode || "prompt",
             prompt: (input as any).prompt || "",
+            passthrough_activated: startPassthrough,
           },
           null,
           2,

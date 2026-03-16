@@ -17,6 +17,7 @@ import { SessionManager } from '@/infrastructure/session';
 import { styled } from './styler';
 import { LarkChatService } from './chat';
 import { LarkWsClientManager } from './ws-client';
+import { getAcpSessionState } from '@/shared/acp-session';
 
 // 飞书配置类型
 interface LarkConfig {
@@ -153,6 +154,7 @@ export class LarkAdapter extends DefaultAdapter {
     this.on('commandExecuted', this.handleCommandExecuted.bind(this));
     this.on('rawText', this.handleRawText.bind(this));
     this.on('toolProgress', this.handleToolProgress.bind(this));
+    this.on('acpResponse', this.handleAcpResponse.bind(this));
   }
 
   /**
@@ -599,7 +601,25 @@ export class LarkAdapter extends DefaultAdapter {
   }
 
   private async handleSessionStart(data: { welcomeMessage?: string; modelInfo?: string; session?: any }): Promise<void> {
-    let sessionMessage = `✨ **基本信息**
+    const acpState = getAcpSessionState();
+
+    if (acpState) {
+      // ACP passthrough is already active (e.g. pre-configured via env/CLI).
+      // Show a dedicated startup card with ACP indicator.
+      const sessionInfo = acpState.sessionName ? `\n• 会话: \`${acpState.sessionName}\`` : '';
+      const cwdInfo = acpState.cwd ? `\n• 目录: \`${acpState.cwd}\`` : '';
+      const sessionMessage = `✨ **基本信息**
+• 代理: \`${acpState.agent}\`${sessionInfo}${cwdInfo}
+• 工作目录: \`${process.cwd()}\`
+
+🚀 **使用说明**
+• 所有消息将直接转发给 \`${acpState.agent}\`，不经过 AI 大模型处理
+• 说「退出 acp」或输入 \`/acp stop\` 可退出直传模式
+• 输入 \`/help\` 查看所有可用命令
+`;
+      await this.sendMessage(styled.system(`🔗 ACP [${acpState.agent}] 已就绪`, sessionMessage));
+    } else {
+      let sessionMessage = `✨ **基本信息**
 • 模型: ${data?.modelInfo || '未知模型'}
 • 工作目录: \`${process.cwd()}\`
 
@@ -608,9 +628,15 @@ export class LarkAdapter extends DefaultAdapter {
 • 直接描述您的需求，我会帮您完成
 • 支持文件操作、代码分析、知识管理等功能
 `;
-    
-    // 对于 session start 消息，使用系统消息样式
-    await this.sendMessage(styled.system('🤖 AIBO 助手已启动', sessionMessage));
+      // 对于 session start 消息，使用系统消息样式
+      await this.sendMessage(styled.system('🤖 AIBO 助手已启动', sessionMessage));
+    }
+  }
+
+  private async handleAcpResponse(data: { agentName: string; response: string }): Promise<void> {
+    if (!data?.response) return;
+    const title = `🔗 ACP [${data.agentName}] 透传中`;
+    await this.sendMessage(styled.system(title, data.response));
   }
 
   private async handleSessionEnd(data: { message: string }): Promise<void> {
