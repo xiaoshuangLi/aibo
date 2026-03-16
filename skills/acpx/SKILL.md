@@ -103,8 +103,9 @@ Unknown names are treated as raw ACP server commands.
 
 ## Lark passthrough mode
 
-When running in Lark mode, users can enter **ACP passthrough** to talk directly to a coding agent without going through the main AI model:
+When running in Lark mode, users can enter **ACP passthrough** to talk directly to a coding agent without going through the main AI model.
 
+### Via slash command
 ```
 /acp codex              # Enter passthrough mode with codex
 /acp codex backend      # Enter passthrough with named session "backend"
@@ -112,7 +113,31 @@ When running in Lark mode, users can enter **ACP passthrough** to talk directly 
 /acp stop               # Exit passthrough mode
 ```
 
-In passthrough mode every Lark message is forwarded verbatim to `acpx <agent> prompt "<message>"`. Responses stream back as tool progress updates.
+### Via natural language (recommended)
+
+When the user asks to start an interactive session with a coding tool — e.g. "用 claude 帮我修复这个 bug，然后我想直接和 claude 对话" — call `acpx_execute` with `start_passthrough: true`:
+
+```json
+{
+  "agent": "claude",
+  "prompt": "Fix the failing tests in src/",
+  "start_passthrough": true
+}
+```
+
+After this call completes, AIBO will automatically:
+1. Send a Lark notification titled **"🔗 ACP [claude] 透传中"** announcing that passthrough mode is active
+2. Forward all subsequent Lark messages directly to the `claude` ACP session (no LLM involved)
+3. Label every response from the agent with the title **"🔗 ACP [claude] 透传中"** so the user always knows they are in passthrough mode
+
+The user can exit passthrough mode at any time by saying "退出 acp", "exit acp", or typing `/acp stop`.
+
+**When to set `start_passthrough: true`:**
+- The user explicitly says they want to chat directly with a coding tool
+- The user asks to "enter" / "启动" / "开始" a direct session with an agent
+- The user wants follow-up conversations to go straight to the agent without going through AIBO
+
+In passthrough mode every Lark message is forwarded verbatim to `acpx <agent> <prompt>`. Responses stream back as ACP-titled progress updates and a final response card.
 
 ## Routing guidance
 

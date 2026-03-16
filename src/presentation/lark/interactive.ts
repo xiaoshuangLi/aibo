@@ -102,7 +102,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     });
 
     (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-      session.logToolProgress(`acpx[${agent}]`, data.toString());
+      session.logToolProgress(`ACP [${agent}]`, data.toString());
     });
 
     const { stdout } = await promise;
@@ -264,10 +264,11 @@ export async function handleUserMessage(
     const acpStateAfterStream = getAcpPassthroughState();
     if (!acpStateBeforeStream && acpStateAfterStream) {
       const { agent: acpAgent, sessionName, cwd } = acpStateAfterStream;
-      const sessionInfo = sessionName ? `，会话: \`${sessionName}\`` : '';
-      const cwdInfo = cwd ? `，目录: \`${cwd}\`` : '';
-      session.logSystemMessage(
-        `🔗 **ACP [${acpAgent}] 直传模式已激活**${sessionInfo}${cwdInfo}\n\n` +
+      const sessionInfo = sessionName ? `\n• 会话: \`${sessionName}\`` : '';
+      const cwdInfo = cwd ? `\n• 目录: \`${cwd}\`` : '';
+      session.logAcpResponse(
+        acpAgent,
+        `**ACP 直传模式已激活**${sessionInfo}${cwdInfo}\n\n` +
         `后续所有 Lark 消息将直接转发给 \`${acpAgent}\`，不再经过 AI 大模型处理。\n` +
         `说「退出 acp」或输入 \`/acp stop\` 可退出直传模式。`,
       );

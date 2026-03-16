@@ -180,7 +180,7 @@ function createAcpExecuteTool(session?: Session) {
         });
 
         (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
-          session?.logToolProgress("acpx_execute", data.toString());
+          session?.logToolProgress(`ACP [${(input as any).agent}]`, data.toString());
         });
 
         const { stdout, stderr } = await promise;

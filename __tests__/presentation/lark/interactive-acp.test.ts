@@ -175,6 +175,34 @@ describe('handleAcpPassthrough', () => {
     expect(execFileAsyncMock).toHaveBeenCalled();
     expect(getAcpPassthroughState()).not.toBeNull();
   });
+
+  it('should use "ACP [agent]" as toolProgress name (not "acpx[agent]")', async () => {
+    setAcpPassthroughState({ agent: 'claude' });
+
+    // Create a mock that fires stdout data before resolving
+    execFileAsyncMock.mockImplementation((..._args: any[]) => {
+      const promise = Promise.resolve({ stdout: 'final result', stderr: '' }) as any;
+      promise.child = {
+        stdout: {
+          on: (_event: string, cb: (data: Buffer) => void) => {
+            if (_event === 'data') {
+              cb(Buffer.from('streaming output'));
+            }
+          },
+        },
+      };
+      return promise;
+    });
+
+    await handleAcpPassthrough('do something', mockSession);
+
+    expect(mockLogToolProgress).toHaveBeenCalledWith('ACP [claude]', 'streaming output');
+    // Ensure the old format is NOT used
+    expect(mockLogToolProgress).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^acpx\[/),
+      expect.anything(),
+    );
+  });
 });
 
 describe('handleUserMessage with ACP passthrough', () => {
@@ -255,5 +283,50 @@ describe('handleUserMessage with ACP passthrough', () => {
     // Image messages bypass passthrough and go to LLM
     expect(mockAgent.stream).toHaveBeenCalled();
     expect(execFileAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it('should send activation notification via logAcpResponse when passthrough activates during LLM stream', async () => {
+    // Passthrough NOT active before stream
+    const { processStreamChunks } = require('@/core/utils/stream');
+    const { setAcpPassthroughState: setPassthrough } = require('@/presentation/lark/acp-passthrough');
+    const session = createMockSession();
+    const mockStream = {};
+    const mockAgent = { stream: jest.fn().mockReturnValue(mockStream) };
+
+    // Mock processStreamChunks to activate ACP passthrough as a side effect
+    processStreamChunks.mockImplementationOnce(async () => {
+      setPassthrough({ agent: 'claude' });
+    });
+
+    await handleUserMessage('start direct claude session', session, mockAgent);
+
+    // logAcpResponse should have been called with activation message
+    expect(session.logAcpResponse).toHaveBeenCalledWith(
+      'claude',
+      expect.stringContaining('ACP 直传模式已激活'),
+    );
+    // logSystemMessage should NOT have been called with the activation message
+    expect(mockLogSystemMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('ACP'),
+    );
+  });
+
+  it('should include session name in activation notification', async () => {
+    const { processStreamChunks } = require('@/core/utils/stream');
+    const { setAcpPassthroughState: setPassthrough } = require('@/presentation/lark/acp-passthrough');
+    const session = createMockSession();
+    const mockStream = {};
+    const mockAgent = { stream: jest.fn().mockReturnValue(mockStream) };
+
+    processStreamChunks.mockImplementationOnce(async () => {
+      setPassthrough({ agent: 'codex', sessionName: 'backend' });
+    });
+
+    await handleUserMessage('start codex session backend', session, mockAgent);
+
+    expect(session.logAcpResponse).toHaveBeenCalledWith(
+      'codex',
+      expect.stringContaining('backend'),
+    );
   });
 });
