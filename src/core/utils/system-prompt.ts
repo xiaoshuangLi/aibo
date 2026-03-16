@@ -13,7 +13,8 @@ export function buildSystemPromptFromTools(tools: Array<{ name: string }>): stri
   const hasGeminiTool  = tools.some(t => t.name === 'gemini_execute');
   const hasCodexTool   = tools.some(t => t.name === 'codex_execute');
   const hasCopilotTool = tools.some(t => t.name === 'copilot_execute');
-  return SYSTEM_PROMPT + buildCodingAgentHint(hasClaudeTool, hasCursorTool, hasGeminiTool, hasCodexTool, hasCopilotTool);
+  const hasAcpTool     = tools.some(t => t.name === 'acpx_execute');
+  return SYSTEM_PROMPT + buildCodingAgentHint(hasClaudeTool, hasCursorTool, hasGeminiTool, hasCodexTool, hasCopilotTool, hasAcpTool);
 }
 
 /**
@@ -25,12 +26,14 @@ export function buildSystemPromptFromTools(tools: Array<{ name: string }>): stri
  *   - codex_execute   : 后端 API、数据库、服务端业务逻辑
  *   - cursor_execute  : 通用 AI 辅助编程（通用任务的优选）
  *   - copilot_execute : 通用 AI 辅助编程（通用任务的优选）
+ *   - acpx_execute    : 通过 ACP 协议与本地编程工具对话（支持持久会话）
  *
  * @param hasClaudeTool  - 是否检测到 claude_execute 工具
  * @param hasCursorTool  - 是否检测到 cursor_execute 工具
  * @param hasGeminiTool  - 是否检测到 gemini_execute 工具
  * @param hasCodexTool   - 是否检测到 codex_execute 工具
  * @param hasCopilotTool - 是否检测到 copilot_execute 工具
+ * @param hasAcpTool     - 是否检测到 acpx_execute 工具
  * @returns 追加到系统提示词末尾的补充字符串（若均不可用则返回空字符串）
  */
 export function buildCodingAgentHint(
@@ -39,6 +42,7 @@ export function buildCodingAgentHint(
   hasGeminiTool: boolean = false,
   hasCodexTool: boolean = false,
   hasCopilotTool: boolean = false,
+  hasAcpTool: boolean = false,
 ): string {
   const available: string[] = [];
   if (hasClaudeTool) available.push('`claude_execute`');
@@ -46,6 +50,7 @@ export function buildCodingAgentHint(
   if (hasCodexTool) available.push('`codex_execute`');
   if (hasCursorTool) available.push('`cursor_execute`');
   if (hasCopilotTool) available.push('`copilot_execute`');
+  if (hasAcpTool) available.push('`acpx_execute`');
 
   if (available.length === 0) {
     return '';
@@ -81,6 +86,7 @@ A local AI coding agent CLI is available on this system: ${singleTool}.
   if (hasCodexTool) routingRows.push('| `codex_execute`  | Backend API (REST/GraphQL), database/ORM design, server-side business logic, scripts |');
   if (hasCursorTool) routingRows.push('| `cursor_execute` | General-purpose AI coding: any coding task, file editing, shell commands, codebase search |');
   if (hasCopilotTool) routingRows.push('| `copilot_execute` | General-purpose AI coding: any coding task, shell & git commands, codebase search, gh CLI |');
+  if (hasAcpTool) routingRows.push('| `acpx_execute`   | ACP protocol: persistent multi-turn sessions with codex/claude/gemini/cursor/copilot; use when you need session continuity or named parallel sessions |');
 
   const routingTable = `\n| Tool | Best for |\n|------|----------|\n${routingRows.join('\n')}`;
 

@@ -9,16 +9,83 @@
  * @module interactive
  */
 
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { LarkAdapter, MessageContent } from './adapter';
 import { Session } from '@/core/agent';
 import { createAIAgent } from '@/core/agent';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
+import { handleCliExecutionError } from '@/shared/utils';
+import {
+  AcpPassthroughState,
+  getAcpPassthroughState,
+  setAcpPassthroughState,
+  clearAcpPassthroughState,
+} from './acp-passthrough';
+
+export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
+
+const execFileAsync = promisify(execFile);
 
 // 全局会话和代理实例
 let currentSession: Session | null = null;
 let currentAgent: any = null;
+
+/**
+ * 将用户输入直传到 acpx ACP 会话，并把输出流回 Session。
+ * 
+ * @param input   用户输入的文本
+ * @param session 当前会话（用于日志和进度上报）
+ */
+export async function handleAcpPassthrough(input: string, session: Session): Promise<void> {
+  const state = getAcpPassthroughState();
+  if (!state) {
+    return;
+  }
+
+  const { agent, sessionName, cwd } = state;
+  const toolName = `acpx[${agent}]`;
+  const timeout = 6000000;
+
+  // 构建 acpx 参数：
+  //   acpx --approve-all --format text [--cwd <cwd>] <agent> [-s <name>] <prompt>
+  const execArgs: string[] = ['--approve-all', '--format', 'text'];
+  if (cwd) execArgs.push('--cwd', cwd);
+  execArgs.push(agent);
+  if (sessionName) execArgs.push('-s', sessionName);
+  execArgs.push(input);
+
+  session.logToolCall(toolName, { agent, sessionName, prompt: input });
+
+  try {
+    const promise = execFileAsync('acpx', execArgs, {
+      timeout,
+      cwd: cwd || process.cwd(),
+      env: process.env,
+      signal: session?.abortController?.signal,
+      killSignal: 'SIGKILL',
+    });
+
+    (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+      session.logToolProgress(toolName, data.toString());
+    });
+
+    const { stdout } = await promise;
+
+    session.logToolResult(toolName, true, stdout ? stdout.slice(0, 200) : '(empty)');
+  } catch (error) {
+    const errJson = handleCliExecutionError(error, 'acpx', input, timeout);
+    let preview: string;
+    try {
+      preview = JSON.parse(errJson)?.message || errJson;
+    } catch {
+      preview = errJson;
+    }
+    session.logToolResult(toolName, false, preview);
+  }
+}
 
 /**
  * 启动飞书交互模式
@@ -99,6 +166,25 @@ export async function handleUserMessage(
       if (commandHandled) {
         return;
       }
+    }
+
+    // ACP 直传模式：将文本消息直接透传到 ACP 会话，不经过大模型
+    if (getAcpPassthroughState()) {
+      if (session.isRunning && session.abortController) {
+        session.abortController.abort();
+      }
+      session.isRunning = true;
+      const abortController = new AbortController();
+      session.setAbortController(abortController);
+      try {
+        await handleAcpPassthrough(input, session);
+      } finally {
+        if (session.abortController === abortController) {
+          session.isRunning = false;
+          session.setAbortController(new AbortController());
+        }
+      }
+      return;
     }
   }
 
