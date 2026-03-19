@@ -30,6 +30,10 @@ export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, cl
 
 const execFileAsync = promisify(execFile);
 
+/** Timeout in ms for acpx executions (100 minutes).
+ * ACP coding agents may perform long-running tasks so a generous timeout avoids premature cancellation. */
+const ACP_EXEC_TIMEOUT_MS = 6_000_000;
+
 // 全局会话和代理实例
 let currentSession: Session | null = null;
 let currentAgent: any = null;
@@ -77,7 +81,6 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
 
   const { agent, sessionName, cwd } = state;
   const displayName = getAcpAgentDisplayName(agent);
-  const timeout = 6000000;
 
   // Detect natural-language exit intent before forwarding to ACP.
   if (isAcpExitIntent(input)) {
@@ -96,7 +99,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
 
   try {
     const promise = execFileAsync('acpx', execArgs, {
-      timeout,
+      timeout: ACP_EXEC_TIMEOUT_MS,
       cwd: cwd || process.cwd(),
       env: process.env,
       signal: session?.abortController?.signal,
@@ -110,7 +113,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     const { stdout } = await promise;
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
-    const errJson = handleCliExecutionError(error, 'acpx', input, timeout);
+    const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
     let message: string;
     try {
       message = JSON.parse(errJson)?.message || errJson;

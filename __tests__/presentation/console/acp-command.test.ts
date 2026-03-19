@@ -9,6 +9,7 @@
 import {
   handleAcpCommand,
   createHandleInternalCommand,
+  KNOWN_ACP_AGENTS,
 } from '@/presentation/console/commander';
 import {
   onLine,
@@ -141,8 +142,7 @@ describe('handleAcpCommand', () => {
   });
 
   it('supports all known built-in agents', async () => {
-    const agents = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw', 'kimi', 'opencode', 'kiro', 'kilocode', 'qwen', 'droid'];
-    for (const agent of agents) {
+    for (const agent of KNOWN_ACP_AGENTS) {
       clearAcpSessionState();
       const result = await handleAcpCommand(session, [agent]);
       expect(result).toBe(true);

@@ -18,7 +18,9 @@ import { handleCliExecutionError } from '@/shared/utils';
 
 const execFileAsync = promisify(execFile);
 
-/** Timeout in ms for acpx executions (100 minutes). */
+/** Timeout in ms for acpx executions (100 minutes).
+ * ACP coding agents may perform long-running tasks (builds, large refactors)
+ * so a generous timeout avoids premature cancellation. */
 const ACP_EXEC_TIMEOUT_MS = 6_000_000;
 
 /**

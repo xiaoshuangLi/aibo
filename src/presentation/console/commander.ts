@@ -11,6 +11,7 @@ import {
   setAcpSessionState,
   clearAcpSessionState,
   getAcpAgentDisplayName,
+  KNOWN_ACP_AGENTS as _KNOWN_ACP_AGENTS,
 } from '@/shared/acp-session';
 
 /**
@@ -24,7 +25,7 @@ import {
  */
 
 /** Built-in ACP-compatible agent names recognised by the /acp command. */
-export const KNOWN_ACP_AGENTS = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw', 'kimi', 'opencode', 'kiro', 'kilocode', 'qwen', 'droid'];
+export const KNOWN_ACP_AGENTS = _KNOWN_ACP_AGENTS;
 
 // ==================== 内部命令处理器辅助函数 ====================
 

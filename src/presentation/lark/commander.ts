@@ -6,6 +6,10 @@ import { getRestartCommand } from '@/shared/utils';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { LspClientManager } from '@/infrastructure/code-analysis';
 import { setAcpPassthroughState, getAcpPassthroughState, clearAcpPassthroughState } from './acp-passthrough';
+import { getAcpAgentDisplayName, KNOWN_ACP_AGENTS } from '@/shared/acp-session';
+
+/** Built-in ACP-compatible agent names recognised by ACP commands. */
+export { KNOWN_ACP_AGENTS };
 
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
@@ -133,6 +137,18 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/acp stop\`             - ⏹️  退出 ACP 直传模式
 • \`/acp status\`           - 📊 查看当前 ACP 直传状态
   代理名支持：codex / claude / gemini / cursor / copilot / pi / openclaw / kimi / opencode / kiro / kilocode / qwen / droid
+
+⚡ **ACP 快捷指令**
+• \`/acp-exit\`             - ⏹️  退出 ACP 直传模式（同 \`/acp stop\`）
+• \`/acp-kill\`             - 🔪 强制中止当前 ACP 进程并退出直传
+• \`/acp-cancel\`           - ❌ 取消当前 ACP 操作（保留直传模式）
+• \`/acp-status\`           - 📊 查看当前 ACP 直传状态
+• \`/acp-codex\`            - 🚀 快速连接 Codex
+• \`/acp-claude\`           - 🚀 快速连接 Claude Code
+• \`/acp-gemini\`           - 🚀 快速连接 Gemini
+• \`/acp-cursor\`           - 🚀 快速连接 Cursor
+• \`/acp-copilot\`          - 🚀 快速连接 GitHub Copilot
+• \`/acp-<代理名>\`         - 🚀 快速连接任意已知代理（支持追加会话名）
 
 📂 **文件管理命令**  
 • \`/show-files\` - 📋 查看工作区改动文件
@@ -680,9 +696,8 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
   const agent = args[0];
   const sessionName = args[1] || undefined;
 
-  const KNOWN_AGENTS = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw', 'kimi', 'opencode', 'kiro', 'kilocode', 'qwen', 'droid'];
-  if (!KNOWN_AGENTS.includes(agent)) {
-    await emitMessage(`⚠️ **未知代理名称**: \`${agent}\`\n\n支持的内置代理：${KNOWN_AGENTS.map(a => `\`${a}\``).join(', ')}\n\n如需使用自定义代理，请直接使用 \`acpx_execute\` 工具。`);
+  if (!KNOWN_ACP_AGENTS.includes(agent)) {
+    await emitMessage(`⚠️ **未知代理名称**: \`${agent}\`\n\n支持的内置代理：${KNOWN_ACP_AGENTS.map(a => `\`${a}\``).join(', ')}\n\n如需使用自定义代理，请直接使用 \`acpx_execute\` 工具。`);
     return true;
   }
 
@@ -690,6 +705,127 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
 
   const sessionInfo = sessionName ? `（命名会话: \`${sessionName}\`）` : '';
   await emitMessage(`🔗 **ACP 直传模式已激活**\n\n现在您的消息将直接透传给 \`${agent}\` ${sessionInfo}，不经过 AI 大模型处理。\n\n发送 \`/acp stop\` 退出直传模式，或 \`/acp status\` 查看状态。`);
+  return true;
+}
+
+/**
+ * 处理 ACP 退出命令 (/acp-exit)
+ *
+ * 优雅地退出 ACP 直传模式，不中止正在运行的操作。
+ */
+export async function handleAcpExitCommand(session: any): Promise<boolean> {
+  const current = getAcpPassthroughState();
+  const emitMessage = async (message: string) => {
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { command: '/acp-exit', result: { success: true, message } },
+      timestamp: Date.now(),
+    });
+    console.log(message);
+  };
+
+  if (!current) {
+    await emitMessage('ℹ️ **ACP 直传模式未激活**\n\n当前未处于 ACP 直传模式。');
+    return true;
+  }
+
+  clearAcpPassthroughState();
+  const displayName = getAcpAgentDisplayName(current.agent);
+  await emitMessage(`✅ **ACP 直传模式已退出**\n\n已离开与 \`${displayName}\` 的直传会话，后续消息将重新由 AI 大模型处理。`);
+  return true;
+}
+
+/**
+ * 处理 ACP 强制终止命令 (/acp-kill)
+ *
+ * 中止当前正在运行的 ACP 操作，同时退出直传模式。
+ */
+export async function handleAcpKillCommand(session: any): Promise<boolean> {
+  const current = getAcpPassthroughState();
+  const emitMessage = async (message: string) => {
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { command: '/acp-kill', result: { success: true, message } },
+      timestamp: Date.now(),
+    });
+    console.log(message);
+  };
+
+  // Abort any in-flight ACP execution
+  if (session.isRunning && session.abortController && !session.abortController.signal.aborted) {
+    session.abortController.abort();
+  }
+  session.isRunning = false;
+
+  if (!current) {
+    await emitMessage('ℹ️ **ACP 直传模式未激活**\n\n当前 ACP 进程已中止（如果有），未处于直传模式。');
+    return true;
+  }
+
+  clearAcpPassthroughState();
+  const displayName = getAcpAgentDisplayName(current.agent);
+  await emitMessage(`🔪 **ACP 进程已强制终止**\n\n已中止 \`${displayName}\` 的当前操作并退出直传模式，后续消息将由 AI 大模型处理。`);
+  return true;
+}
+
+/**
+ * 处理 ACP 状态查询命令 (/acp-status)
+ *
+ * 显示当前 ACP 直传模式的详细状态。
+ */
+export async function handleAcpStatusCommand(session: any): Promise<boolean> {
+  const current = getAcpPassthroughState();
+  const emitMessage = async (message: string) => {
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { command: '/acp-status', result: { success: true, message } },
+      timestamp: Date.now(),
+    });
+    console.log(message);
+  };
+
+  if (!current) {
+    await emitMessage('ℹ️ **ACP 直传模式未激活**\n\n当前未处于 ACP 直传模式。\n\n使用 `/acp <代理名>` 或 `/acp-<代理名>` 激活直传模式。');
+    return true;
+  }
+
+  const displayName = getAcpAgentDisplayName(current.agent);
+  const sessionInfo = current.sessionName ? `\n- 命名会话: \`${current.sessionName}\`` : '';
+  const cwdInfo = current.cwd ? `\n- 工作目录: \`${current.cwd}\`` : '';
+  const runningInfo = session.isRunning ? '\n- 状态: 🔄 **正在处理请求**' : '\n- 状态: ⏸️ **空闲，等待输入**';
+  await emitMessage(`🔗 **ACP 直传模式已激活**\n\n- 代理: \`${displayName}\` (\`${current.agent}\`)${sessionInfo}${cwdInfo}${runningInfo}\n\n发送 \`/acp-exit\` 退出直传模式，或 \`/acp-kill\` 强制终止。`);
+  return true;
+}
+
+/**
+ * 处理 ACP 取消操作命令 (/acp-cancel)
+ *
+ * 取消当前正在运行的 ACP 操作，但保留直传模式。
+ * 适用于 ACP 工具响应超时或需要重新发送指令的场景。
+ */
+export async function handleAcpCancelCommand(session: any): Promise<boolean> {
+  const emitMessage = async (message: string) => {
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { command: '/acp-cancel', result: { success: true, message } },
+      timestamp: Date.now(),
+    });
+    console.log(message);
+  };
+
+  if (session.isRunning && session.abortController && !session.abortController.signal.aborted) {
+    session.abortController.abort();
+    session.isRunning = false;
+    const current = getAcpPassthroughState();
+    if (current) {
+      const displayName = getAcpAgentDisplayName(current.agent);
+      await emitMessage(`❌ **ACP 操作已取消**\n\n已中止 \`${displayName}\` 的当前请求，直传模式保持激活。\n\n您可以继续发送新的指令，或使用 \`/acp-exit\` 退出直传模式。`);
+    } else {
+      await emitMessage('❌ **操作已取消**\n\n当前任务已中止。');
+    }
+  } else {
+    await emitMessage('ℹ️ **无操作可取消**\n\n当前没有正在运行的 ACP 任务。');
+  }
   return true;
 }
 
@@ -1211,8 +1347,28 @@ export function createHandleInternalCommand(session: any): (command: string) => 
 
       case "/acp":
         return await handleAcpCommand(session, args);
+
+      // ── ACP 快捷指令 (hyphenated form) ──
+      case "/acp-exit":
+      case "/acp-stop":
+      case "/acp-off":
+        return await handleAcpExitCommand(session);
+
+      case "/acp-kill":
+        return await handleAcpKillCommand(session);
+
+      case "/acp-status":
+        return await handleAcpStatusCommand(session);
+
+      case "/acp-cancel":
+        return await handleAcpCancelCommand(session);
         
       default:
+        // Dynamic /acp-<agent> shortcut: e.g. /acp-codex, /acp-claude mySession
+        if (cmd.startsWith('/acp-')) {
+          const agentSlug = cmd.slice(5); // strip '/acp-'
+          return await handleAcpCommand(session, [agentSlug, ...args]);
+        }
         return await handleUnknownCommand(command);
     }
   };
