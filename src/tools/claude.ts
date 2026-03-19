@@ -12,6 +12,7 @@ Use this to leverage Claude's autonomous coding capabilities: writing code, debu
 Requires the 'claude' command to be installed locally.`,
       promptFlag: "-p",
       extraArgs: ["--dangerously-skip-permissions"],
+      acpAgent: "claude",
     },
     session,
   );

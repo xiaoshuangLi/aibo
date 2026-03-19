@@ -18,6 +18,8 @@ export class TerminalAdapter extends DefaultAdapter {
   private _rl: readline.Interface | null = null;
   private abortController: AbortController | null = null;
   private isDestroyed = false;
+  private _sigintHandler: (() => void) | null = null;
+  private _sigtermHandler: (() => void) | null = null;
 
   // Expose rl for compatibility with existing code that needs direct access
   get rl(): readline.Interface | null {
@@ -65,16 +67,17 @@ export class TerminalAdapter extends DefaultAdapter {
 
   private setupProcessHandlers(): void {
     // 设置进程信号处理器
-    process.on('SIGINT', () => {
+    this._sigintHandler = () => {
       if (this.abortController) {
         this.abortController.abort();
       }
-    });
-    
-    process.on('SIGTERM', () => {
+    };
+    this._sigtermHandler = () => {
       this.destroy();
       process.exit(0);
-    });
+    };
+    process.on('SIGINT', this._sigintHandler);
+    process.on('SIGTERM', this._sigtermHandler);
   }
 
   setAbortSignal(signal: AbortSignal): void {
@@ -324,6 +327,16 @@ export class TerminalAdapter extends DefaultAdapter {
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
+    }
+
+    // Remove signal handlers so they don't accumulate across multiple instances.
+    if (this._sigintHandler) {
+      process.removeListener('SIGINT', this._sigintHandler);
+      this._sigintHandler = null;
+    }
+    if (this._sigtermHandler) {
+      process.removeListener('SIGTERM', this._sigtermHandler);
+      this._sigtermHandler = null;
     }
     
     super.destroy();

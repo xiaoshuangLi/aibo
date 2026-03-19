@@ -4,12 +4,62 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
 import { isCliCommandAvailable, handleCliExecutionError } from "@/shared/utils";
+import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
+const ACP_AGENT = "cursor";
+
 function createCursorExecuteTool(session?: Session) {
   return tool(
-    async ({ prompt, continueSession = false, timeout = 6000000, cwd, args = [] }) => {
+    async ({ prompt, continueSession = false, timeout = 6000000, cwd, args = [], session_name, start_passthrough = true }) => {
+      // ── ACP mode (preferred when acpx is available) ──────────────────────────
+      if (isCliCommandAvailable("acpx")) {
+        const displayName = getAcpAgentDisplayName(ACP_AGENT);
+        const execArgs: string[] = ["--approve-all", "--format", "text"];
+        if (cwd) execArgs.push("--cwd", cwd);
+        execArgs.push(ACP_AGENT);
+        if (session_name) execArgs.push("-s", session_name);
+        execArgs.push(prompt);
+        if (args.length) execArgs.push(...args);
+
+        try {
+          const promise = execFileAsync("acpx", execArgs, {
+            timeout,
+            cwd: cwd || process.cwd(),
+            env: process.env,
+            signal: session?.abortController?.signal,
+            killSignal: "SIGKILL",
+          });
+
+          (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
+            session?.logToolProgress(`${displayName} 输出`, data.toString());
+          });
+
+          const { stdout, stderr } = await promise;
+
+          if (start_passthrough) {
+            setAcpSessionState({ agent: ACP_AGENT, sessionName: session_name, cwd });
+          }
+
+          return JSON.stringify(
+            {
+              success: true,
+              stdout: stdout || "(empty)",
+              stderr: stderr || "(empty)",
+              prompt,
+              agent: ACP_AGENT,
+              passthrough_activated: start_passthrough,
+            },
+            null,
+            2,
+          );
+        } catch (error) {
+          return handleCliExecutionError(error, "acpx", prompt, timeout);
+        }
+      }
+
+      // ── Fallback: direct CLI execution ────────────────────────────────────────
       const continueArgs = continueSession ? ["--continue"] : [];
       const execArgs = ["-p", prompt, ...continueArgs, ...args, "--yolo"];
 
@@ -54,7 +104,7 @@ Requires the Cursor CLI 'agent' command to be installed locally.`,
           .boolean()
           .optional()
           .default(false)
-          .describe("Whether to continue the previous Cursor agent session (adds --continue flag)."),
+          .describe("Whether to continue the previous Cursor agent session (adds --continue flag, fallback mode only)."),
         timeout: z
           .number()
           .optional()
@@ -62,6 +112,12 @@ Requires the Cursor CLI 'agent' command to be installed locally.`,
           .describe("Timeout in milliseconds (default: 6000000 = 100 minutes). Increase for complex tasks."),
         cwd: z.string().optional().describe("Working directory for command execution (default: current process directory)."),
         args: z.array(z.string()).optional().default([]).describe("Additional CLI arguments to pass to the command."),
+        session_name: z.string().optional().describe(
+          "Named ACP session (-s flag). Allows parallel workstreams in the same repo. Only used in ACP mode.",
+        ),
+        start_passthrough: z.boolean().optional().default(true).describe(
+          "When true (default), activates Lark ACP passthrough mode after this call. Only used in ACP mode.",
+        ),
       }),
     },
   );

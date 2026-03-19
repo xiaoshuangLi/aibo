@@ -1,5 +1,8 @@
 /**
  * Tests for codex tool execution paths and error handling.
+ *
+ * Since execSync is mocked to return '' for all commands (meaning acpx is
+ * available), the tests below exercise the ACP code path by default.
  */
 
 const execFileAsyncMock = jest.fn().mockResolvedValue({ stdout: '', stderr: '' });
@@ -17,7 +20,7 @@ jest.mock('child_process', () => {
 
 import getCodexTools from '@/tools/codex';
 
-describe('codex tool execution', () => {
+describe('codex tool execution (ACP mode)', () => {
   let executeTool: any;
 
   beforeAll(async () => {
@@ -29,7 +32,19 @@ describe('codex tool execution', () => {
     execFileAsyncMock.mockReset();
   });
 
-  it('should return success JSON when command succeeds', async () => {
+  it('should call acpx with codex agent', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'codex result', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'implement REST API' });
+
+    expect(execFileAsyncMock).toHaveBeenCalledWith(
+      'acpx',
+      expect.arrayContaining(['--approve-all', '--format', 'text', 'codex', 'implement REST API']),
+      expect.any(Object),
+    );
+  });
+
+  it('should return success JSON with agent field when command succeeds', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: 'codex result', stderr: '' });
 
     const result = await executeTool.invoke({ prompt: 'implement REST API' });
@@ -38,6 +53,8 @@ describe('codex tool execution', () => {
     expect(parsed.success).toBe(true);
     expect(parsed.stdout).toBe('codex result');
     expect(parsed.prompt).toBe('implement REST API');
+    expect(parsed.agent).toBe('codex');
+    expect(parsed.passthrough_activated).toBe(true);
   });
 
   it('should return (empty) for empty stdout/stderr', async () => {
@@ -115,5 +132,42 @@ describe('codex tool execution', () => {
     const parsed = JSON.parse(result);
 
     expect(parsed.error).toBe('EXECUTION_ERROR');
+  });
+});
+
+// ── Direct-CLI fallback (acpx not available) ──────────────────────────────────
+
+describe('codex tool execution (direct-CLI fallback, no acpx)', () => {
+  let executeTool: any;
+
+  beforeAll(async () => {
+    const { execSync } = require('child_process') as { execSync: jest.Mock };
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd.startsWith('acpx')) throw new Error('not found');
+      return '';
+    });
+    const tools = await getCodexTools();
+    executeTool = tools[0];
+  });
+
+  beforeEach(() => {
+    execFileAsyncMock.mockReset();
+  });
+
+  afterAll(() => {
+    const { execSync } = require('child_process') as { execSync: jest.Mock };
+    execSync.mockReturnValue('');
+  });
+
+  it('should call codex directly with --yolo flag', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'implement REST API' });
+
+    expect(execFileAsyncMock).toHaveBeenCalledWith(
+      'codex',
+      expect.arrayContaining(['implement REST API', '--yolo']),
+      expect.any(Object),
+    );
   });
 });

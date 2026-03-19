@@ -17,7 +17,7 @@ import { SessionManager } from '@/infrastructure/session';
 import { styled } from './styler';
 import { LarkChatService } from './chat';
 import { LarkWsClientManager } from './ws-client';
-import { getAcpSessionState } from '@/shared/acp-session';
+import { getAcpSessionState, getAcpAgentDisplayName } from '@/shared/acp-session';
 
 // 飞书配置类型
 interface LarkConfig {
@@ -606,6 +606,7 @@ export class LarkAdapter extends DefaultAdapter {
     if (acpState) {
       // ACP passthrough is already active (e.g. pre-configured via env/CLI).
       // Show a dedicated startup card with ACP indicator.
+      const displayName = getAcpAgentDisplayName(acpState.agent);
       const sessionInfo = acpState.sessionName ? `\n• 会话: \`${acpState.sessionName}\`` : '';
       const cwdInfo = acpState.cwd ? `\n• 目录: \`${acpState.cwd}\`` : '';
       const sessionMessage = `✨ **基本信息**
@@ -613,11 +614,11 @@ export class LarkAdapter extends DefaultAdapter {
 • 工作目录: \`${process.cwd()}\`
 
 🚀 **使用说明**
-• 所有消息将直接转发给 \`${acpState.agent}\`，不经过 AI 大模型处理
+• 所有消息将直接转发给 **${displayName}**，不经过 AI 大模型处理
 • 说「退出 acp」或输入 \`/acp stop\` 可退出直传模式
 • 输入 \`/help\` 查看所有可用命令
 `;
-      await this.sendMessage(styled.system(`🔗 ACP [${acpState.agent}] 已就绪`, sessionMessage));
+      await this.sendMessage(styled.system(`🔗 正在与 ${displayName} 对话`, sessionMessage));
     } else {
       let sessionMessage = `✨ **基本信息**
 • 模型: ${data?.modelInfo || '未知模型'}
@@ -635,7 +636,8 @@ export class LarkAdapter extends DefaultAdapter {
 
   private async handleAcpResponse(data: { agentName: string; response: string }): Promise<void> {
     if (!data?.response) return;
-    const title = `🔗 ACP [${data.agentName}] 透传中`;
+    const displayName = getAcpAgentDisplayName(data.agentName);
+    const title = `🔗 正在与 ${displayName} 对话`;
     await this.sendMessage(styled.system(title, data.response));
   }
 
@@ -681,7 +683,7 @@ export class LarkAdapter extends DefaultAdapter {
     this.progressFlushTimer = setTimeout(async () => {
       this.progressFlushTimer = null;
       await this.flushProgressBuffer();
-    }, LarkAdapter.PROGRESS_FLUSH_INTERVAL);
+    }, LarkAdapter.PROGRESS_FLUSH_INTERVAL).unref();
   }
 
   private async flushProgressBuffer(): Promise<void> {

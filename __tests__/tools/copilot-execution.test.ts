@@ -1,5 +1,8 @@
 /**
  * Tests for copilot tool execution paths and error handling.
+ *
+ * Since execSync is mocked to return '' for all commands (meaning acpx is
+ * available), the tests below exercise the ACP code path by default.
  */
 
 const execFileAsyncMock = jest.fn().mockResolvedValue({ stdout: '', stderr: '' });
@@ -17,7 +20,7 @@ jest.mock('child_process', () => {
 
 import getCopilotTools from '@/tools/copilot';
 
-describe('copilot tool execution', () => {
+describe('copilot tool execution (ACP mode)', () => {
   let executeTool: any;
 
   beforeAll(async () => {
@@ -29,7 +32,19 @@ describe('copilot tool execution', () => {
     execFileAsyncMock.mockReset();
   });
 
-  it('should return success JSON when command succeeds', async () => {
+  it('should call acpx with copilot agent', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'docker ps', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'list all running docker containers' });
+
+    expect(execFileAsyncMock).toHaveBeenCalledWith(
+      'acpx',
+      expect.arrayContaining(['--approve-all', '--format', 'text', 'copilot', 'list all running docker containers']),
+      expect.any(Object),
+    );
+  });
+
+  it('should return success JSON with agent field when command succeeds', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: 'docker ps', stderr: '' });
 
     const result = await executeTool.invoke({ prompt: 'list all running docker containers' });
@@ -38,36 +53,8 @@ describe('copilot tool execution', () => {
     expect(parsed.success).toBe(true);
     expect(parsed.stdout).toBe('docker ps');
     expect(parsed.prompt).toBe('list all running docker containers');
-  });
-
-  it('should augment prompt with exit reminder', async () => {
-    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
-
-    await executeTool.invoke({ prompt: 'fix the bug' });
-
-    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
-    const promptArg = callArgs[1];
-    expect(promptArg).toContain('fix the bug');
-    expect(promptArg).toContain('IMPORTANT');
-    expect(promptArg).toContain('exit immediately');
-  });
-
-  it('should not include --continue flag when continueSession is false', async () => {
-    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
-
-    await executeTool.invoke({ prompt: 'task', continueSession: false });
-
-    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
-    expect(callArgs).not.toContain('--continue');
-  });
-
-  it('should include --continue flag when continueSession is true', async () => {
-    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
-
-    await executeTool.invoke({ prompt: 'continue the task', continueSession: true });
-
-    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
-    expect(callArgs).toContain('--continue');
+    expect(parsed.agent).toBe('copilot');
+    expect(parsed.passthrough_activated).toBe(true);
   });
 
   it('should return (empty) for empty stdout/stderr', async () => {
@@ -145,5 +132,61 @@ describe('copilot tool execution', () => {
     const parsed = JSON.parse(result);
 
     expect(parsed.error).toBe('EXECUTION_ERROR');
+  });
+});
+
+// ── Direct-CLI fallback (acpx not available) ──────────────────────────────────
+
+describe('copilot tool execution (direct-CLI fallback, no acpx)', () => {
+  let executeTool: any;
+
+  beforeAll(async () => {
+    const { execSync } = require('child_process') as { execSync: jest.Mock };
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd.startsWith('acpx')) throw new Error('not found');
+      return '';
+    });
+    const tools = await getCopilotTools();
+    executeTool = tools[0];
+  });
+
+  beforeEach(() => {
+    execFileAsyncMock.mockReset();
+  });
+
+  afterAll(() => {
+    const { execSync } = require('child_process') as { execSync: jest.Mock };
+    execSync.mockReturnValue('');
+  });
+
+  it('should augment prompt with exit reminder and call copilot directly', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'fix the bug' });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    const promptArg = callArgs[1];
+    expect(execFileAsyncMock.mock.calls[0][0]).toBe('copilot');
+    expect(promptArg).toContain('fix the bug');
+    expect(promptArg).toContain('IMPORTANT');
+    expect(promptArg).toContain('exit immediately');
+  });
+
+  it('should include --continue flag when continueSession is true', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'continue the task', continueSession: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).toContain('--continue');
+  });
+
+  it('should not include --continue flag when continueSession is false', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'done', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'task', continueSession: false });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('--continue');
   });
 });

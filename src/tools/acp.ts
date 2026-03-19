@@ -4,7 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
 import { isCliCommandAvailable, handleCliExecutionError } from "@/shared/utils";
-import { setAcpSessionState } from "@/shared/acp-session";
+import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
@@ -180,7 +180,7 @@ function createAcpExecuteTool(session?: Session) {
         });
 
         (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
-          session?.logToolProgress(`ACP [${(input as any).agent}]`, data.toString());
+          session?.logToolProgress(`${getAcpAgentDisplayName((input as any).agent)} 输出`, data.toString());
         });
 
         const { stdout, stderr } = await promise;

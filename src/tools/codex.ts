@@ -12,6 +12,7 @@ Best suited for: backend API development (REST/GraphQL), database design and que
 Requires the 'codex' command to be installed locally (https://github.com/openai/codex).`,
       promptFlag: "",
       extraArgs: ["--yolo"],
+      acpAgent: "codex",
     },
     session,
   );
