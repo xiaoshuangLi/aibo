@@ -29,6 +29,7 @@ export type OutputEventType =
   | 'commandExecuted'     // 命令执行完成
   | 'rawText'             // 原始文本输出
   | 'toolProgress'        // 工具执行过程中的实时输出
+  | 'acpResponse'         // ACP 直传模式：从编程工具收到的响应
 
 /**
  * 输出事件数据接口

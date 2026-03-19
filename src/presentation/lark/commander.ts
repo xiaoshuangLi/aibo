@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import { getRestartCommand } from '@/shared/utils';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { LspClientManager } from '@/infrastructure/code-analysis';
+import { setAcpPassthroughState, getAcpPassthroughState, clearAcpPassthroughState } from './acp-passthrough';
 
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
@@ -125,6 +126,13 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/verbose\`   - 📊 切换详细/简洁模式
 • \`/session\`   - 📊 查看会话元数据统计
 • \`/rebot\`     - 🔄 重启并重新构建
+
+🤖 **ACP 直传模式命令**
+• \`/acp <代理名>\`         - 🔗 进入 ACP 直传模式（如 \`/acp codex\`）
+• \`/acp <代理名> <会话名>\` - 🔗 进入带命名会话的 ACP 直传模式
+• \`/acp stop\`             - ⏹️  退出 ACP 直传模式
+• \`/acp status\`           - 📊 查看当前 ACP 直传状态
+  代理名支持：codex / claude / gemini / cursor / copilot / pi / openclaw / kimi / opencode / kiro / kilocode / qwen / droid
 
 📂 **文件管理命令**  
 • \`/show-files\` - 📋 查看工作区改动文件
@@ -621,6 +629,70 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
  * @param command - 用户输入的未知命令字符串
  * @returns Promise<boolean> - 始终返回true，表示命令处理完成
  */
+/**
+ * 处理 ACP 直传模式命令
+ *
+ * 用法：
+ *   /acp <代理名>             进入直传模式（如 /acp codex）
+ *   /acp <代理名> <会话名>    进入带命名会话的直传模式
+ *   /acp stop                退出直传模式
+ *   /acp status              查看当前直传状态
+ *
+ * @param session - 会话对象
+ * @param args    - /acp 后面的参数列表
+ */
+export async function handleAcpCommand(session: any, args: string[]): Promise<boolean> {
+  const emitMessage = async (message: string) => {
+    await session.adapter.emit({
+      type: 'commandExecuted',
+      data: { command: '/acp', result: { success: true, message } },
+      timestamp: Date.now(),
+    });
+    console.log(message);
+  };
+
+  // /acp stop | off | exit
+  if (args.length === 0 || args[0] === 'stop' || args[0] === 'off' || args[0] === 'exit') {
+    const current = getAcpPassthroughState();
+    if (!current) {
+      await emitMessage('ℹ️ **ACP 直传模式未激活**\n\n当前未处于 ACP 直传模式。');
+      return true;
+    }
+    clearAcpPassthroughState();
+    await emitMessage(`✅ **ACP 直传模式已关闭**\n\n已退出对 \`${current.agent}\` 的直传会话，后续消息将重新由 AI 处理。`);
+    return true;
+  }
+
+  // /acp status
+  if (args[0] === 'status') {
+    const current = getAcpPassthroughState();
+    if (!current) {
+      await emitMessage('ℹ️ **ACP 直传模式未激活**\n\n当前未处于 ACP 直传模式。');
+    } else {
+      const sessionInfo = current.sessionName ? `（命名会话: \`${current.sessionName}\`）` : '';
+      const cwdInfo = current.cwd ? `\n- 工作目录: \`${current.cwd}\`` : '';
+      await emitMessage(`🔗 **ACP 直传模式已激活**\n\n- 代理: \`${current.agent}\`${sessionInfo}${cwdInfo}\n\n发送 \`/acp stop\` 退出直传模式。`);
+    }
+    return true;
+  }
+
+  // /acp <代理名> [会话名]
+  const agent = args[0];
+  const sessionName = args[1] || undefined;
+
+  const KNOWN_AGENTS = ['codex', 'claude', 'gemini', 'cursor', 'copilot', 'pi', 'openclaw', 'kimi', 'opencode', 'kiro', 'kilocode', 'qwen', 'droid'];
+  if (!KNOWN_AGENTS.includes(agent)) {
+    await emitMessage(`⚠️ **未知代理名称**: \`${agent}\`\n\n支持的内置代理：${KNOWN_AGENTS.map(a => `\`${a}\``).join(', ')}\n\n如需使用自定义代理，请直接使用 \`acpx_execute\` 工具。`);
+    return true;
+  }
+
+  setAcpPassthroughState({ agent, sessionName });
+
+  const sessionInfo = sessionName ? `（命名会话: \`${sessionName}\`）` : '';
+  await emitMessage(`🔗 **ACP 直传模式已激活**\n\n现在您的消息将直接透传给 \`${agent}\` ${sessionInfo}，不经过 AI 大模型处理。\n\n发送 \`/acp stop\` 退出直传模式，或 \`/acp status\` 查看状态。`);
+  return true;
+}
+
 export async function handleUnknownCommand(command: string): Promise<boolean> {
   console.log(styled.error(`❌ **未知命令**\n\n您输入的命令 \`${command}\` 无法识别。\n\n💡 请输入 \`/help\` 查看所有可用命令。`));
   return true;
@@ -1136,6 +1208,9 @@ export function createHandleInternalCommand(session: any): (command: string) => 
           return false;
         }
         return await handleStageCommand(session, args[0]);
+
+      case "/acp":
+        return await handleAcpCommand(session, args);
         
       default:
         return await handleUnknownCommand(command);

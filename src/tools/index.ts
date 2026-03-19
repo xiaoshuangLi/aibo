@@ -14,6 +14,7 @@ import getCursorTools from '@/tools/cursor';
 import getGeminiTools from '@/tools/gemini';
 import getCodexTools from '@/tools/codex';
 import getCopilotTools from '@/tools/copilot';
+import getAcpTools from '@/tools/acp';
 import getLocalMcpTools from '@/tools/local-mcp';
 import getPlaywrightTools from '@/tools/playwright';
 import getReadImageTools from '@/tools/read-image';
@@ -43,6 +44,7 @@ export default async function getTools(session?: Session) {
     geminiTools,
     codexTools,
     copilotTools,
+    acpTools,
     localMcpTools,
     playwrightTools,
     readImageTools,
@@ -63,6 +65,7 @@ export default async function getTools(session?: Session) {
     getGeminiTools(session),
     getCodexTools(session),
     getCopilotTools(session),
+    getAcpTools(session),
     getLocalMcpTools(),
     getPlaywrightTools(),
     getReadImageTools(),
@@ -85,6 +88,7 @@ export default async function getTools(session?: Session) {
     ...geminiTools,
     ...codexTools,
     ...copilotTools,
+    ...acpTools,
     ...localMcpTools,
     ...playwrightTools,
     ...readImageTools,
