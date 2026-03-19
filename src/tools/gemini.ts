@@ -12,6 +12,7 @@ Best suited for: frontend UI development (React/Vue/HTML/CSS), algorithm impleme
 Requires the 'gemini' command to be installed locally (https://github.com/google-gemini/gemini-cli).`,
       promptFlag: "-p",
       extraArgs: ["--yolo"],
+      acpAgent: "gemini",
     },
     session,
   );

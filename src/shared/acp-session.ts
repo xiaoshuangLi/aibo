@@ -18,6 +18,31 @@ export interface AcpSessionState {
   cwd?: string;
 }
 
+/**
+ * Maps an ACP agent identifier to a human-readable programming tool display name.
+ *
+ * @param agent - The ACP agent identifier (e.g. "claude", "codex")
+ * @returns A display name suitable for Lark message titles (e.g. "Claude Code", "Codex")
+ */
+export function getAcpAgentDisplayName(agent: string): string {
+  const names: Record<string, string> = {
+    claude: 'Claude Code',
+    codex: 'Codex',
+    gemini: 'Gemini',
+    cursor: 'Cursor',
+    copilot: 'GitHub Copilot',
+    pi: 'Pi',
+    openclaw: 'OpenClaw',
+    kimi: 'Kimi',
+    opencode: 'OpenCode',
+    kiro: 'Kiro',
+    kilocode: 'Kilocode',
+    qwen: 'Qwen',
+    droid: 'Droid',
+  };
+  return names[agent.toLowerCase()] ?? (agent.charAt(0).toUpperCase() + agent.slice(1));
+}
+
 let _state: AcpSessionState | null = null;
 
 /** Return the current ACP passthrough state, or null if inactive. */

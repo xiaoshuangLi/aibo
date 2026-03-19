@@ -176,7 +176,7 @@ describe('handleAcpPassthrough', () => {
     expect(getAcpPassthroughState()).not.toBeNull();
   });
 
-  it('should use "ACP [agent]" as toolProgress name (not "acpx[agent]")', async () => {
+  it('should use the tool display name as toolProgress label', async () => {
     setAcpPassthroughState({ agent: 'claude' });
 
     // Create a mock that fires stdout data before resolving
@@ -196,10 +196,14 @@ describe('handleAcpPassthrough', () => {
 
     await handleAcpPassthrough('do something', mockSession);
 
-    expect(mockLogToolProgress).toHaveBeenCalledWith('ACP [claude]', 'streaming output');
-    // Ensure the old format is NOT used
+    expect(mockLogToolProgress).toHaveBeenCalledWith('Claude Code 输出', 'streaming output');
+    // Ensure the old formats are NOT used
     expect(mockLogToolProgress).not.toHaveBeenCalledWith(
       expect.stringMatching(/^acpx\[/),
+      expect.anything(),
+    );
+    expect(mockLogToolProgress).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^ACP \[/),
       expect.anything(),
     );
   });

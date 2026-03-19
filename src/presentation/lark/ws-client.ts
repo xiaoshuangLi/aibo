@@ -160,7 +160,7 @@ export class LarkWsClientManager {
       const timer = setTimeout(() => {
         server.close();
         settle(false);
-      }, SAFETY_TIMEOUT_MS);
+      }, SAFETY_TIMEOUT_MS).unref();
 
       server.once('error', () => {
         clearTimeout(timer);
@@ -202,7 +202,7 @@ export class LarkWsClientManager {
       });
 
       // 安全超时：连接或握手若在 SAFETY_TIMEOUT_MS 内未完成，放弃此端口。
-      timer = setTimeout(() => settle(false), SAFETY_TIMEOUT_MS);
+      timer = setTimeout(() => settle(false), SAFETY_TIMEOUT_MS).unref();
 
       socket.on('connect', () => socket.emit(VERIFY_EVENT));
 
@@ -251,7 +251,7 @@ export class LarkWsClientManager {
       this.discover(WS_START_PORT).catch(err =>
         console.error('❌ 重新发现失败:', err)
       );
-    }, RECONNECT_BASE_MS + jitter);
+    }, RECONNECT_BASE_MS + jitter).unref();
   }
 
   // ─── 主进程逻辑 ───────────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ export class LarkWsClientManager {
                 this.discover(port + 1).then(resolve, reject);
               }
             }, reject);
-          }, POST_CONFLICT_DELAY_MS);
+          }, POST_CONFLICT_DELAY_MS).unref();
         } else {
           reject(err);
         }

@@ -24,6 +24,7 @@ import {
   setAcpPassthroughState,
   clearAcpPassthroughState,
 } from './acp-passthrough';
+import { getAcpAgentDisplayName } from '@/shared/acp-session';
 
 export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
 
@@ -75,12 +76,13 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   }
 
   const { agent, sessionName, cwd } = state;
+  const displayName = getAcpAgentDisplayName(agent);
   const timeout = 6000000;
 
   // Detect natural-language exit intent before forwarding to ACP.
   if (isAcpExitIntent(input)) {
     clearAcpPassthroughState();
-    session.logSystemMessage(`✅ 已退出 ACP [${agent}] 直传模式，恢复正常 AI 对话。`);
+    session.logSystemMessage(`✅ 已退出与 ${displayName} 的对话，恢复正常 AI 对话。`);
     return;
   }
 
@@ -102,7 +104,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     });
 
     (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-      session.logToolProgress(`ACP [${agent}]`, data.toString());
+      session.logToolProgress(`${displayName} 输出`, data.toString());
     });
 
     const { stdout } = await promise;
