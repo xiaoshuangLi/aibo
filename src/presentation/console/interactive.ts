@@ -1,4 +1,6 @@
 import readline from 'readline';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { config } from '@/core/config';
 import { createAIAgent } from '@/core/agent';
 import { createHandleInternalCommand } from './commander';
@@ -7,6 +9,17 @@ import { handleUserInput } from './input';
 import { TerminalAdapter } from './adapter';
 import { Session } from '@/core/agent';
 import { createConsoleThreadId } from '@/core/utils';
+import {
+  getAcpSessionState,
+  clearAcpSessionState,
+  getAcpAgentDisplayName,
+} from '@/shared/acp-session';
+import { handleCliExecutionError } from '@/shared/utils';
+
+const execFileAsync = promisify(execFile);
+
+/** Timeout in ms for acpx executions (100 minutes). */
+const ACP_EXEC_TIMEOUT_MS = 6_000_000;
 
 /**
  * Interactive Mode module that orchestrates the main interactive conversation interface.
@@ -19,6 +32,94 @@ import { createConsoleThreadId } from '@/core/utils';
  */
 
 /**
+ * Patterns that signal the user wants to exit ACP passthrough mode.
+ */
+const ACP_EXIT_PATTERNS: RegExp[] = [
+  /退出\s*acp/i,
+  /关闭\s*acp/i,
+  /停止\s*acp/i,
+  /结束\s*acp/i,
+  /exit\s*acp/i,
+  /stop\s*acp/i,
+  /quit\s*acp/i,
+  /close\s*acp/i,
+  /退出.*透传/i,
+  /停止.*透传/i,
+  /关闭.*透传/i,
+];
+
+/**
+ * Return true when the input expresses an intent to leave ACP passthrough mode.
+ */
+function isAcpExitIntent(input: string): boolean {
+  const trimmed = input.trim();
+  return ACP_EXIT_PATTERNS.some((re) => re.test(trimmed));
+}
+
+/**
+ * Forward user input to the ACP passthrough session and display the output.
+ * When the input matches an exit intent, the passthrough state is cleared.
+ *
+ * @param input   - The user's text input
+ * @param session - The current console session
+ */
+export async function handleConsoleAcpPassthrough(input: string, session: Session): Promise<void> {
+  const state = getAcpSessionState();
+  if (!state) {
+    return;
+  }
+
+  const { agent, sessionName, cwd } = state;
+  const displayName = getAcpAgentDisplayName(agent);
+
+  // Detect natural-language exit intent before forwarding to ACP.
+  if (isAcpExitIntent(input)) {
+    clearAcpSessionState();
+    session.logSystemMessage(`✅ 已退出与 ${displayName} 的对话，恢复正常 AI 对话。`);
+    return;
+  }
+
+  // Build acpx arguments:
+  //   acpx --approve-all --format text [--cwd <cwd>] <agent> [-s <name>] <prompt>
+  const execArgs: string[] = ['--approve-all', '--format', 'text'];
+  if (cwd) execArgs.push('--cwd', cwd);
+  execArgs.push(agent);
+  if (sessionName) execArgs.push('-s', sessionName);
+  execArgs.push(input);
+
+  try {
+    const promise = execFileAsync('acpx', execArgs, {
+      timeout: ACP_EXEC_TIMEOUT_MS,
+      cwd: cwd || process.cwd(),
+      env: process.env,
+      signal: session?.abortController?.signal,
+      killSignal: 'SIGKILL',
+    });
+
+    (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+      session.logToolProgress(`${displayName} 输出`, data.toString());
+    });
+
+    const { stdout } = await promise;
+    session.logAcpResponse(agent, stdout || '(empty)');
+  } catch (error: any) {
+    // Provide a helpful message when acpx is not installed
+    if (error?.code === 'ENOENT') {
+      session.logAcpResponse(agent, `❌ 错误: acpx 命令未找到。请先安装：npm install -g acpx`);
+      return;
+    }
+    const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
+    let message: string;
+    try {
+      message = JSON.parse(errJson)?.message || errJson;
+    } catch {
+      message = errJson;
+    }
+    session.logAcpResponse(agent, `❌ 错误: ${message}`);
+  }
+}
+
+/**
  * 处理行输入事件
  * 
  * 中文名称：处理行输入事件
@@ -27,13 +128,15 @@ import { createConsoleThreadId } from '@/core/utils';
  * - 处理用户输入的文本行
  * - 识别内部命令（以/开头）并路由到命令处理器
  * - 处理空输入并显示提示符
+ * - 在 ACP 直传模式下将输入直接转发给 ACP 进程
  * - 保存用户输入到命令历史
  * - 将非命令输入作为用户查询处理
  * 
  * 行为分支：
  * 1. 内部命令：以/开头的输入被路由到内部命令处理器
  * 2. 空输入：忽略空输入并显示提示符
- * 3. 用户查询：非命令输入被添加到历史记录并作为用户查询处理
+ * 3. ACP 直传模式：输入直接转发给 ACP 进程
+ * 4. 用户查询：非命令输入被添加到历史记录并作为用户查询处理
  * 
  * @param session - 会话对象，包含threadId、commandHistory等状态
  * @param handleInternalCommand - 内部命令处理器函数
@@ -43,7 +146,7 @@ import { createConsoleThreadId } from '@/core/utils';
 export const onLine = (session: Session, handleInternalCommand: any, agent: any) => async (input: string = '') => {
   const trimmed = input.trim();
   
-  // Handle internal commands
+  // Handle internal commands (always processed even in ACP passthrough mode)
   if (trimmed.startsWith("/")) {
     await handleInternalCommand(trimmed);
     session.requestUserInput();
@@ -52,6 +155,24 @@ export const onLine = (session: Session, handleInternalCommand: any, agent: any)
   
   // Empty input
   if (!trimmed) {
+    session.requestUserInput();
+    return;
+  }
+
+  // ACP passthrough mode: forward messages directly to ACP, bypass the LLM
+  if (getAcpSessionState()) {
+    session.addToHistory(trimmed);
+    session.isRunning = true;
+    const abortController = new AbortController();
+    session.abortController = abortController;
+    try {
+      await handleConsoleAcpPassthrough(trimmed, session);
+    } finally {
+      if (session.abortController === abortController) {
+        session.isRunning = false;
+        session.abortController = new AbortController();
+      }
+    }
     session.requestUserInput();
     return;
   }
