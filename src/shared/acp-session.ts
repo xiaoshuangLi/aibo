@@ -19,6 +19,16 @@ export interface AcpSessionState {
 }
 
 /**
+ * Built-in ACP-compatible agent names recognised by acpx.
+ * Exported from the shared module so both console and Lark commanders stay in sync.
+ */
+export const KNOWN_ACP_AGENTS: string[] = [
+  'codex', 'claude', 'gemini', 'cursor', 'copilot',
+  'pi', 'openclaw', 'kimi', 'opencode', 'kiro',
+  'kilocode', 'qwen', 'droid',
+];
+
+/**
  * Maps an ACP agent identifier to a human-readable programming tool display name.
  *
  * @param agent - The ACP agent identifier (e.g. "claude", "codex")
