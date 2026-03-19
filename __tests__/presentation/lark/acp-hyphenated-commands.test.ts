@@ -13,6 +13,8 @@ import {
   handleAcpKillCommand,
   handleAcpStatusCommand,
   handleAcpCancelCommand,
+  handleAcpPauseCommand,
+  handleAcpResumeCommand,
   createHandleInternalCommand,
   KNOWN_ACP_AGENTS,
 } from '@/presentation/lark/commander';
@@ -20,6 +22,9 @@ import {
   getAcpPassthroughState,
   setAcpPassthroughState,
   clearAcpPassthroughState,
+  getAcpPausedPassthroughState,
+  pauseAcpPassthroughState,
+  clearAcpPausedPassthroughState,
 } from '@/presentation/lark/acp-passthrough';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
@@ -79,6 +84,7 @@ const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
 beforeEach(() => {
   clearAcpPassthroughState();
+  clearAcpPausedPassthroughState();
   consoleSpy.mockClear();
   jest.clearAllMocks();
 });
@@ -86,6 +92,7 @@ beforeEach(() => {
 afterAll(() => {
   consoleSpy.mockRestore();
   clearAcpPassthroughState();
+  clearAcpPausedPassthroughState();
 });
 
 // ── KNOWN_ACP_AGENTS export ────────────────────────────────────────────
@@ -394,5 +401,120 @@ describe('createHandleInternalCommand — ACP hyphenated routing', () => {
         }),
       }),
     );
+  });
+
+  it('routes /acp-pause to handleAcpPauseCommand', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    const session = makeSession();
+    const handler = createHandleInternalCommand(session);
+    const result = await handler('/acp-pause');
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toBeNull();
+    expect(getAcpPausedPassthroughState()?.agent).toBe('codex');
+  });
+
+  it('routes /acp-resume to handleAcpResumeCommand', async () => {
+    setAcpPassthroughState({ agent: 'claude', sessionName: 'main' });
+    pauseAcpPassthroughState();
+    const session = makeSession();
+    const handler = createHandleInternalCommand(session);
+    const result = await handler('/acp-resume');
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toEqual({ agent: 'claude', sessionName: 'main' });
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+});
+
+// ── handleAcpPauseCommand ──────────────────────────────────────────────
+
+describe('handleAcpPauseCommand', () => {
+  it('pauses active passthrough and saves state', async () => {
+    setAcpPassthroughState({ agent: 'codex', sessionName: 'backend' });
+    const session = makeSession();
+    const result = await handleAcpPauseCommand(session);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toBeNull();
+    expect(getAcpPausedPassthroughState()).toEqual({ agent: 'codex', sessionName: 'backend' });
+  });
+
+  it('shows "not active" when no passthrough is running', async () => {
+    const session = makeSession();
+    const result = await handleAcpPauseCommand(session);
+    expect(result).toBe(true);
+    const emitCall = session.adapter.emit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('未激活');
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('emits /acp-pause command event', async () => {
+    setAcpPassthroughState({ agent: 'gemini' });
+    const session = makeSession();
+    await handleAcpPauseCommand(session);
+    expect(session.adapter.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ command: '/acp-pause' }),
+      }),
+    );
+  });
+
+  it('includes agent display name in pause message', async () => {
+    setAcpPassthroughState({ agent: 'claude' });
+    const session = makeSession();
+    await handleAcpPauseCommand(session);
+    const emitCall = session.adapter.emit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('Claude Code');
+  });
+});
+
+// ── handleAcpResumeCommand ─────────────────────────────────────────────
+
+describe('handleAcpResumeCommand', () => {
+  it('resumes paused passthrough state', async () => {
+    setAcpPassthroughState({ agent: 'codex', sessionName: 'review' });
+    pauseAcpPassthroughState();
+    const session = makeSession();
+    const result = await handleAcpResumeCommand(session);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toEqual({ agent: 'codex', sessionName: 'review' });
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('shows "no paused session" when nothing was paused', async () => {
+    const session = makeSession();
+    const result = await handleAcpResumeCommand(session);
+    expect(result).toBe(true);
+    const emitCall = session.adapter.emit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('无可恢复');
+  });
+
+  it('shows "already active" when passthrough is already running', async () => {
+    setAcpPassthroughState({ agent: 'gemini' });
+    const session = makeSession();
+    const result = await handleAcpResumeCommand(session);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()?.agent).toBe('gemini');
+    const emitCall = session.adapter.emit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('已激活');
+  });
+
+  it('emits /acp-resume command event', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    pauseAcpPassthroughState();
+    const session = makeSession();
+    await handleAcpResumeCommand(session);
+    expect(session.adapter.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ command: '/acp-resume' }),
+      }),
+    );
+  });
+
+  it('includes agent display name in resume message', async () => {
+    setAcpPassthroughState({ agent: 'claude' });
+    pauseAcpPassthroughState();
+    const session = makeSession();
+    await handleAcpResumeCommand(session);
+    const emitCall = session.adapter.emit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('Claude Code');
   });
 });

@@ -54,6 +54,7 @@ export function getAcpAgentDisplayName(agent: string): string {
 }
 
 let _state: AcpSessionState | null = null;
+let _pausedState: AcpSessionState | null = null;
 
 /** Return the current ACP passthrough state, or null if inactive. */
 export function getAcpSessionState(): AcpSessionState | null {
@@ -68,4 +69,43 @@ export function setAcpSessionState(state: AcpSessionState | null): void {
 /** Deactivate ACP passthrough. */
 export function clearAcpSessionState(): void {
   _state = null;
+}
+
+/**
+ * Return the previously paused ACP passthrough state, or null if none.
+ * This state is saved by pauseAcpSessionState() and can be restored with resumeAcpSessionState().
+ */
+export function getAcpPausedSessionState(): AcpSessionState | null {
+  return _pausedState;
+}
+
+/**
+ * Pause ACP passthrough: saves the active state to the paused slot and deactivates passthrough.
+ * Returns the state that was paused, or null if there was no active state.
+ */
+export function pauseAcpSessionState(): AcpSessionState | null {
+  const current = _state;
+  if (current) {
+    _pausedState = current;
+    _state = null;
+  }
+  return current;
+}
+
+/**
+ * Resume ACP passthrough: restores the paused state as the active state.
+ * Returns the resumed state, or null if there was no paused state.
+ */
+export function resumeAcpSessionState(): AcpSessionState | null {
+  const paused = _pausedState;
+  if (paused) {
+    _state = paused;
+    _pausedState = null;
+  }
+  return paused;
+}
+
+/** Clear the paused ACP passthrough state. */
+export function clearAcpPausedSessionState(): void {
+  _pausedState = null;
 }

@@ -13,4 +13,8 @@ export {
   getAcpSessionState as getAcpPassthroughState,
   setAcpSessionState as setAcpPassthroughState,
   clearAcpSessionState as clearAcpPassthroughState,
+  getAcpPausedSessionState as getAcpPausedPassthroughState,
+  pauseAcpSessionState as pauseAcpPassthroughState,
+  resumeAcpSessionState as resumeAcpPassthroughState,
+  clearAcpPausedSessionState as clearAcpPausedPassthroughState,
 } from '@/shared/acp-session';

@@ -6,6 +6,10 @@ import {
   getAcpPassthroughState,
   setAcpPassthroughState,
   clearAcpPassthroughState,
+  getAcpPausedPassthroughState,
+  pauseAcpPassthroughState,
+  resumeAcpPassthroughState,
+  clearAcpPausedPassthroughState,
 } from '@/presentation/lark/acp-passthrough';
 import { handleAcpCommand } from '@/presentation/lark/commander';
 
@@ -16,10 +20,12 @@ import { handleAcpCommand } from '@/presentation/lark/commander';
 describe('ACP Passthrough State', () => {
   beforeEach(() => {
     clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
   });
 
   afterEach(() => {
     clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
   });
 
   it('should return null when no state is set', () => {
@@ -65,6 +71,73 @@ describe('ACP Passthrough State', () => {
 });
 
 // ====================================================================
+// ACP Pause / Resume state tests
+// ====================================================================
+
+describe('ACP Pause / Resume State', () => {
+  beforeEach(() => {
+    clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
+  });
+
+  afterEach(() => {
+    clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
+  });
+
+  it('getAcpPausedPassthroughState returns null initially', () => {
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('pauseAcpPassthroughState saves active state and clears it', () => {
+    setAcpPassthroughState({ agent: 'codex', sessionName: 'backend' });
+    const returned = pauseAcpPassthroughState();
+    expect(returned).toEqual({ agent: 'codex', sessionName: 'backend' });
+    expect(getAcpPassthroughState()).toBeNull();
+    expect(getAcpPausedPassthroughState()).toEqual({ agent: 'codex', sessionName: 'backend' });
+  });
+
+  it('pauseAcpPassthroughState returns null when no active state', () => {
+    const returned = pauseAcpPassthroughState();
+    expect(returned).toBeNull();
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('resumeAcpPassthroughState restores paused state as active', () => {
+    setAcpPassthroughState({ agent: 'claude', sessionName: 'review' });
+    pauseAcpPassthroughState();
+    const resumed = resumeAcpPassthroughState();
+    expect(resumed).toEqual({ agent: 'claude', sessionName: 'review' });
+    expect(getAcpPassthroughState()).toEqual({ agent: 'claude', sessionName: 'review' });
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('resumeAcpPassthroughState returns null when no paused state', () => {
+    const resumed = resumeAcpPassthroughState();
+    expect(resumed).toBeNull();
+    expect(getAcpPassthroughState()).toBeNull();
+  });
+
+  it('clearAcpPausedPassthroughState clears only the paused state', () => {
+    setAcpPassthroughState({ agent: 'gemini' });
+    pauseAcpPassthroughState();
+    // Restore active state manually
+    setAcpPassthroughState({ agent: 'codex' });
+    clearAcpPausedPassthroughState();
+    expect(getAcpPausedPassthroughState()).toBeNull();
+    expect(getAcpPassthroughState()).toEqual({ agent: 'codex' });
+  });
+
+  it('preserves cwd when pausing and resuming', () => {
+    setAcpPassthroughState({ agent: 'codex', cwd: '/my/project' });
+    pauseAcpPassthroughState();
+    const resumed = resumeAcpPassthroughState();
+    expect(resumed?.cwd).toBe('/my/project');
+    expect(getAcpPassthroughState()?.cwd).toBe('/my/project');
+  });
+});
+
+// ====================================================================
 // handleAcpCommand tests
 // ====================================================================
 
@@ -76,6 +149,7 @@ describe('handleAcpCommand', () => {
 
   beforeEach(() => {
     clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
     mockEmit.mockClear();
     // Suppress console.log during tests
     jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -83,6 +157,7 @@ describe('handleAcpCommand', () => {
 
   afterEach(() => {
     clearAcpPassthroughState();
+    clearAcpPausedPassthroughState();
     jest.restoreAllMocks();
   });
 
@@ -179,5 +254,47 @@ describe('handleAcpCommand', () => {
     const result = await handleAcpCommand(mockSession, []);
     expect(result).toBe(true);
     expect(getAcpPassthroughState()).toBeNull();
+  });
+
+  it('/acp pause should pause active passthrough and save state', async () => {
+    setAcpPassthroughState({ agent: 'codex', sessionName: 'backend' });
+    const result = await handleAcpCommand(mockSession, ['pause']);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toBeNull();
+    expect(getAcpPausedPassthroughState()).toEqual({ agent: 'codex', sessionName: 'backend' });
+    expect(mockEmit).toHaveBeenCalled();
+  });
+
+  it('/acp pause should show "not active" when no passthrough is active', async () => {
+    const result = await handleAcpCommand(mockSession, ['pause']);
+    expect(result).toBe(true);
+    expect(getAcpPausedPassthroughState()).toBeNull();
+    const emitCall = mockEmit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('未激活');
+  });
+
+  it('/acp resume should restore paused passthrough state', async () => {
+    setAcpPassthroughState({ agent: 'claude', sessionName: 'review' });
+    pauseAcpPassthroughState();
+    const result = await handleAcpCommand(mockSession, ['resume']);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toEqual({ agent: 'claude', sessionName: 'review' });
+    expect(getAcpPausedPassthroughState()).toBeNull();
+  });
+
+  it('/acp resume should show "no paused session" when nothing was paused', async () => {
+    const result = await handleAcpCommand(mockSession, ['resume']);
+    expect(result).toBe(true);
+    expect(getAcpPassthroughState()).toBeNull();
+    const emitCall = mockEmit.mock.calls[0][0];
+    expect(emitCall.data.result.message).toContain('无可恢复');
+  });
+
+  it('/acp resume should show "already active" when passthrough is already running', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    const result = await handleAcpCommand(mockSession, ['resume']);
+    expect(result).toBe(true);
+    // Active state should remain unchanged
+    expect(getAcpPassthroughState()?.agent).toBe('codex');
   });
 });
