@@ -122,18 +122,45 @@ describe('copilot tool execution (ACP mode)', () => {
     expect(parsed.error).toBe('EACCES');
   });
 
-  it('should fallback to EXECUTION_ERROR when no code', async () => {
-    const err: any = new Error('unexpected');
+  it('should auto-create session and retry when "No acpx session found" error occurs', async () => {
+    const noSessionErr: any = new Error('Command failed: No acpx session found');
+    noSessionErr.stderr = '⚠ No acpx session found (searched up to /project).';
+    noSessionErr.stdout = '';
+
+    // First call (prompt) fails with session-not-found; second call (sessions new) succeeds; third call (retry) returns result
+    execFileAsyncMock
+      .mockRejectedValueOnce(noSessionErr)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' }) // sessions new
+      .mockResolvedValueOnce({ stdout: 'copilot result', stderr: '' }); // retry
+
+    const result = await executeTool.invoke({ prompt: 'hello' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.stdout).toBe('copilot result');
+    // Three execFileAsync calls: initial prompt, sessions new, retry
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(3);
+    // Second call must be sessions new for the copilot agent
+    const sessionNewArgs = execFileAsyncMock.mock.calls[1][1] as string[];
+    expect(sessionNewArgs).toContain('copilot');
+    expect(sessionNewArgs).toContain('sessions');
+    expect(sessionNewArgs).toContain('new');
+  });
+
+  it('should NOT retry on non-session errors', async () => {
+    const err: any = new Error('Permission denied');
+    err.code = 'EACCES';
     err.stdout = '';
-    err.stderr = '';
+    err.stderr = 'Permission denied';
     execFileAsyncMock.mockRejectedValue(err);
 
     const result = await executeTool.invoke({ prompt: 'task' });
     const parsed = JSON.parse(result);
 
-    expect(parsed.error).toBe('EXECUTION_ERROR');
+    expect(parsed.success).toBe(false);
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(1);
   });
-});
+
 
 // ── Direct-CLI fallback (acpx not available) ──────────────────────────────────
 
@@ -189,4 +216,5 @@ describe('copilot tool execution (direct-CLI fallback, no acpx)', () => {
     const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
     expect(callArgs).not.toContain('--continue');
   });
+});
 });

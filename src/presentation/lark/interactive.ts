@@ -17,7 +17,7 @@ import { createAIAgent } from '@/core/agent';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
-import { handleCliExecutionError } from '@/shared/utils';
+import { handleCliExecutionError, isNoAcpSessionError, createAcpSession } from '@/shared/utils';
 import {
   AcpPassthroughState,
   getAcpPassthroughState,
@@ -98,19 +98,31 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   execArgs.push(input);
 
   try {
-    const promise = execFileAsync('acpx', execArgs, {
+    const acpOptions = {
       timeout: ACP_EXEC_TIMEOUT_MS,
       cwd: cwd || process.cwd(),
       env: process.env,
       signal: session?.abortController?.signal,
-      killSignal: 'SIGKILL',
-    });
+      killSignal: 'SIGKILL' as const,
+    };
 
-    (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-      session.logToolProgress(`${displayName} 输出`, data.toString());
-    });
+    const runAcp = () => {
+      const promise = execFileAsync('acpx', execArgs, acpOptions);
+      (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+        session.logToolProgress(`${displayName} 输出`, data.toString());
+      });
+      return promise;
+    };
 
-    const { stdout } = await promise;
+    let stdout: string;
+    try {
+      ({ stdout } = await runAcp());
+    } catch (firstError) {
+      if (!isNoAcpSessionError(firstError)) throw firstError;
+      await createAcpSession(agent, cwd);
+      ({ stdout } = await runAcp());
+    }
+
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);

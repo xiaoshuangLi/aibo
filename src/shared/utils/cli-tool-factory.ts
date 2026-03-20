@@ -67,6 +67,33 @@ export function isCliCommandAvailable(command: string): boolean {
 }
 
 /**
+ * Detects whether a CLI error indicates that no acpx session exists for the agent.
+ * This happens when running an acpx prompt command before any session has been created.
+ */
+export function isNoAcpSessionError(error: unknown): boolean {
+  const err = error as any;
+  const combined = `${err.message || ""} ${err.stderr || ""}`;
+  return combined.includes("No acpx session found");
+}
+
+/**
+ * Creates a new acpx session for the given agent and optional working directory.
+ * Equivalent to: acpx [--cwd <cwd>] <agent> sessions new
+ */
+export async function createAcpSession(
+  agent: string,
+  cwd?: string,
+): Promise<void> {
+  const args: string[] = [];
+  if (cwd) args.push("--cwd", cwd);
+  args.push(agent, "sessions", "new");
+  await execFileAsync("acpx", args, {
+    cwd: cwd || process.cwd(),
+    env: process.env,
+  });
+}
+
+/**
  * Builds a standardised error JSON string for CLI execution failures.
  */
 export function handleCliExecutionError(
@@ -159,19 +186,32 @@ export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
         if (args.length) execArgs.push(...args);
 
         try {
-          const promise = execFileAsync("acpx", execArgs, {
+          const acpOptions = {
             timeout,
             cwd: cwd || process.cwd(),
             env: process.env,
             signal: session?.abortController?.signal,
-            killSignal: "SIGKILL",
-          });
+            killSignal: "SIGKILL" as const,
+          };
 
-          (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
-            session?.logToolProgress(`${displayName} 输出`, data.toString());
-          });
+          const runAcp = () => {
+            const promise = execFileAsync("acpx", execArgs, acpOptions);
+            (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
+              session?.logToolProgress(`${displayName} 输出`, data.toString());
+            });
+            return promise;
+          };
 
-          const { stdout, stderr } = await promise;
+          let result: { stdout: string; stderr: string };
+          try {
+            result = await runAcp();
+          } catch (firstError) {
+            if (!isNoAcpSessionError(firstError)) throw firstError;
+            await createAcpSession(acpAgent, cwd);
+            result = await runAcp();
+          }
+
+          const { stdout, stderr } = result;
 
           if (start_passthrough) {
             setAcpSessionState({ agent: acpAgent, sessionName: session_name, cwd });

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
-import { isCliCommandAvailable, handleCliExecutionError } from "@/shared/utils";
+import { isCliCommandAvailable, handleCliExecutionError, isNoAcpSessionError, createAcpSession } from "@/shared/utils";
 import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
@@ -24,19 +24,32 @@ function createCursorExecuteTool(session?: Session) {
         if (args.length) execArgs.push(...args);
 
         try {
-          const promise = execFileAsync("acpx", execArgs, {
+          const acpOptions = {
             timeout,
             cwd: cwd || process.cwd(),
             env: process.env,
             signal: session?.abortController?.signal,
-            killSignal: "SIGKILL",
-          });
+            killSignal: "SIGKILL" as const,
+          };
 
-          (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
-            session?.logToolProgress(`${displayName} 输出`, data.toString());
-          });
+          const runAcp = () => {
+            const promise = execFileAsync("acpx", execArgs, acpOptions);
+            (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
+              session?.logToolProgress(`${displayName} 输出`, data.toString());
+            });
+            return promise;
+          };
 
-          const { stdout, stderr } = await promise;
+          let result: { stdout: string; stderr: string };
+          try {
+            result = await runAcp();
+          } catch (firstError) {
+            if (!isNoAcpSessionError(firstError)) throw firstError;
+            await createAcpSession(ACP_AGENT, cwd);
+            result = await runAcp();
+          }
+
+          const { stdout, stderr } = result;
 
           if (start_passthrough) {
             setAcpSessionState({ agent: ACP_AGENT, sessionName: session_name, cwd });

@@ -173,12 +173,40 @@ describe('acpx tool execution', () => {
     expect(callArgs).toContain('cancel');
   });
 
-  it('should include mode in success response', async () => {
-    execFileAsyncMock.mockResolvedValue({ stdout: 'result', stderr: '' });
+  it('should auto-create session and retry when "No acpx session found" error occurs', async () => {
+    const noSessionErr: any = new Error('Command failed: No acpx session found');
+    noSessionErr.stderr = '⚠ No acpx session found (searched up to /project).\nCreate one: acpx codex sessions new';
+    noSessionErr.stdout = '';
 
-    const result = await executeTool.invoke({ agent: 'codex', prompt: 'task', mode: 'exec' });
+    execFileAsyncMock
+      .mockRejectedValueOnce(noSessionErr)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' }) // sessions new
+      .mockResolvedValueOnce({ stdout: 'acpx result after session', stderr: '' }); // retry
+
+    const result = await executeTool.invoke({ agent: 'codex', prompt: 'fix tests' });
     const parsed = JSON.parse(result);
 
-    expect(parsed.mode).toBe('exec');
+    expect(parsed.success).toBe(true);
+    expect(parsed.stdout).toBe('acpx result after session');
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(3);
+    const sessionNewArgs = execFileAsyncMock.mock.calls[1][1] as string[];
+    expect(sessionNewArgs).toContain('codex');
+    expect(sessionNewArgs).toContain('sessions');
+    expect(sessionNewArgs).toContain('new');
   });
+
+  it('should NOT retry on non-session errors', async () => {
+    const err: any = new Error('Permission denied');
+    err.code = 'EACCES';
+    err.stdout = '';
+    err.stderr = 'Permission denied';
+    execFileAsyncMock.mockRejectedValue(err);
+
+    const result = await executeTool.invoke({ agent: 'codex', prompt: 'task' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(1);
+  });
+
 });
