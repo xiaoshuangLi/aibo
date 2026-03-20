@@ -61,51 +61,6 @@ describe('viewFileTool - extra coverage', () => {
   });
 });
 
-// ── write-file: error path (line 40) ─────────────────────────────────────────
-
-describe('writeFileTool - write error path', () => {
-  it('returns error JSON when write target is invalid', async () => {
-    const { writeFileTool } = require('../../src/tools/write-file');
-
-    const result = await writeFileTool.invoke({
-      file_path: '/proc/sys/this_cannot_be_written.txt',
-      content: 'test',
-    });
-    const parsed = JSON.parse(result);
-    expect(parsed.success).toBe(false);
-  });
-});
-
-// ── grep: unreadable file skip (line 57) ─────────────────────────────────────
-
-describe('grepFilesTool - skip unreadable file', () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = realFs.mkdtempSync(path.join(os.tmpdir(), 'grep-chmod-'));
-  });
-  afterEach(() => {
-    realFs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('skips files that cannot be read (chmod 000)', async () => {
-    const { grepFilesTool } = require('../../src/tools/grep');
-    const good = path.join(tmpDir, 'good.txt');
-    const bad = path.join(tmpDir, 'bad.txt');
-    realFs.writeFileSync(good, 'hello world');
-    realFs.writeFileSync(bad, 'secret');
-    realFs.chmodSync(bad, 0o000);
-
-    try {
-      const result = await grepFilesTool.invoke({ pattern: 'hello', cwd: tmpDir });
-      const parsed = JSON.parse(result);
-      expect(parsed.success).toBe(true);
-    } finally {
-      try { realFs.chmodSync(bad, 0o644); } catch { /* ignore */ }
-    }
-  });
-});
-
 // ── prompts: English locale path (line 37) ───────────────────────────────────
 
 describe('getSystemPrompt - English locale', () => {

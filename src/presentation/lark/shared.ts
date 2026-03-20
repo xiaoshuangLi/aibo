@@ -297,7 +297,7 @@ export const isJsonContent = (content: string): boolean => {
  */
 export const getToolType = (name: string): string => {
   // 文件系统工具
-  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'glob_files', 'grep', 'grep_files'].includes(name)) {
+  if (['ls', 'read_file', 'view_file', 'write_file', 'edit_file', 'glob', 'grep'].includes(name)) {
     return 'filesystem';
   }
   // 系统/Bash工具
@@ -329,7 +329,7 @@ export const getToolType = (name: string): string => {
     return 'search';
   }
   // 任务管理工具
-  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task', 'todo_write', 'todo_read'].includes(name)) {
+  if (['write-subagent-todos', 'read-subagent-todos', 'write_todos', 'task'].includes(name)) {
     return 'task_management';
   }
   // AI代理执行工具

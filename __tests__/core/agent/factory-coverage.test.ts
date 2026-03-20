@@ -3,7 +3,7 @@ jest.mock('dotenv', () => ({ config: jest.fn() }));
 
 describe('AgentFactory - createCheckpointer branch coverage', () => {
   const baseConfig = {
-    model: { apiKey: 'test-key', baseURL: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
+    model: { apiKey: 'test-key', baseUrl: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
     langgraph: { recursionLimit: 100, checkpointerType: 'memory' },
     memory: {},
     output: { verbose: false },
@@ -41,6 +41,9 @@ describe('AgentFactory - createCheckpointer branch coverage', () => {
       }),
       createImageUploadMiddleware: jest.fn().mockReturnValue({
         name: 'image-upload-middleware', wrapModelCall: jest.fn()
+      }),
+      createFilterDuplicateToolsMiddleware: jest.fn().mockReturnValue({
+        name: 'FilterDuplicateToolsMiddleware', wrapModelCall: jest.fn()
       })
     }));
 
@@ -236,7 +239,7 @@ describe('buildCodingAgentHint', () => {
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     jest.doMock('@/core/config', () => ({
       config: {
-        model: { apiKey: 'test-key', baseURL: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
+        model: { apiKey: 'test-key', baseUrl: undefined, name: 'gpt-4o', provider: undefined, azureApiVersion: undefined },
         langgraph: { recursionLimit: 100, checkpointerType: 'memory' },
         memory: {},
         output: { verbose: false },
@@ -263,6 +266,7 @@ describe('buildCodingAgentHint', () => {
     jest.doMock('@/core/middlewares', () => ({
       createLangChainToolRetryMiddleware: jest.fn().mockReturnValue({ name: 'mw', wrapToolCall: jest.fn() }),
       createSessionOutputCaptureMiddleware: jest.fn().mockReturnValue({ name: 'mw2', wrapToolCall: jest.fn() }),
+      createFilterDuplicateToolsMiddleware: jest.fn().mockReturnValue({ name: 'FilterDuplicateToolsMiddleware', wrapModelCall: jest.fn() }),
     }));
     jest.doMock('@/infrastructure/agents/loader', () => ({
       loadSubAgents: jest.fn().mockReturnValue([]),

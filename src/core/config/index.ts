@@ -156,7 +156,7 @@ const resolvedLarkType = resolveLarkType();
  * @type {Object}
  * @property {Object} model - Unified model configuration
  * @property {string|undefined} model.apiKey - API key for the model provider (not required for Ollama)
- * @property {string|undefined} model.baseURL - Base URL for the model provider
+ * @property {string|undefined} model.baseUrl - Base URL for the model provider
  * @property {string} model.name - The AI model name to use
  * @property {string|undefined} model.provider - Explicit provider override; auto-detected when omitted
  * @property {string|undefined} model.azureApiVersion - Azure OpenAI API version (Azure only)
@@ -168,7 +168,7 @@ const resolvedLarkType = resolveLarkType();
 export const config = {
   model: {
     apiKey: env.AIBO_API_KEY ?? env.AIBO_OPENAI_API_KEY,
-    baseURL: env.AIBO_BASE_URL ?? env.AIBO_OPENAI_BASE_URL,
+    baseUrl: env.AIBO_BASE_URL ?? env.AIBO_OPENAI_BASE_URL,
     name: env.AIBO_MODEL_NAME,
     provider: env.AIBO_MODEL_PROVIDER,
     azureApiVersion: env.AIBO_AZURE_API_VERSION,

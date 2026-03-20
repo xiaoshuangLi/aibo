@@ -6,6 +6,13 @@ import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { createVoiceRecognition } from '@/features/voice-input';
 import { handleUserInput } from './input';
 import { LspClientManager } from '@/infrastructure/code-analysis';
+import {
+  getAcpSessionState,
+  setAcpSessionState,
+  clearAcpSessionState,
+  getAcpAgentDisplayName,
+  KNOWN_ACP_AGENTS as _KNOWN_ACP_AGENTS,
+} from '@/shared/acp-session';
 
 /**
  * Command Handlers module that provides internal command processing functionality.
@@ -16,6 +23,9 @@ import { LspClientManager } from '@/infrastructure/code-analysis';
  * 
  * @module commander
  */
+
+/** Built-in ACP-compatible agent names recognised by the /acp command. */
+export const KNOWN_ACP_AGENTS = _KNOWN_ACP_AGENTS;
 
 // ==================== 内部命令处理器辅助函数 ====================
 
@@ -42,18 +52,26 @@ import { LspClientManager } from '@/infrastructure/code-analysis';
 export async function handleHelpCommand(): Promise<boolean> {
   console.log(`
 🔧 可用命令:
-   /help        - 显示此帮助
-   /exit        - 立即退出（任何时刻可用）
-   /clear       - 清屏
-   /pwd         - 显示当前目录
-   /ls          - 列出当前目录
-   /verbose     - 切换详细/简略输出模式
-   /new         - 开始新会话（清除对话历史）
-   /compact     - 压缩对话历史（保留知识库，开始新会话，适合长对话变慢时使用）
-   /session     - 查看会话元数据统计
-   /voice       - 启动语音输入（5秒录音）
-   双击空格键   - 开始/结束语音输入（推荐使用）
-   Ctrl+C       - 强制中断当前操作（任何时刻可用）
+   /help                      - 显示此帮助
+   /exit                      - 立即退出（任何时刻可用）
+   /clear                     - 清屏
+   /pwd                       - 显示当前目录
+   /ls                        - 列出当前目录
+   /verbose                   - 切换详细/简略输出模式
+   /new                       - 开始新会话（清除对话历史）
+   /compact                   - 压缩对话历史（保留知识库，开始新会话，适合长对话变慢时使用）
+   /session                   - 查看会话元数据统计
+   /voice                     - 启动语音输入（5秒录音）
+   双击空格键                 - 开始/结束语音输入（推荐使用）
+   Ctrl+C                     - 强制中断当前操作（任何时刻可用）
+
+🤖 ACP 直传模式命令:
+   /acp <代理名>              - 进入 ACP 直传模式（如 /acp codex）
+   /acp <代理名> <会话名>     - 进入带命名会话的 ACP 直传模式
+   /acp stop                  - 退出 ACP 直传模式（终止 ACP 进程）
+   /acp kill                  - 强制终止当前 ACP 进程并退出直传模式
+   /acp status                - 查看当前 ACP 直传状态
+   代理名支持：${KNOWN_ACP_AGENTS.join(' / ')}
 `);
   return true;
 }
@@ -388,6 +406,66 @@ export async function handleSessionCommand(session: any): Promise<boolean> {
 }
 
 /**
+ * 处理 ACP 直传模式命令
+ *
+ * 用法：
+ *   /acp <代理名>             进入直传模式（如 /acp codex）
+ *   /acp <代理名> <会话名>    进入带命名会话的直传模式
+ *   /acp stop | kill         退出直传模式并中止当前 ACP 进程
+ *   /acp status              查看当前直传状态
+ *
+ * @param session - 会话对象
+ * @param args    - /acp 后面的参数列表
+ */
+export async function handleAcpCommand(session: any, args: string[]): Promise<boolean> {
+  // /acp stop | off | exit | kill
+  if (args.length === 0 || ['stop', 'off', 'exit', 'kill'].includes(args[0])) {
+    const current = getAcpSessionState();
+    if (!current) {
+      console.log(styled.system('ℹ️ ACP 直传模式未激活\n\n当前未处于 ACP 直传模式。'));
+      return true;
+    }
+    // Abort any in-flight ACP execution
+    if (session.abortController) {
+      session.abortController.abort();
+    }
+    session.isRunning = false;
+    clearAcpSessionState();
+    console.log(styled.system(`✅ ACP 直传模式已关闭\n\n已退出对 \`${current.agent}\` 的直传会话，后续消息将重新由 AI 处理。`));
+    return true;
+  }
+
+  // /acp status
+  if (args[0] === 'status') {
+    const current = getAcpSessionState();
+    if (!current) {
+      console.log(styled.system('ℹ️ ACP 直传模式未激活\n\n当前未处于 ACP 直传模式。'));
+    } else {
+      const sessionInfo = current.sessionName ? `（命名会话: \`${current.sessionName}\`）` : '';
+      const cwdInfo = current.cwd ? `\n- 工作目录: \`${current.cwd}\`` : '';
+      console.log(styled.system(`🔗 ACP 直传模式已激活\n\n- 代理: \`${current.agent}\`${sessionInfo}${cwdInfo}\n\n输入 \`/acp stop\` 退出直传模式。`));
+    }
+    return true;
+  }
+
+  // /acp <代理名> [会话名]
+  const agent = args[0];
+  const sessionName = args[1] || undefined;
+
+  if (!KNOWN_ACP_AGENTS.includes(agent)) {
+    console.log(styled.error(`⚠️ 未知代理名称: \`${agent}\`\n\n支持的内置代理：${KNOWN_ACP_AGENTS.map(a => `\`${a}\``).join(', ')}`));
+    return true;
+  }
+
+  setAcpSessionState({ agent, sessionName });
+
+  const displayName = getAcpAgentDisplayName(agent);
+  const sessionInfo = sessionName ? `（命名会话: \`${sessionName}\`）` : '';
+  console.log(styled.system(`🔗 ACP 直传模式已激活\n\n现在您的消息将直接透传给 \`${displayName}\` ${sessionInfo}，不经过 AI 大模型处理。\n\n输入 \`/acp stop\` 退出直传模式，或 \`/acp status\` 查看状态。`));
+  return true;
+}
+
+/**
  * 处理退出命令
  * 
  * 预期行为：
@@ -485,7 +563,12 @@ export async function handleUnknownCommand(command: string): Promise<boolean> {
  */
 export function createHandleInternalCommand(session: any, agent: any): (command: string) => Promise<boolean> {
   return async (command: string): Promise<boolean> => {
-    switch (command) {
+    // Parse command and arguments
+    const parts = command.trim().split(/\s+/);
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    switch (cmd) {
       case "/help":
         return await handleHelpCommand();
         
@@ -513,6 +596,9 @@ export function createHandleInternalCommand(session: any, agent: any): (command:
       case "/voice":
       case "/speech":
         return await handleVoiceCommand(session, agent);
+
+      case "/acp":
+        return await handleAcpCommand(session, args);
         
       case "/exit":
       case "/quit":

@@ -6,19 +6,15 @@ import getComposioTools from '@/tools/composio';
 import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
 import getKnowledgeTools from '@/tools/knowledge';
 import getLspTools from '@/tools/lsp';
-import getGlobTools from '@/tools/glob';
-import getGrepTools from '@/tools/grep';
 import getWebFetchTools from '@/tools/web-fetch';
 import getViewFileTools from '@/tools/view-file';
-import getEditFileTools from '@/tools/edit-file';
 import getThinkTools from '@/tools/think';
-import getWriteFileTools from '@/tools/write-file';
-import getTodoTools from '@/tools/todo';
 import getClaudeTools from '@/tools/claude';
 import getCursorTools from '@/tools/cursor';
 import getGeminiTools from '@/tools/gemini';
 import getCodexTools from '@/tools/codex';
 import getCopilotTools from '@/tools/copilot';
+import getAcpTools from '@/tools/acp';
 import getLocalMcpTools from '@/tools/local-mcp';
 import getPlaywrightTools from '@/tools/playwright';
 import getReadImageTools from '@/tools/read-image';
@@ -40,19 +36,15 @@ export default async function getTools(session?: Session) {
     writeSubagentTodosTools,
     knowledgeTools,
     lspTools,
-    globTools,
-    grepTools,
     webFetchTools,
     viewFileTools,
-    editFileTools,
     thinkTools,
-    writeFileTools,
-    todoTools,
     claudeTools,
     cursorTools,
     geminiTools,
     codexTools,
     copilotTools,
+    acpTools,
     localMcpTools,
     playwrightTools,
     readImageTools,
@@ -65,19 +57,15 @@ export default async function getTools(session?: Session) {
     getWriteSubagentTodosTools(),
     getKnowledgeTools(),
     getLspTools(),
-    getGlobTools(),
-    getGrepTools(),
     getWebFetchTools(),
     getViewFileTools(),
-    getEditFileTools(),
     getThinkTools(),
-    getWriteFileTools(),
-    getTodoTools(),
     getClaudeTools(session),
     getCursorTools(session),
     getGeminiTools(session),
     getCodexTools(session),
     getCopilotTools(session),
+    getAcpTools(session),
     getLocalMcpTools(),
     getPlaywrightTools(),
     getReadImageTools(),
@@ -92,19 +80,15 @@ export default async function getTools(session?: Session) {
     ...writeSubagentTodosTools,
     ...knowledgeTools,
     ...lspTools,
-    ...globTools,
-    ...grepTools,
     ...webFetchTools,
     ...viewFileTools,
-    ...editFileTools,
     ...thinkTools,
-    ...writeFileTools,
-    ...todoTools,
     ...claudeTools,
     ...cursorTools,
     ...geminiTools,
     ...codexTools,
     ...copilotTools,
+    ...acpTools,
     ...localMcpTools,
     ...playwrightTools,
     ...readImageTools,

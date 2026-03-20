@@ -194,8 +194,11 @@ describe('Tool Result Formatter', () => {
     });
 
     it('should handle task management result', () => {
-      const result = formatToolResultByType('write_todos', 'task_management', true, {todos: [{content: 'test', status: 'completed'}]});
-      expect(result).toContain('待办事项更新');
+      const todos = [{content: 'test', status: 'completed'}];
+      const result = formatToolResultByType('write_todos', 'task_management', true,
+        `Updated todo list to ${JSON.stringify(todos)}`
+      );
+      expect(result).toContain('待办事项已更新');
     });
 
     it('should handle composio result', () => {

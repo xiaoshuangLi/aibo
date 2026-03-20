@@ -162,7 +162,7 @@ jest.mock('../src/core/config', () => ({
     model: {
       apiKey: 'test-api-key',
       name: 'gpt-4',
-      baseURL: 'https://api.openai.com/v1',
+      baseUrl: 'https://api.openai.com/v1',
     },
     langgraph: {
       checkpointerType: 'memory',

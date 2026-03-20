@@ -202,7 +202,7 @@ describe('createModel', () => {
     expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-unified-key' }));
   });
 
-  test('passes AIBO_BASE_URL as configuration.baseURL to ChatOpenAI', () => {
+  test('passes AIBO_BASE_URL as configuration.baseUrl to ChatOpenAI', () => {
     process.env.AIBO_BASE_URL = 'https://custom-endpoint.example.com/v1';
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model');
@@ -215,7 +215,7 @@ describe('createModel', () => {
     );
   });
 
-  test('no configuration.baseURL when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
+  test('no configuration.baseUrl when neither AIBO_BASE_URL nor AIBO_OPENAI_BASE_URL is set', () => {
     process.env.AIBO_MODEL_NAME = 'gpt-4o';
     const { createModel } = require('@/core/agent/model');
     const { ChatOpenAI } = require('@langchain/openai');
@@ -317,7 +317,7 @@ describe('createModel', () => {
     );
   });
 
-  test('passes AIBO_CUSTOM_HEADERS as additionalCustomHeaders to ChatGoogleGenerativeAI', () => {
+  test('passes AIBO_CUSTOM_HEADERS as customHeaders to ChatGoogleGenerativeAI', () => {
     process.env.AIBO_MODEL_NAME = 'gemini-2.0-flash';
     process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent';
     const { createModel } = require('@/core/agent/model');
@@ -327,7 +327,7 @@ describe('createModel', () => {
 
     expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        additionalCustomHeaders: { 'X-App-Name': 'MyAgent' },
+        customHeaders: { 'X-App-Name': 'MyAgent' },
       })
     );
   });
@@ -404,6 +404,84 @@ describe('createModel', () => {
 
     const callArgs = (ChatOpenAI as jest.Mock).mock.calls[0][0];
     expect(callArgs.configuration).toBeUndefined();
+  });
+
+  // ── Anthropic API URL Configuration ────────────────────────────────────────
+
+  test('passes AIBO_BASE_URL as anthropicApiUrl to ChatAnthropic', () => {
+    process.env.AIBO_API_KEY = 'sk-ant-test';
+    process.env.AIBO_BASE_URL = 'https://custom-anthropic-endpoint.example.com';
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    expect(ChatAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'claude-3-5-sonnet-20241022',
+        anthropicApiKey: 'sk-ant-test',
+        anthropicApiUrl: 'https://custom-anthropic-endpoint.example.com',
+        temperature: 0
+      })
+    );
+  });
+
+  test('does not pass anthropicApiUrl when AIBO_BASE_URL is not set for ChatAnthropic', () => {
+    process.env.AIBO_API_KEY = 'sk-ant-test';
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    const callArgs = (ChatAnthropic as jest.Mock).mock.calls[0][0];
+    expect(callArgs.anthropicApiUrl).toBeUndefined();
+    expect(callArgs).toEqual(
+      expect.objectContaining({
+        model: 'claude-3-5-sonnet-20241022',
+        anthropicApiKey: 'sk-ant-test',
+        temperature: 0
+      })
+    );
+  });
+
+  test('passes both anthropicApiUrl and clientOptions when both AIBO_BASE_URL and AIBO_CUSTOM_HEADERS are set for ChatAnthropic', () => {
+    process.env.AIBO_API_KEY = 'sk-ant-test';
+    process.env.AIBO_BASE_URL = 'https://custom-anthropic-endpoint.example.com';
+    process.env.AIBO_CUSTOM_HEADERS = 'X-App-Name:MyAgent|X-Trace-Id:998877';
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    expect(ChatAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'claude-3-5-sonnet-20241022',
+        anthropicApiKey: 'sk-ant-test',
+        anthropicApiUrl: 'https://custom-anthropic-endpoint.example.com',
+        clientOptions: { defaultHeaders: { 'X-App-Name': 'MyAgent', 'X-Trace-Id': '998877' } },
+        temperature: 0
+      })
+    );
+  });
+
+  test('anthropicApiUrl takes precedence over legacy AIBO_ANTHROPIC_BASE_URL if both are set', () => {
+    process.env.AIBO_API_KEY = 'sk-ant-test';
+    process.env.AIBO_BASE_URL = 'https://new-anthropic-endpoint.example.com';
+    process.env.AIBO_ANTHROPIC_BASE_URL = 'https://legacy-anthropic-endpoint.example.com';
+    process.env.AIBO_MODEL_NAME = 'claude-3-5-sonnet-20241022';
+    const { createModel } = require('@/core/agent/model');
+    const { ChatAnthropic } = require('@langchain/anthropic');
+
+    createModel();
+
+    expect(ChatAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        anthropicApiUrl: 'https://new-anthropic-endpoint.example.com'
+      })
+    );
   });
 });
 

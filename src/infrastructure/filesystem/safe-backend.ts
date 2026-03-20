@@ -5,6 +5,21 @@ import { BLOCKED_EXTENSIONS, IGNORED_DIRECTORIES } from '@/shared/constants/file
 import { hasBlockedExtension } from '@/shared/utils/filesystem';
 
 /**
+ * deepagents 内部写入路径前缀列表
+ *
+ * createDeepAgent 内置的 SummarizationMiddleware 会以绝对路径
+ * （如 /conversation_history/xxx.json、/large_tool_results/xxx.json）
+ * 调用 backend.write / read / ls 等方法。
+ *
+ * 这些路径不在项目根目录内，会被 SafeFilesystemBackend 的安全检查拦截。
+ * 通过将其重定向到 <projectRoot>/.data/ 来解决这个问题，同时保持安全边界。
+ */
+const DEEPAGENTS_INTERNAL_PREFIXES = [
+  '/conversation_history',
+  '/large_tool_results',
+];
+
+/**
  * Safe Filesystem Backend with restricted access and filtering
  * 
  * This backend provides a secure wrapper around the default FilesystemBackend
@@ -14,6 +29,7 @@ import { hasBlockedExtension } from '@/shared/utils/filesystem';
  * - Size limits to prevent token overflow
  * - Depth limits to prevent excessive directory traversal
  * - Proper error handling for permission issues
+ * - Transparent redirect of deepagents internal paths to <projectRoot>/.data/
  */
 export class SafeFilesystemBackend extends FilesystemBackend {
   readonly allowedExtensions: Set<string>;
@@ -29,7 +45,7 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }) {
     // Set reasonable defaults
     const maxFileSizeMb = options.maxFileSizeMb ?? 10; // 10MB default instead of 1000MB
-    const maxDepth = options.maxDepth ?? 5; // Limit directory depth
+    const maxDepth = options.maxDepth ?? 10; // Limit directory depth
     
     super({
       rootDir: options.rootDir,
@@ -48,11 +64,34 @@ export class SafeFilesystemBackend extends FilesystemBackend {
       '.html', '.css', '.scss', '.sass', '.less', '.xml', '.csv', '.sql',
       '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go', '.rs', '.rb',
       '.php', '.swift', '.kt', '.gradle', '.properties', '.env', '.gitignore',
-      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log', '.example'
+      '.dockerfile', '.toml', '.ini', '.cfg', '.conf', '.log', '.example', '.mjs'
     ]);
 
     // Blocked extensions for binary files, models, and sensitive content
     this.blockedExtensions = new Set(BLOCKED_EXTENSIONS);
+  }
+
+  /**
+   * Redirect deepagents internal absolute paths to <projectRoot>/.data/<prefix>/...
+   *
+   * deepagents' built-in SummarizationMiddleware (and other internal middleware)
+   * writes to absolute paths like /conversation_history/<sessionId>.json and
+   * /large_tool_results/<id>.json. These paths fall outside the project root
+   * and would be blocked by isWithinProjectRoot(). This method transparently
+   * remaps them so that:
+   *   /conversation_history/foo.json  →  <projectRoot>/.data/conversation_history/foo.json
+   *   /large_tool_results/bar.json    →  <projectRoot>/.data/large_tool_results/bar.json
+   *
+   * All other paths are returned unchanged.
+   */
+  redirectDeepagentsPath(filePath: string): string {
+    for (const prefix of DEEPAGENTS_INTERNAL_PREFIXES) {
+      if (filePath === prefix || filePath.startsWith(prefix + '/') || filePath.startsWith(prefix + path.sep)) {
+        const relative = filePath.slice(prefix.length);
+        return path.join(this.projectRoot, '.data', prefix.slice(1), relative);
+      }
+    }
+    return filePath;
   }
 
   /**
@@ -130,6 +169,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async read(filePath: string, offset?: number, limit?: number): Promise<string> {
     try {
+      filePath = this.redirectDeepagentsPath(filePath);
+
       // Security checks
       if (!this.isWithinProjectRoot(filePath)) {
         throw new Error(`Access denied: ${filePath} is outside project root`);
@@ -166,6 +207,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async lsInfo(directoryPath: string = process.cwd()): Promise<import('deepagents').FileInfo[]> {
     try {
+      directoryPath = this.redirectDeepagentsPath(directoryPath);
+
       // Security checks
       if (!this.isWithinProjectRoot(directoryPath)) {
         throw new Error(`Access denied: ${directoryPath} is outside project root`);
@@ -207,6 +250,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
     glob: string | null = null,
   ): Promise<GrepMatch[] | string> {
     try {
+      dirPath = this.redirectDeepagentsPath(dirPath);
+
       // Security checks for the base directory
       if (!this.isWithinProjectRoot(dirPath)) {
         return `Access denied: ${dirPath} is outside project root`;
@@ -260,6 +305,8 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async globInfo(pattern: string, searchPath: string = process.cwd()): Promise<import('deepagents').FileInfo[]> {
     try {
+      searchPath = this.redirectDeepagentsPath(searchPath);
+
       // Security checks for the base directory
       if (!this.isWithinProjectRoot(searchPath)) {
         throw new Error(`Access denied: ${searchPath} is outside project root`);
@@ -312,6 +359,9 @@ export class SafeFilesystemBackend extends FilesystemBackend {
    */
   async write(filePath: string, content: string): Promise<WriteResult> {
     try {
+      // Redirect deepagents internal paths BEFORE any other resolution
+      filePath = this.redirectDeepagentsPath(filePath);
+
       // Resolve relative paths against projectRoot to avoid CWD-based resolution issues
       // (e.g. on macOS where process.chdir resolves symlinks differently than path.resolve)
       const resolvedPath = path.isAbsolute(filePath)

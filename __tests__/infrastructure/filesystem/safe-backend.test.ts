@@ -26,7 +26,7 @@ describe('SafeFilesystemBackend', () => {
 
     test('should use default values when options are not provided', () => {
       const backendWithDefaults = new SafeFilesystemBackend({ rootDir: testRoot });
-      expect(backendWithDefaults.maxDepth).toBe(5);
+      expect(backendWithDefaults.maxDepth).toBe(10);
     });
   });
 

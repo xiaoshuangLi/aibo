@@ -12,7 +12,7 @@
 # feat: 添加 AI Agent 核心功能支持
 # 
 # - 实现基于 DeepAgents 的 AI Agent 核心功能
-# - 集成环境变量配置系统，支持自定义 API baseURL
+# - 集成环境变量配置系统，支持自定义 API baseUrl
 # - 添加完整的测试覆盖和错误处理
 # - 相关任务: #123
 

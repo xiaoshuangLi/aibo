@@ -6,7 +6,7 @@
 作为AI开发者，我想要实现基于DeepAgents的AI Agent核心功能，以便提供完整的TypeScript开发环境和灵活的环境变量配置系统。
 
 ### ✅ Acceptance Criteria
-- [ ] 成功集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseURL
+- [ ] 成功集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseUrl
 - [ ] 实现环境变量配置系统，使用Zod进行类型安全验证
 - [ ] 提供完整的单元测试覆盖，测试覆盖率≥90%
 - [ ] 支持通过环境变量灵活切换AI模型和API端点
@@ -28,7 +28,7 @@
 ### ⚙️ Core Implementation
 #### Main Components/Modules
 - **config模块**: 实现环境变量配置系统，使用Zod进行类型安全验证，确保配置的正确性和完整性
-- **AI Agent模块**: 集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseURL，提供灵活的AI模型配置能力
+- **AI Agent模块**: 集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseUrl，提供灵活的AI模型配置能力
 
 #### Key Technical Decisions
 - **决策 1**: 选择Zod作为配置验证库，因为其提供强大的类型安全和运行时验证能力，能够有效防止配置错误
@@ -65,7 +65,7 @@ const config: AIAgentConfig;
 
 ### 📋 Task Breakdown
 1. **配置系统实现** - 实现环境变量配置系统，使用Zod进行类型安全验证 (预计: 4小时)
-2. **AI Agent集成** - 集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseURL (预计: 6小时)
+2. **AI Agent集成** - 集成DeepAgents和LangChain ChatOpenAI模型，支持自定义baseUrl (预计: 6小时)
 3. **测试用例编写** - 为配置系统和AI Agent功能编写完整的单元测试 (预计: 4小时)
 4. **文档编写** - 编写详细的使用文档和API文档 (预计: 2小时)
 

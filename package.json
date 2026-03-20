@@ -1,6 +1,6 @@
 {
   "name": "@boay/aibo",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "AI bot with DeepAgents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,6 +14,10 @@
     "skills",
     "agents"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaoshuangLi/aibo"
+  },
   "scripts": {
     "build": "rm -rf dist && tsc && tsc-alias",
     "test": "jest --verbose=false --forceExit",
@@ -25,7 +29,7 @@
     "dev": "ts-node -r tsconfig-paths/register src/main.ts",
     "dev:console": "AIBO_INTERACTION=console ts-node -r tsconfig-paths/register src/main.ts",
     "dev:lark": "AIBO_INTERACTION=lark ts-node -r tsconfig-paths/register src/main.ts",
-    "dev:lark-inspect": "AIBO_INTERACTION=lark node --inspect -r ts-node/register -r tsconfig-paths/register src/main.ts",
+    "dev:lark-inspect": "AIBO_INTERACTION=lark node --inspect --experimental-network-inspection -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "prepare": "husky",
     "release": "npm publish --access public"
   },
@@ -48,7 +52,7 @@
     "@types/turndown": "^5.0.6",
     "axios": "^1.13.5",
     "commander": "^9.5.0",
-    "deepagents": "^1.7.2",
+    "deepagents": "^1.8.3",
     "dotenv": "^17.2.4",
     "glob": "^11.1.0",
     "js-yaml": "^4.1.1",

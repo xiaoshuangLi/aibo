@@ -49,8 +49,11 @@ function detectProvider(modelName: string): string {
  * @returns A configured LangChain BaseChatModel instance
  */
 export function createModel() {
-  const { name: modelName, provider: explicitProvider, apiKey, baseURL, azureApiVersion, customHeaders } = config.model;
+  const { name: modelName, provider: explicitProvider, apiKey, baseUrl, azureApiVersion, customHeaders } = config.model;
   const provider = explicitProvider ?? detectProvider(modelName);
+
+  const baseHost = baseUrl?.replace?.(/\/v[0-9]+$/g, '') || '';
+  const [apiVersion] = baseUrl?.match?.(/(?<=\/)v[0-9]+$/g) || [];
 
   switch (provider) {
     case 'anthropic':
@@ -58,6 +61,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { anthropicApiKey: apiKey }),
+        ...(baseUrl && { anthropicApiUrl: baseHost }),
         ...(customHeaders && { clientOptions: { defaultHeaders: customHeaders } }),
       });
 
@@ -66,7 +70,9 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
-        ...(customHeaders && { additionalCustomHeaders: customHeaders }),
+        ...(apiVersion && { apiVersion }),
+        ...(baseUrl && { baseUrl: baseHost }),
+        ...(customHeaders && { customHeaders }),
       });
 
     case 'mistral':
@@ -74,6 +80,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
+        ...(baseUrl && { baseUrl }),
         ...(customHeaders && { headers: customHeaders }),
       });
 
@@ -82,6 +89,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { apiKey }),
+        ...(baseUrl && { baseUrl }),
         ...(customHeaders && { configuration: { defaultHeaders: customHeaders } }),
       });
 
@@ -89,7 +97,7 @@ export function createModel() {
       return new ChatOllama({
         model: modelName,
         temperature: 0,
-        baseUrl: baseURL ?? 'http://localhost:11434',
+        baseUrl: baseUrl ?? 'http://localhost:11434',
         ...(customHeaders && { headers: customHeaders }),
       });
 
@@ -98,7 +106,7 @@ export function createModel() {
         model: modelName,
         temperature: 0,
         ...(apiKey && { azureOpenAIApiKey: apiKey }),
-        ...(baseURL && { azureOpenAIBasePath: baseURL }),
+        ...(baseUrl && { azureOpenAIBasePath: baseUrl }),
         azureOpenAIApiVersion: azureApiVersion ?? '2024-02-15-preview',
         ...(customHeaders && { configuration: { defaultHeaders: customHeaders } }),
       });
@@ -106,7 +114,7 @@ export function createModel() {
     case 'openai':
     default: {
       const configuration = {
-        ...(baseURL && { baseURL }),
+        ...(baseUrl && { baseURL: baseUrl }),
         ...(customHeaders && { defaultHeaders: customHeaders }),
       };
       return new ChatOpenAI({
