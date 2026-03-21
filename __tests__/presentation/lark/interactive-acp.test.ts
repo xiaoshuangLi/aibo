@@ -176,6 +176,45 @@ describe('handleAcpPassthrough', () => {
     expect(getAcpPassthroughState()).not.toBeNull();
   });
 
+  it('should auto-create session and retry when "No acpx session found" error occurs', async () => {
+    setAcpPassthroughState({ agent: 'copilot' });
+
+    const noSessionErr: any = new Error('Command failed: No acpx session found');
+    noSessionErr.stderr = '⚠ No acpx session found (searched up to /project).\nCreate one: acpx copilot sessions new';
+    noSessionErr.stdout = '';
+
+    execFileAsyncMock
+      .mockRejectedValueOnce(noSessionErr)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' }) // sessions new
+      .mockResolvedValueOnce({ stdout: 'copilot response', stderr: '' }); // retry
+
+    await handleAcpPassthrough('你是 copilot 吗？', mockSession);
+
+    // Should ultimately succeed and log the response
+    expect(mockLogAcpResponse).toHaveBeenCalledWith('copilot', 'copilot response');
+    // Three calls: initial prompt, sessions new, retry
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(3);
+    const sessionNewArgs = execFileAsyncMock.mock.calls[1][1] as string[];
+    expect(sessionNewArgs).toContain('copilot');
+    expect(sessionNewArgs).toContain('sessions');
+    expect(sessionNewArgs).toContain('new');
+  });
+
+  it('should NOT retry on non-session errors in passthrough', async () => {
+    setAcpPassthroughState({ agent: 'copilot' });
+
+    const err: any = new Error('Permission denied');
+    err.code = 'EACCES';
+    err.stdout = '';
+    err.stderr = 'Permission denied';
+    execFileAsyncMock.mockRejectedValue(err);
+
+    await handleAcpPassthrough('task', mockSession);
+
+    expect(mockLogAcpResponse).toHaveBeenCalledWith('copilot', expect.stringContaining('❌'));
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(1);
+  });
+
   it('should use the tool display name as toolProgress label', async () => {
     setAcpPassthroughState({ agent: 'claude' });
 

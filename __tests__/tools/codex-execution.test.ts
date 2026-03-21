@@ -122,6 +122,28 @@ describe('codex tool execution (ACP mode)', () => {
     expect(parsed.error).toBe('EACCES');
   });
 
+  it('should auto-create session and retry when "No acpx session found" error occurs', async () => {
+    const noSessionErr: any = new Error('Command failed: No acpx session found');
+    noSessionErr.stderr = '⚠ No acpx session found (searched up to /project).\nCreate one: acpx codex sessions new';
+    noSessionErr.stdout = '';
+
+    execFileAsyncMock
+      .mockRejectedValueOnce(noSessionErr)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' }) // sessions new
+      .mockResolvedValueOnce({ stdout: 'codex result', stderr: '' }); // retry
+
+    const result = await executeTool.invoke({ prompt: 'implement REST API' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.stdout).toBe('codex result');
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(3);
+    const sessionNewArgs = execFileAsyncMock.mock.calls[1][1] as string[];
+    expect(sessionNewArgs).toContain('codex');
+    expect(sessionNewArgs).toContain('sessions');
+    expect(sessionNewArgs).toContain('new');
+  });
+
   it('should fallback to EXECUTION_ERROR when no code', async () => {
     const err: any = new Error('unexpected');
     err.stdout = '';

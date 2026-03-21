@@ -3,7 +3,7 @@ import { z } from "zod";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
-import { isCliCommandAvailable, handleCliExecutionError } from "@/shared/utils";
+import { isCliCommandAvailable, handleCliExecutionError, isNoAcpSessionError, createAcpSession } from "@/shared/utils";
 import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
@@ -171,19 +171,32 @@ function createAcpExecuteTool(session?: Session) {
       const execArgs = buildAcpxArgs(input as z.infer<typeof acpSchema>);
 
       try {
-        const promise = execFileAsync("acpx", execArgs, {
+        const acpOptions = {
           timeout,
           cwd: (input as any).cwd || process.cwd(),
           env: process.env,
           signal: session?.abortController?.signal,
-          killSignal: "SIGKILL",
-        });
+          killSignal: "SIGKILL" as const,
+        };
 
-        (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
-          session?.logToolProgress(`${getAcpAgentDisplayName((input as any).agent)} 输出`, data.toString());
-        });
+        const runAcp = () => {
+          const promise = execFileAsync("acpx", execArgs, acpOptions);
+          (promise as any).child?.stdout?.on?.("data", (data: Buffer) => {
+            session?.logToolProgress(`${getAcpAgentDisplayName((input as any).agent)} 输出`, data.toString());
+          });
+          return promise;
+        };
 
-        const { stdout, stderr } = await promise;
+        let result: { stdout: string; stderr: string };
+        try {
+          result = await runAcp();
+        } catch (firstError) {
+          if (!isNoAcpSessionError(firstError)) throw firstError;
+          await createAcpSession((input as any).agent, (input as any).cwd);
+          result = await runAcp();
+        }
+
+        const { stdout, stderr } = result;
 
         // Activate Lark passthrough mode as a side effect when requested.
         // From this point, all Lark messages will be forwarded directly to the
