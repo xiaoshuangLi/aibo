@@ -26,11 +26,14 @@ interface LarkConfig {
   receiveId?: string;
 }
 
+// 文本内容类型（兼容 LangChain 多模态消息格式）
+export type TextContent = { type: "text"; text: string };
+
 // 图片内容类型（兼容 LangChain 多模态消息格式）
 export type ImageContent = { type: "image_url"; image_url: { url: string } };
 
-// 用户消息内容类型：纯文本或图片内容数组
-export type MessageContent = string | ImageContent[];
+// 用户消息内容类型：纯文本或多模态内容数组（文本与图片混合）
+export type MessageContent = string | (TextContent | ImageContent)[];
 
 // 用户消息回调类型
 type UserMessageCallback = (message: MessageContent) => void;
@@ -204,6 +207,66 @@ export class LarkAdapter extends DefaultAdapter {
           }
         } catch (error) {
           console.error('❌ 处理图片消息失败:', error);
+        }
+        return;
+      }
+
+      // 处理富文本（post）消息
+      if (messageType === 'post') {
+        try {
+          const contentObj = JSON.parse(content);
+          const rows: any[][] = contentObj.content || [];
+
+          const blocks: (TextContent | ImageContent)[] = [];
+          let pendingText = '';
+
+          const flushText = () => {
+            const trimmed = pendingText.trim();
+            if (trimmed) {
+              blocks.push({ type: 'text' as const, text: trimmed });
+            }
+            pendingText = '';
+          };
+
+          for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            const row = rows[rowIndex];
+            // 空行不产生换行符；仅在当前行非空且不是第一行时插入换行
+            if (rowIndex > 0 && row.length > 0) {
+              pendingText += '\n';
+            }
+            for (const block of row) {
+              if (block.tag === 'text' && block.text) {
+                pendingText += block.text;
+              } else if (block.tag === 'img' && block.image_key) {
+                flushText();
+                // 从飞书下载图片并上传获取可访问的 HTTPS 地址
+                const imageBuffer = await this.chatService.downloadImage(messageId, block.image_key);
+                const base64 = imageBuffer.toString('base64');
+                const url = await this.chatService.uploadImage(base64);
+                blocks.push({ type: 'image_url' as const, image_url: { url } });
+              }
+            }
+          }
+          flushText();
+
+          if (blocks.length === 0) {
+            return;
+          }
+
+          // 若无图片则降级为纯字符串，否则使用多模态内容数组
+          const hasImages = blocks.some(b => b.type === 'image_url');
+          const postContent: MessageContent = hasImages
+            ? blocks
+            : (blocks[0] as TextContent)?.text ?? '';
+
+          if (this.userMessageCallback) {
+            this.userMessageCallback(postContent);
+          } else {
+            this.messageQueue.push({ content: postContent, chatId: msgChatId });
+            this.processMessageQueue();
+          }
+        } catch (error) {
+          console.error('❌ 处理富文本消息失败:', error);
         }
         return;
       }
