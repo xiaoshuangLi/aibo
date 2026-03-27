@@ -2,6 +2,8 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import {
   processMessagesForImageUpload,
   createImageUploadMiddleware,
+  isClaudeModel,
+  fetchImageAsBase64,
 } from '@/core/middlewares/image-upload';
 import { Session } from '@/core/agent/session';
 
@@ -19,9 +21,12 @@ jest.mock('@/infrastructure/session/manager', () => ({
   },
 }));
 
-jest.mock('@/core/config', () => ({
-  config: { model: { name: 'gpt-4o-mini' } },
-}));
+// Config mock — overridden per-suite below
+const mockConfig = { model: { name: 'gpt-4o-mini', provider: undefined as string | undefined } };
+jest.mock('@/core/config', () => ({ get config() { return mockConfig; } }));
+
+// axios mock for fetchImageAsBase64
+jest.mock('axios');
 
 const BASE64_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==';
 const REMOTE_URL = 'https://example.com/image.png';
@@ -152,6 +157,149 @@ describe('processMessagesForImageUpload', () => {
     expect(result[0]).toBeInstanceOf(SystemMessage);
     const content = result[0].content as any[];
     expect(content[0].image_url.url).toBe(REMOTE_URL);
+  });
+});
+
+describe('processMessagesForImageUpload (Claude / useBase64 mode)', () => {
+  let uploadFn: jest.Mock;
+  let cache: Map<string, Promise<string>>;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const axios = require('axios') as jest.Mocked<typeof import('axios').default>;
+
+  beforeEach(() => {
+    uploadFn = jest.fn().mockResolvedValue(REMOTE_URL);
+    cache = new Map();
+    (axios.get as jest.Mock).mockReset();
+  });
+
+  test('keeps base64 image_url as-is (no upload)', async () => {
+    const messages = [
+      new HumanMessage({
+        content: [
+          { type: 'image_url', image_url: { url: BASE64_IMAGE } },
+        ],
+      }),
+    ];
+
+    const result = await processMessagesForImageUpload(messages, uploadFn, cache, { useBase64: true });
+
+    expect(uploadFn).not.toHaveBeenCalled();
+    const content = result[0].content as any[];
+    expect(content[0].image_url.url).toBe(BASE64_IMAGE);
+  });
+
+  test('converts HTTP image_url to base64 data URL', async () => {
+    const HTTP_URL = 'https://example.com/photo.png';
+    const fakeBuffer = Buffer.from('fakeimagedata');
+    (axios.get as jest.Mock).mockResolvedValue({
+      data: fakeBuffer.buffer.slice(fakeBuffer.byteOffset, fakeBuffer.byteOffset + fakeBuffer.byteLength),
+      headers: { 'content-type': 'image/png' },
+    });
+
+    const messages = [
+      new HumanMessage({
+        content: [
+          { type: 'image_url', image_url: { url: HTTP_URL } },
+        ],
+      }),
+    ];
+
+    const result = await processMessagesForImageUpload(messages, uploadFn, cache, { useBase64: true });
+
+    expect(axios.get).toHaveBeenCalledWith(HTTP_URL, { responseType: 'arraybuffer' });
+    expect(uploadFn).not.toHaveBeenCalled();
+    const content = result[0].content as any[];
+    expect(content[0].image_url.url).toMatch(/^data:image\/png;base64,/);
+  });
+
+  test('converts HTTP image part (url field) to base64', async () => {
+    const HTTP_URL = 'https://example.com/photo.jpg';
+    const fakeBuffer = Buffer.from('fakeimagedata');
+    (axios.get as jest.Mock).mockResolvedValue({
+      data: fakeBuffer.buffer.slice(fakeBuffer.byteOffset, fakeBuffer.byteOffset + fakeBuffer.byteLength),
+      headers: { 'content-type': 'image/jpeg' },
+    });
+
+    const messages = [
+      new HumanMessage({
+        content: [
+          { type: 'image', url: HTTP_URL },
+        ],
+      }),
+    ];
+
+    const result = await processMessagesForImageUpload(messages, uploadFn, cache, { useBase64: true });
+
+    const content = result[0].content as any[];
+    expect(content[0].url).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  test('leaves plain text parts unchanged in Claude mode', async () => {
+    const messages = [
+      new HumanMessage({
+        content: [
+          { type: 'text', text: 'hello' },
+          { type: 'image_url', image_url: { url: BASE64_IMAGE } },
+        ],
+      }),
+    ];
+
+    const result = await processMessagesForImageUpload(messages, uploadFn, cache, { useBase64: true });
+    const content = result[0].content as any[];
+    expect(content[0]).toEqual({ type: 'text', text: 'hello' });
+    expect(content[1].image_url.url).toBe(BASE64_IMAGE);
+  });
+});
+
+describe('isClaudeModel', () => {
+  beforeEach(() => {
+    mockConfig.model = { name: 'gpt-4o-mini', provider: undefined };
+  });
+
+  test('returns false for a non-Claude model', () => {
+    mockConfig.model = { name: 'gpt-4o-mini', provider: undefined };
+    expect(isClaudeModel()).toBe(false);
+  });
+
+  test('returns true when model name starts with claude-', () => {
+    mockConfig.model = { name: 'claude-3-5-sonnet-20241022', provider: undefined };
+    expect(isClaudeModel()).toBe(true);
+  });
+
+  test('returns true when provider is anthropic regardless of model name', () => {
+    mockConfig.model = { name: 'custom-model', provider: 'anthropic' };
+    expect(isClaudeModel()).toBe(true);
+  });
+});
+
+describe('fetchImageAsBase64', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const axios = require('axios') as jest.Mocked<typeof import('axios').default>;
+
+  beforeEach(() => {
+    (axios.get as jest.Mock).mockReset();
+  });
+
+  test('returns a base64 data URL with correct content-type', async () => {
+    const fakeBuffer = Buffer.from('fakeimagedata');
+    (axios.get as jest.Mock).mockResolvedValue({
+      data: fakeBuffer.buffer.slice(fakeBuffer.byteOffset, fakeBuffer.byteOffset + fakeBuffer.byteLength),
+      headers: { 'content-type': 'image/webp' },
+    });
+
+    const result = await fetchImageAsBase64('https://example.com/img.webp');
+    expect(result).toMatch(/^data:image\/webp;base64,/);
+  });
+
+  test('defaults to image/jpeg when content-type header is missing', async () => {
+    const fakeBuffer = Buffer.from('fakeimagedata');
+    (axios.get as jest.Mock).mockResolvedValue({
+      data: fakeBuffer.buffer.slice(fakeBuffer.byteOffset, fakeBuffer.byteOffset + fakeBuffer.byteLength),
+      headers: {},
+    });
+
+    const result = await fetchImageAsBase64('https://example.com/img');
+    expect(result).toMatch(/^data:image\/jpeg;base64,/);
   });
 });
 
