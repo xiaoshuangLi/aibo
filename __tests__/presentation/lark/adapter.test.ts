@@ -104,6 +104,7 @@ jest.mock('@/presentation/lark/ws-client', () => ({
 
 describe('LarkAdapter', () => {
   let originalLarkConfig: any;
+  let originalModelConfig: any;
   
   beforeEach(() => {
     jest.clearAllMocks();
@@ -113,17 +114,21 @@ describe('LarkAdapter', () => {
     
     // Store original config and set test config
     originalLarkConfig = { ...config.lark };
+    originalModelConfig = { ...config.model };
     config.lark = {
       appId: 'test-app-id',
       appSecret: 'test-app-secret',
       receiveId: 'test-receive-id',
       interactiveTemplateId: 'test-template-id'
     };
+    // Default to a non-Claude model so tests that don't specify a model get the upload path
+    config.model = { ...config.model, name: 'gpt-4o' };
   });
 
   afterEach(() => {
     // Restore original config
     config.lark = originalLarkConfig;
+    config.model = originalModelConfig;
   });
 
   describe('constructor', () => {
@@ -605,6 +610,66 @@ describe('LarkAdapter', () => {
 
       expect(mockConsoleError).toHaveBeenCalledWith('❌ 处理图片消息失败:', expect.any(Error));
       expect(callback).not.toHaveBeenCalled();
+    });
+
+    // --- Claude model: base64 data URI path ---
+
+    it('should use base64 data URI (not upload) when model is Claude (via name prefix)', async () => {
+      config.model = { ...config.model, name: 'claude-3-5-sonnet-20241022', provider: undefined };
+      const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      mockChatServiceDownloadImage.mockResolvedValueOnce(pngMagic);
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_claude_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_claude_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_claude_message_id', 'img_claude_key');
+      // uploadImage must NOT be called for Claude
+      expect(mockChatServiceUploadImage).not.toHaveBeenCalled();
+      const expectedUrl = `data:image/png;base64,${pngMagic.toString('base64')}`;
+      expect(callback).toHaveBeenCalledWith([
+        { type: 'image_url', image_url: { url: expectedUrl } },
+      ]);
+    });
+
+    it('should use base64 data URI when provider is explicitly set to anthropic', async () => {
+      config.model = { ...config.model, name: 'some-custom-model', provider: 'anthropic' };
+      const jpegMagic = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+      mockChatServiceDownloadImage.mockResolvedValueOnce(jpegMagic);
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_anthropic_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_anthropic_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockChatServiceUploadImage).not.toHaveBeenCalled();
+      const expectedUrl = `data:image/jpeg;base64,${jpegMagic.toString('base64')}`;
+      expect(callback).toHaveBeenCalledWith([
+        { type: 'image_url', image_url: { url: expectedUrl } },
+      ]);
     });
   });
 
