@@ -481,10 +481,11 @@ describe('LarkAdapter', () => {
 
     // --- image message tests ---
 
-    it('should download image and call callback with base64 data URI', async () => {
-      // Use a PNG magic-byte buffer so the MIME type is detected as image/png
-      const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
-      mockChatServiceDownloadImage.mockResolvedValueOnce(pngMagic);
+    it('should download image, upload it, and call callback with the uploaded URL', async () => {
+      const imageBuffer = Buffer.from('fake-image-data');
+      const uploadedUrl = 'https://example.feishu.cn/tmp/image.png';
+      mockChatServiceDownloadImage.mockResolvedValueOnce(imageBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce(uploadedUrl);
 
       const adapter = new LarkAdapter();
       const callback = jest.fn();
@@ -503,16 +504,17 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_test_message_id', 'img_test_key');
-      expect(mockChatServiceUploadImage).not.toHaveBeenCalled();
-      const expectedUrl = `data:image/png;base64,${pngMagic.toString('base64')}`;
+      expect(mockChatServiceUploadImage).toHaveBeenCalledWith(imageBuffer.toString('base64'));
       expect(callback).toHaveBeenCalledWith([
-        { type: 'image_url', image_url: { url: expectedUrl } },
+        { type: 'image_url', image_url: { url: uploadedUrl } },
       ]);
     });
 
-    it('should queue image content when no callback is set yet', async () => {
-      const jpegMagic = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
-      mockChatServiceDownloadImage.mockResolvedValueOnce(jpegMagic);
+    it('should queue image content (uploaded URL) when no callback is set yet', async () => {
+      const imageBuffer = Buffer.from('another-fake-image');
+      const uploadedUrl = 'https://example.feishu.cn/tmp/queued.png';
+      mockChatServiceDownloadImage.mockResolvedValueOnce(imageBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce(uploadedUrl);
 
       const adapter = new LarkAdapter();
       (adapter as any).userMessageCallback = null;
@@ -531,9 +533,8 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect((adapter as any).messageQueue).toHaveLength(1);
-      const expectedUrl = `data:image/jpeg;base64,${jpegMagic.toString('base64')}`;
       expect((adapter as any).messageQueue[0]).toEqual({
-        content: [{ type: 'image_url', image_url: { url: expectedUrl } }],
+        content: [{ type: 'image_url', image_url: { url: uploadedUrl } }],
         chatId: 'test-chat-id',
       });
     });
@@ -572,6 +573,30 @@ describe('LarkAdapter', () => {
           chat_id: 'test-chat-id',
           chat_type: 'p2p',
           content: JSON.stringify({ image_key: 'img_fail_key' }),
+          message_type: 'image',
+        },
+      };
+
+      await (adapter as any).handleUserMessage(testData);
+
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 处理图片消息失败:', expect.any(Error));
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should log error and not call callback when image upload fails', async () => {
+      mockChatServiceDownloadImage.mockResolvedValueOnce(Buffer.from('some-image'));
+      mockChatServiceUploadImage.mockRejectedValueOnce(new Error('upload failed'));
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      const testData = {
+        message: {
+          message_id: 'om_upload_fail_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ image_key: 'img_upload_fail_key' }),
           message_type: 'image',
         },
       };
