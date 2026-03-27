@@ -26,6 +26,40 @@ interface LarkConfig {
   receiveId?: string;
 }
 
+/**
+ * Detect image MIME type from buffer magic bytes.
+ * Falls back to 'image/png' as the safest default when the format cannot be
+ * determined — most Lark-sourced images are PNG or JPEG, and PNG is the more
+ * widely-supported fallback for model providers.
+ */
+function detectImageMimeType(buffer: Buffer): string {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 &&
+    buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+  if (
+    buffer.length >= 6 &&
+    buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38 &&
+    (buffer[4] === 0x37 || buffer[4] === 0x39) && buffer[5] === 0x61
+  ) {
+    return 'image/gif';
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+  return 'image/png';
+}
+
 // 图片内容类型（兼容 LangChain 多模态消息格式）
 export type ImageContent = { type: "image_url"; image_url: { url: string } };
 
@@ -190,9 +224,10 @@ export class LarkAdapter extends DefaultAdapter {
           }
           // 从飞书下载图片（message_id 与 image_key 均为必填）
           const imageBuffer = await this.chatService.downloadImage(messageId, imageKey);
-          // 转换为 base64 后上传，获取可访问的图片地址
+          // 转换为 base64 data URI 直接传给模型（避免飞书内网 URL 无法被模型提供商访问）
           const base64 = imageBuffer.toString('base64');
-          const url = await this.chatService.uploadImage(base64);
+          const mimeType = detectImageMimeType(imageBuffer);
+          const url = `data:${mimeType};base64,${base64}`;
           // 构造多模态内容数组
           const imageContent: MessageContent = [{ type: "image_url" as const, image_url: { url } }];
 

@@ -481,10 +481,10 @@ describe('LarkAdapter', () => {
 
     // --- image message tests ---
 
-    it('should download and upload image, then call callback with image_url array', async () => {
-      const fakeBuffer = Buffer.from('fake-image');
-      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
-      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/image.png');
+    it('should download image and call callback with base64 data URI', async () => {
+      // Use a PNG magic-byte buffer so the MIME type is detected as image/png
+      const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      mockChatServiceDownloadImage.mockResolvedValueOnce(pngMagic);
 
       const adapter = new LarkAdapter();
       const callback = jest.fn();
@@ -503,16 +503,16 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_test_message_id', 'img_test_key');
-      expect(mockChatServiceUploadImage).toHaveBeenCalledWith(fakeBuffer.toString('base64'));
+      expect(mockChatServiceUploadImage).not.toHaveBeenCalled();
+      const expectedUrl = `data:image/png;base64,${pngMagic.toString('base64')}`;
       expect(callback).toHaveBeenCalledWith([
-        { type: 'image_url', image_url: { url: 'https://example.com/image.png' } },
+        { type: 'image_url', image_url: { url: expectedUrl } },
       ]);
     });
 
     it('should queue image content when no callback is set yet', async () => {
-      const fakeBuffer = Buffer.from('img-bytes');
-      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
-      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/queued.png');
+      const jpegMagic = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+      mockChatServiceDownloadImage.mockResolvedValueOnce(jpegMagic);
 
       const adapter = new LarkAdapter();
       (adapter as any).userMessageCallback = null;
@@ -531,8 +531,9 @@ describe('LarkAdapter', () => {
       await (adapter as any).handleUserMessage(testData);
 
       expect((adapter as any).messageQueue).toHaveLength(1);
+      const expectedUrl = `data:image/jpeg;base64,${jpegMagic.toString('base64')}`;
       expect((adapter as any).messageQueue[0]).toEqual({
-        content: [{ type: 'image_url', image_url: { url: 'https://example.com/queued.png' } }],
+        content: [{ type: 'image_url', image_url: { url: expectedUrl } }],
         chatId: 'test-chat-id',
       });
     });
