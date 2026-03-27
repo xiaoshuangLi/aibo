@@ -582,6 +582,170 @@ describe('LarkAdapter', () => {
     });
   });
 
+  // --- post (rich text) message tests ---
+
+  describe('handleUserMessage - post messages', () => {
+    const POST_CONTENT = JSON.stringify({
+      title: '',
+      content: [
+        [{ tag: 'text', text: '这个根本不需要', style: [] }],
+        [{ tag: 'img', image_key: 'img_key_1', width: 2890, height: 268 }],
+        [],
+        [{ tag: 'text', text: '这个空白信息太多了', style: [] }],
+        [{ tag: 'img', image_key: 'img_key_2', width: 1436, height: 1166 }],
+        [],
+        [{ tag: 'text', text: '这两个合并到一起', style: [] }],
+        [{ tag: 'img', image_key: 'img_key_3', width: 2892, height: 1194 }],
+      ],
+    });
+
+    it('should parse post content and call callback with mixed text+image blocks', async () => {
+      const fakeBuffer = Buffer.from('fake-image');
+      mockChatServiceDownloadImage.mockResolvedValue(fakeBuffer);
+      mockChatServiceUploadImage
+        .mockResolvedValueOnce('https://example.com/img1.png')
+        .mockResolvedValueOnce('https://example.com/img2.png')
+        .mockResolvedValueOnce('https://example.com/img3.png');
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_post_message_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: POST_CONTENT,
+          message_type: 'post',
+        },
+      });
+
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledTimes(3);
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_post_message_id', 'img_key_1');
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_post_message_id', 'img_key_2');
+      expect(mockChatServiceDownloadImage).toHaveBeenCalledWith('om_post_message_id', 'img_key_3');
+
+      expect(callback).toHaveBeenCalledWith([
+        { type: 'text', text: '这个根本不需要' },
+        { type: 'image_url', image_url: { url: 'https://example.com/img1.png' } },
+        { type: 'text', text: '这个空白信息太多了' },
+        { type: 'image_url', image_url: { url: 'https://example.com/img2.png' } },
+        { type: 'text', text: '这两个合并到一起' },
+        { type: 'image_url', image_url: { url: 'https://example.com/img3.png' } },
+      ]);
+    });
+
+    it('should return plain string when post has only text (no images)', async () => {
+      const textOnlyContent = JSON.stringify({
+        title: '',
+        content: [
+          [{ tag: 'text', text: '纯文本内容', style: [] }],
+        ],
+      });
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_text_only_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: textOnlyContent,
+          message_type: 'post',
+        },
+      });
+
+      expect(mockChatServiceDownloadImage).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith('纯文本内容');
+    });
+
+    it('should queue post content when no callback is set yet', async () => {
+      const fakeBuffer = Buffer.from('img-bytes');
+      mockChatServiceDownloadImage.mockResolvedValueOnce(fakeBuffer);
+      mockChatServiceUploadImage.mockResolvedValueOnce('https://example.com/queued-post.png');
+
+      const simplePostContent = JSON.stringify({
+        title: '',
+        content: [
+          [{ tag: 'text', text: '问题描述' }],
+          [{ tag: 'img', image_key: 'img_queued_key' }],
+        ],
+      });
+
+      const adapter = new LarkAdapter();
+      (adapter as any).userMessageCallback = null;
+      (adapter as any).processMessageQueue = jest.fn();
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_queued_post_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: simplePostContent,
+          message_type: 'post',
+        },
+      });
+
+      expect((adapter as any).messageQueue).toHaveLength(1);
+      expect((adapter as any).messageQueue[0].content).toEqual([
+        { type: 'text', text: '问题描述' },
+        { type: 'image_url', image_url: { url: 'https://example.com/queued-post.png' } },
+      ]);
+    });
+
+    it('should ignore post message with empty content', async () => {
+      const emptyPostContent = JSON.stringify({ title: '', content: [[], []] });
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_empty_post_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: emptyPostContent,
+          message_type: 'post',
+        },
+      });
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should log error when image download fails in post message', async () => {
+      mockChatServiceDownloadImage.mockRejectedValueOnce(new Error('download error'));
+
+      const postWithImage = JSON.stringify({
+        title: '',
+        content: [
+          [{ tag: 'text', text: '描述' }],
+          [{ tag: 'img', image_key: 'img_fail_key' }],
+        ],
+      });
+
+      const adapter = new LarkAdapter();
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_fail_post_id',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: postWithImage,
+          message_type: 'post',
+        },
+      });
+
+      expect(mockConsoleError).toHaveBeenCalledWith('❌ 处理富文本消息失败:', expect.any(Error));
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
   describe('sendMessage', () => {
     it('should send message with proper formatting', async () => {
       const adapter = new LarkAdapter();
