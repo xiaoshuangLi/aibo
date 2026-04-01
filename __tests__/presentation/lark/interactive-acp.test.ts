@@ -341,17 +341,69 @@ describe('handleUserMessage with ACP passthrough', () => {
     expect(processStreamChunks).toHaveBeenCalled();
   });
 
-  it('should not enter passthrough mode for image messages', async () => {
+  it('should route post message (array with text blocks) to ACP passthrough when state is active', async () => {
     setAcpPassthroughState({ agent: 'codex' });
     const session = createMockSession();
-    const mockStream = {};
-    const mockAgent = { stream: jest.fn().mockReturnValue(mockStream) };
+    const mockAgent = { stream: jest.fn() };
+    const postContent = [
+      { type: 'text' as const, text: 'help me with this' },
+      { type: 'text' as const, text: 'fix the bug' },
+    ];
+
+    await handleUserMessage(postContent, session, mockAgent);
+
+    // acpx should be called with the extracted text
+    expect(execFileAsyncMock).toHaveBeenCalled();
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs[callArgs.length - 1]).toBe('help me with this\nfix the bug');
+    // LLM stream should NOT be called
+    expect(mockAgent.stream).not.toHaveBeenCalled();
+  });
+
+  it('should route post message with images to ACP passthrough, including image URLs in text', async () => {
+    setAcpPassthroughState({ agent: 'copilot' });
+    const session = createMockSession();
+    const mockAgent = { stream: jest.fn() };
+    const postWithImage = [
+      { type: 'text' as const, text: 'look at this screenshot' },
+      { type: 'image_url' as const, image_url: { url: 'https://cdn.example.com/img.png' } },
+    ];
+
+    await handleUserMessage(postWithImage, session, mockAgent);
+
+    expect(execFileAsyncMock).toHaveBeenCalled();
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    const forwarded = callArgs[callArgs.length - 1];
+    expect(forwarded).toContain('look at this screenshot');
+    expect(forwarded).toContain('https://cdn.example.com/img.png');
+    expect(mockAgent.stream).not.toHaveBeenCalled();
+  });
+
+  it('should forward image-only array to ACP passthrough when state is active', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    const session = createMockSession();
+    const mockAgent = { stream: jest.fn() };
     // Image content is an array, not a string
     const imageContent = [{ type: 'image_url' as const, image_url: { url: 'http://example.com/img.jpg' } }];
 
     await handleUserMessage(imageContent, session, mockAgent);
 
-    // Image messages bypass passthrough and go to LLM
+    // With ACP passthrough active, even image-only arrays are forwarded (URL as text)
+    expect(execFileAsyncMock).toHaveBeenCalled();
+    expect(mockAgent.stream).not.toHaveBeenCalled();
+  });
+
+  it('should route image-only array to LLM when passthrough is NOT active', async () => {
+    // No passthrough state set
+    const { processStreamChunks } = require('@/core/utils/stream');
+    const session = createMockSession();
+    const mockStream = {};
+    const mockAgent = { stream: jest.fn().mockReturnValue(mockStream) };
+    const imageContent = [{ type: 'image_url' as const, image_url: { url: 'http://example.com/img.jpg' } }];
+
+    await handleUserMessage(imageContent, session, mockAgent);
+
+    // With no passthrough active, image arrays go to LLM
     expect(mockAgent.stream).toHaveBeenCalled();
     expect(execFileAsyncMock).not.toHaveBeenCalled();
   });
