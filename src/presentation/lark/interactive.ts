@@ -126,12 +126,19 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
-    let message: string;
+    let parsedError: any;
     try {
-      message = JSON.parse(errJson)?.message || errJson;
+      parsedError = JSON.parse(errJson);
     } catch {
-      message = errJson;
+      parsedError = null;
     }
+    // Silently discard abort errors — these occur when the user sends a new message
+    // while a passthrough execution is in progress. The abort is intentional and the
+    // new message is already being forwarded to ACP, so no error should be shown.
+    if (parsedError?.interrupted) {
+      return;
+    }
+    const message = parsedError?.message || errJson;
     session.logAcpResponse(agent, `❌ 错误: ${message}`);
   }
 }

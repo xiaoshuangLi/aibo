@@ -133,6 +133,34 @@ describe('handleAcpPassthrough', () => {
     expect(mockLogToolResult).not.toHaveBeenCalled();
   });
 
+  it('should silently return without logging an error when acpx is aborted (ABORT_ERR)', async () => {
+    setAcpPassthroughState({ agent: 'copilot' });
+    const err: any = new Error('aborted');
+    err.code = 'ABORT_ERR';
+    err.stdout = '';
+    err.stderr = '';
+    execFileAsyncMock.mockRejectedValue(err);
+
+    await handleAcpPassthrough('new message while running', mockSession);
+
+    // No error should be shown to the user — abort was intentional (new message came in)
+    expect(mockLogAcpResponse).not.toHaveBeenCalled();
+    expect(mockLogToolResult).not.toHaveBeenCalled();
+  });
+
+  it('should silently return without logging an error when acpx is aborted (AbortError name)', async () => {
+    setAcpPassthroughState({ agent: 'copilot' });
+    const err: any = new Error('aborted');
+    err.name = 'AbortError';
+    err.stdout = '';
+    err.stderr = '';
+    execFileAsyncMock.mockRejectedValue(err);
+
+    await handleAcpPassthrough('interrupt me', mockSession);
+
+    expect(mockLogAcpResponse).not.toHaveBeenCalled();
+  });
+
   it('should include --cwd flag when cwd is set in passthrough state', async () => {
     setAcpPassthroughState({ agent: 'codex', cwd: '/project/dir' });
     execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
