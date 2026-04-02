@@ -11,7 +11,7 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { LarkAdapter, MessageContent } from './adapter';
+import { LarkAdapter, MessageContent, TextContent, ImageContent } from './adapter';
 import { Session } from '@/core/agent';
 import { createAIAgent } from '@/core/agent';
 import { processStreamChunks } from '@/core/utils';
@@ -62,6 +62,23 @@ const ACP_EXIT_PATTERNS: RegExp[] = [
 function isAcpExitIntent(input: string): boolean {
   const trimmed = input.trim();
   return ACP_EXIT_PATTERNS.some((re) => re.test(trimmed));
+}
+
+/**
+ * Convert any multimodal MessageContent array (e.g. from a Lark "post" rich-text
+ * message) to a plain string suitable for forwarding to an ACP passthrough session.
+ * Text blocks are included as-is; image blocks contribute their URL so the ACP
+ * agent can inspect the image if it supports URL-based image input.
+ */
+function extractTextForAcp(content: (TextContent | ImageContent)[]): string {
+  return content
+    .map((block) => {
+      if (block.type === 'text') return block.text;
+      if (block.type === 'image_url') return block.image_url.url;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
@@ -126,12 +143,19 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
-    let message: string;
+    let parsedError: any;
     try {
-      message = JSON.parse(errJson)?.message || errJson;
+      parsedError = JSON.parse(errJson);
     } catch {
-      message = errJson;
+      parsedError = null;
     }
+    // Silently discard abort errors — these occur when the user sends a new message
+    // while a passthrough execution is in progress. The abort is intentional and the
+    // new message is already being forwarded to ACP, so no error should be shown.
+    if (parsedError?.interrupted) {
+      return;
+    }
+    const message = parsedError?.message || errJson;
     session.logAcpResponse(agent, `❌ 错误: ${message}`);
   }
 }
@@ -216,25 +240,27 @@ export async function handleUserMessage(
         return;
       }
     }
+  }
 
-    // ACP 直传模式：将文本消息直接透传到 ACP 会话，不经过大模型
-    if (getAcpPassthroughState()) {
-      if (session.isRunning && session.abortController) {
-        session.abortController.abort();
-      }
-      session.isRunning = true;
-      const abortController = new AbortController();
-      session.setAbortController(abortController);
-      try {
-        await handleAcpPassthrough(input, session);
-      } finally {
-        if (session.abortController === abortController) {
-          session.isRunning = false;
-          session.setAbortController(new AbortController());
-        }
-      }
-      return;
+  // ACP 直传模式：将消息直接透传到 ACP 会话，不经过大模型。
+  // 同时支持纯文本消息和 post 富文本消息（图片块的 URL 内嵌为文本转发给 ACP Agent）。
+  if (getAcpPassthroughState()) {
+    const textForAcp = typeof input === 'string' ? input : extractTextForAcp(input);
+    if (session.isRunning && session.abortController) {
+      session.abortController.abort();
     }
+    session.isRunning = true;
+    const abortController = new AbortController();
+    session.setAbortController(abortController);
+    try {
+      await handleAcpPassthrough(textForAcp, session);
+    } finally {
+      if (session.abortController === abortController) {
+        session.isRunning = false;
+        session.setAbortController(new AbortController());
+      }
+    }
+    return;
   }
 
   // 如果大模型正在运行，取消当前任务

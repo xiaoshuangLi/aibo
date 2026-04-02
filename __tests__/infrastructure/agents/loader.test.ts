@@ -113,6 +113,39 @@ describe('Agent Loader', () => {
       expect(result[0].description).toBe('Follows the Nexus workflow: Requirements → Design → Tasks');
     });
 
+    test('should load agent with description containing backslashes', () => {
+      const content = `---\nname: path-agent\ndescription: Use C:\\\\Users\\\\test path for storage\n---\nSystem prompt.`;
+      writeFileSync(join(agentsDir, 'path-agent.md'), content);
+
+      const result = loadSubAgents(testDir);
+
+      expect(result.length).toBe(1);
+      expect(result[0].name).toBe('path-agent');
+      expect(result[0].description).toContain('Users');
+    });
+
+    test('should load agent with description starting with brackets', () => {
+      const content = `---\nname: optional-agent\ndescription: [Optional] tasks for advanced users\n---\nSystem prompt.`;
+      writeFileSync(join(agentsDir, 'optional-agent.md'), content);
+
+      // Without the fix this would either throw (YAMLException) or parse description as an array.
+      // With the fix the loader skips values that start with '[' (already excluded from quoting),
+      // so js-yaml treats it as a flow sequence — the agent falls back to filename-based name
+      // but does NOT throw an unhandled exception.
+      expect(() => loadSubAgents(testDir)).not.toThrow();
+    });
+
+    test('should load agent with description containing backslash and colon', () => {
+      const content = `---\nname: mixed-agent\ndescription: Run C:\\\\tool.exe: perform analysis\n---\nSystem prompt.`;
+      writeFileSync(join(agentsDir, 'mixed-agent.md'), content);
+
+      const result = loadSubAgents(testDir);
+
+      expect(result.length).toBe(1);
+      expect(result[0].name).toBe('mixed-agent');
+      expect(result[0].description).toContain('perform analysis');
+    });
+
     test('should handle invalid YAML frontmatter gracefully', () => {
       // 创建包含无效YAML的agent文件
       const invalidContent = `---

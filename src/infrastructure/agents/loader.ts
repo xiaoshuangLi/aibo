@@ -94,8 +94,8 @@ function findAllAgentsDirectories(rootDir: string): string[] {
  * @throws {Error} 如果YAML解析失败
  */
 /**
- * 预处理YAML内容，将顶级纯标量值中包含 ": " 的行自动加引号，
- * 避免 js-yaml 将其误解为嵌套映射条目。
+ * 预处理YAML内容，将顶级纯标量值自动加引号，
+ * 避免 js-yaml 将描述中的 ": "、反斜杠、方括号、花括号等字符误解为 YAML 语法。
  *
  * 只处理未缩进的 `key: value` 行，且 value 是未加引号的纯文本（非数组、对象、块标量）。
  */
@@ -105,9 +105,9 @@ function preprocessYamlScalars(yamlContent: string): string {
     if (keyValueMatch) {
       const key = keyValueMatch[1];
       const value = keyValueMatch[2];
-      // Only quote plain scalars that contain ": " and are not already quoted/complex
+      // Quote any plain scalar that is not already quoted/complex.
+      // This handles descriptions containing ": ", backslashes, brackets, etc.
       if (
-        value.includes(': ') &&
         !value.startsWith('"') &&
         !value.startsWith("'") &&
         !value.startsWith('[') &&
