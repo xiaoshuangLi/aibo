@@ -67,13 +67,23 @@ export function isCliCommandAvailable(command: string): boolean {
 }
 
 /**
- * Detects whether a CLI error indicates that no acpx session exists for the agent.
- * This happens when running an acpx prompt command before any session has been created.
+ * Detects whether a CLI error indicates that the acpx session is missing or corrupted,
+ * and can therefore be recovered by creating a fresh session.
+ *
+ * Two cases are handled:
+ * 1. "No acpx session found" – session was never created for this agent/cwd scope.
+ * 2. CAPIError 400 "tool call must have a tool call ID and function name" – a previous
+ *    session stored on disk has a corrupted tool-call entry in its conversation history
+ *    (typically caused by an interrupted tool-call). The GitHub Copilot API rejects the
+ *    history, making the session unusable. Creating a new session wipes the bad history.
  */
 export function isNoAcpSessionError(error: unknown): boolean {
   const err = error as any;
   const combined = `${err.message || ""} ${err.stderr || ""}`;
-  return combined.includes("No acpx session found");
+  return (
+    combined.includes("No acpx session found") ||
+    combined.includes("tool call must have a tool call ID and function name")
+  );
 }
 
 /**
