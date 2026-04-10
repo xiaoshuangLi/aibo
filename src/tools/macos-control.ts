@@ -61,14 +61,6 @@ interface CompressResult {
   srcHeight: number;
 }
 
-/**
- * Compress a PNG Buffer to JPEG, targeting TARGET_SIZE_BYTES.
- * Optionally crops to a region first, then scales down to MAX_WIDTH and
- * iteratively reduces JPEG quality until the output fits within the target.
- *
- * Returns the compressed buffer together with the original source dimensions
- * so the caller can expose coordinate scale factors to the LLM.
- */
 async function compressImage(
   buffer: Buffer,
   region?: { x: number; y: number; width: number; height: number }
@@ -105,6 +97,50 @@ async function compressImage(
   }
 
   return { compressed: result, srcWidth, srcHeight };
+}
+
+/**
+ * Composite a red crosshair cursor indicator onto a JPEG image buffer.
+ *
+ * @param imageBuffer - JPEG image to overlay the cursor on
+ * @param cx          - Cursor x position in image pixels
+ * @param cy          - Cursor y position in image pixels
+ * @param imgWidth    - Image width in pixels
+ * @param imgHeight   - Image height in pixels
+ * @returns New JPEG buffer with cursor drawn
+ */
+async function overlayMouseCursor(
+  imageBuffer: Buffer,
+  cx: number,
+  cy: number,
+  imgWidth: number,
+  imgHeight: number,
+): Promise<Buffer> {
+  const sharp = await loadSharp();
+  const radius = 7;
+  const armLen = 11;
+  const halfSize = radius + armLen + 1;
+  const svgSize = halfSize * 2 + 1;
+  const c = halfSize; // center of SVG
+
+  const svg = [
+    `<svg width="${svgSize}" height="${svgSize}" xmlns="http://www.w3.org/2000/svg">`,
+    `<circle cx="${c}" cy="${c}" r="${radius}" fill="none" stroke="#FF3B30" stroke-width="2.5"/>`,
+    `<circle cx="${c}" cy="${c}" r="2.5" fill="#FF3B30"/>`,
+    `<line x1="0" y1="${c}" x2="${c - radius - 2}" y2="${c}" stroke="#FF3B30" stroke-width="2"/>`,
+    `<line x1="${c + radius + 2}" y1="${c}" x2="${svgSize - 1}" y2="${c}" stroke="#FF3B30" stroke-width="2"/>`,
+    `<line x1="${c}" y1="0" x2="${c}" y2="${c - radius - 2}" stroke="#FF3B30" stroke-width="2"/>`,
+    `<line x1="${c}" y1="${c + radius + 2}" x2="${c}" y2="${svgSize - 1}" stroke="#FF3B30" stroke-width="2"/>`,
+    `</svg>`,
+  ].join('');
+
+  const left = Math.max(0, Math.min(imgWidth - svgSize, cx - c));
+  const top = Math.max(0, Math.min(imgHeight - svgSize, cy - c));
+
+  return sharp(imageBuffer)
+    .composite([{ input: Buffer.from(svg), blend: 'over', left, top }])
+    .jpeg({ quality: 85 })
+    .toBuffer();
 }
 
 // -----------------------------------------------------------------------
@@ -264,8 +300,6 @@ export const macosScreenshotTool = tool(
         });
       }
 
-      const base64 = compressed.toString("base64");
-
       // Get compressed image dimensions via sharp so we can expose the scale
       // factor to the LLM. The LLM reports coordinates relative to the
       // compressed image; they must be multiplied by the scale factors to
@@ -324,6 +358,28 @@ export const macosScreenshotTool = tool(
         `Compressed image delivered to you: ${imgWidth}x${imgHeight} px. ` +
         `To convert a coordinate from the image to a nut-js screen coordinate for mouse tools, ` +
         `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
+
+      // Overlay the current mouse cursor position as a red crosshair so that
+      // the LLM can use it as a visual reference when adjusting coordinates.
+      let finalImage = compressed;
+      try {
+        const { mouse: nutMouse } = await loadNutjs();
+        const cursorPos = await nutMouse.getPosition();
+        // Convert logical screen coordinates to image coordinates.
+        // For full-screen: image_x = mouse_x / scaleX
+        // For region: image_x = (mouse_x − region.x) / scaleX  (origin offset)
+        const originX = r ? r.x : 0;
+        const originY = r ? r.y : 0;
+        const cursorImgX = Math.round((cursorPos.x - originX) / scaleX);
+        const cursorImgY = Math.round((cursorPos.y - originY) / scaleY);
+        if (cursorImgX >= 0 && cursorImgX < imgWidth && cursorImgY >= 0 && cursorImgY < imgHeight) {
+          finalImage = await overlayMouseCursor(compressed, cursorImgX, cursorImgY, imgWidth, imgHeight);
+        }
+      } catch {
+        // If cursor position is unavailable, return the plain screenshot.
+      }
+
+      const base64 = finalImage.toString("base64");
 
       return [
         { type: "text" as const, text: coordNote },
