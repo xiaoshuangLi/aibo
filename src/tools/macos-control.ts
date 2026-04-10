@@ -49,7 +49,8 @@ async function loadNutjs() {
 
 /**
  * Compress a PNG Buffer to JPEG, targeting TARGET_SIZE_BYTES.
- * Scales down to MAX_WIDTH first, then reduces JPEG quality iteratively.
+ * Optionally crops to a region first, then scales down to MAX_WIDTH and
+ * iteratively reduces JPEG quality until the output fits within the target.
  */
 async function compressImage(
   buffer: Buffer,
@@ -57,31 +58,29 @@ async function compressImage(
 ): Promise<Buffer> {
   const sharp = await loadSharp();
 
-  let pipeline = sharp(buffer);
-
+  // Step 1: crop to region if requested
+  let source: Buffer = buffer;
   if (region) {
-    pipeline = pipeline.extract({
-      left: region.x,
-      top: region.y,
-      width: region.width,
-      height: region.height,
-    });
+    source = await sharp(buffer)
+      .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
+      .toBuffer();
   }
 
-  // Get metadata to determine scale factor
-  const meta = await pipeline.clone().metadata();
+  // Step 2: resolve target width (scale down to MAX_WIDTH if wider)
+  const meta = await sharp(source).metadata();
   const srcWidth = meta.width ?? MAX_WIDTH;
   const targetWidth = srcWidth > MAX_WIDTH ? MAX_WIDTH : srcWidth;
 
-  pipeline = pipeline.resize(targetWidth, undefined, { fit: "inside" });
-
+  // Step 3: resize + compress, iterating quality until under TARGET_SIZE_BYTES
   let quality = JPEG_QUALITY_INITIAL;
-  let result = await pipeline.clone().jpeg({ quality }).toBuffer();
+  let result = await sharp(source)
+    .resize(targetWidth, undefined, { fit: "inside" })
+    .jpeg({ quality })
+    .toBuffer();
 
   while (result.length > TARGET_SIZE_BYTES && quality > JPEG_QUALITY_MIN) {
     quality -= JPEG_QUALITY_STEP;
-    result = await sharp(buffer)
-      .extract(region ? { left: region.x, top: region.y, width: region.width, height: region.height } : { left: 0, top: 0, width: srcWidth, height: meta.height ?? 0 })
+    result = await sharp(source)
       .resize(targetWidth, undefined, { fit: "inside" })
       .jpeg({ quality })
       .toBuffer();
