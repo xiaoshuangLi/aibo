@@ -1,6 +1,6 @@
 /**
  * Additional coverage tests for SafeFilesystemBackend error paths.
- * Covers permission error handling in read(), lsInfo(), grepRaw(), and globInfo().
+ * Covers permission error handling in read(), ls(), grep(), and glob().
  */
 import { SafeFilesystemBackend } from '@/infrastructure/filesystem/safe-backend';
 import * as path from 'path';
@@ -13,99 +13,103 @@ describe('SafeFilesystemBackend - error branch coverage', () => {
     backend = new SafeFilesystemBackend({ rootDir: testRoot, maxDepth: 5 });
   });
 
-  // ── read(): EACCES error (lines 193-194) ──────────────────────────────────
+  // ── read(): EACCES error ──────────────────────────────────────────────────
 
-  it('read() throws "Permission denied" on EACCES error from parent', async () => {
+  it('read() returns "Permission denied" on EACCES error from parent', async () => {
     jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'read')
       .mockRejectedValueOnce(new Error('EACCES permission denied'));
 
-    await expect(backend.read('src/cli/init.ts', 0, 100)).rejects.toThrow('Permission denied');
+    const result = await backend.read('src/cli/init.ts', 0, 100);
+    expect(result.error).toContain('Permission denied');
   });
 
-  it('read() rethrows other errors (line 198)', async () => {
+  it('read() rethrows other errors', async () => {
     jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'read')
       .mockRejectedValueOnce(new Error('some other error'));
 
     await expect(backend.read('src/cli/init.ts', 0, 100)).rejects.toThrow('some other error');
   });
 
-  it('read() throws "Permission denied" on EPERM error', async () => {
+  it('read() returns "Permission denied" on EPERM error', async () => {
     jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'read')
       .mockRejectedValueOnce(new Error('EPERM operation not permitted'));
 
-    await expect(backend.read('src/cli/init.ts', 0, 100)).rejects.toThrow('Permission denied');
+    const result = await backend.read('src/cli/init.ts', 0, 100);
+    expect(result.error).toContain('Permission denied');
   });
 
-  // ── lsInfo(): EACCES error (lines 230-231) ─────────────────────────────────
+  // ── ls(): EACCES error ─────────────────────────────────────────────────────
 
-  it('lsInfo() throws "Permission denied" on EACCES error from parent', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'lsInfo')
+  it('ls() returns "Permission denied" on EACCES error from parent', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'ls')
       .mockRejectedValueOnce(new Error('EACCES permission denied'));
 
-    await expect(backend.lsInfo(testRoot)).rejects.toThrow('Permission denied');
+    const result = await backend.ls(testRoot);
+    expect(result.error).toContain('Permission denied');
   });
 
-  it('lsInfo() rethrows other errors (line 235)', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'lsInfo')
-      .mockRejectedValueOnce(new Error('unknown lsInfo error'));
+  it('ls() rethrows other errors', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'ls')
+      .mockRejectedValueOnce(new Error('unknown ls error'));
 
-    await expect(backend.lsInfo(testRoot)).rejects.toThrow('unknown lsInfo error');
+    await expect(backend.ls(testRoot)).rejects.toThrow('unknown ls error');
   });
 
-  // ── grepRaw(): EACCES (line 332) and other (line 337) ────────────────────
+  // ── grep(): EACCES and other errors ───────────────────────────────────────
 
-  it('grepRaw() returns "Permission denied" string on EACCES error', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grepRaw')
+  it('grep() returns "Permission denied" error on EACCES error', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grep')
       .mockRejectedValueOnce(new Error('EACCES permission denied'));
 
-    const result = await backend.grepRaw('pattern', testRoot, '**/*.ts');
-    expect(typeof result === 'string' ? result : '').toContain('Permission denied');
+    const result = await backend.grep('pattern', testRoot, '**/*.ts');
+    expect(result.error).toContain('Permission denied');
   });
 
-  it('grepRaw() rethrows other errors (line 337)', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grepRaw')
+  it('grep() rethrows other errors', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grep')
       .mockRejectedValueOnce(new Error('critical grep error'));
 
-    await expect(backend.grepRaw('pattern', testRoot, '**/*.ts')).rejects.toThrow('critical grep error');
+    await expect(backend.grep('pattern', testRoot, '**/*.ts')).rejects.toThrow('critical grep error');
   });
 
-  // ── globInfo(): EACCES (line 394-409) ─────────────────────────────────────
+  // ── glob(): EACCES and other errors ────────────────────────────────────────
 
-  it('globInfo() throws "Permission denied" on EACCES error', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'globInfo')
+  it('glob() returns "Permission denied" error on EACCES error', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'glob')
       .mockRejectedValueOnce(new Error('EACCES permission denied'));
 
-    await expect(backend.globInfo('**/*.ts', testRoot)).rejects.toThrow('Permission denied');
+    const result = await backend.glob('**/*.ts', testRoot);
+    expect(result.error).toContain('Permission denied');
   });
 
-  it('globInfo() rethrows other errors (line 409)', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'globInfo')
+  it('glob() rethrows other errors', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'glob')
       .mockRejectedValueOnce(new Error('glob error'));
 
-    await expect(backend.globInfo('**/*.ts', testRoot)).rejects.toThrow('glob error');
+    await expect(backend.glob('**/*.ts', testRoot)).rejects.toThrow('glob error');
   });
 
-  // ── grepRaw(): "Access denied" error string (line 283) ──────────────────
+  // ── grep(): "Access denied" error string ──────────────────────────────────
 
-  it('grepRaw() returns Access denied string from catch when message includes Access denied', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grepRaw')
+  it('grep() returns Access denied error when caught error message includes Access denied', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'grep')
       .mockRejectedValueOnce(new Error('Access denied: path is blocked'));
 
-    const result = await backend.grepRaw('pattern', testRoot, '**/*.ts');
-    expect(typeof result).toBe('string');
-    expect(result).toContain('Access denied');
+    const result = await backend.grep('pattern', testRoot, '**/*.ts');
+    expect(result.error).toContain('Access denied');
   });
 
-  // ── globInfo(): "Access denied" error (line 394) ────────────────────────
+  // ── glob(): "Access denied" error ────────────────────────────────────────
 
-  it('globInfo() rethrows "Access denied" error as-is', async () => {
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'globInfo')
+  it('glob() returns Access denied error when caught error message includes Access denied', async () => {
+    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(backend)), 'glob')
       .mockRejectedValueOnce(new Error('Access denied: path outside root'));
 
-    await expect(backend.globInfo('**/*.ts', testRoot)).rejects.toThrow('Access denied');
+    const result = await backend.glob('**/*.ts', testRoot);
+    expect(result.error).toContain('Access denied');
   });
 
-  // ── write(): EACCES error (line 396) ──────────────────────────────────────
+  // ── write(): EACCES error ──────────────────────────────────────────────────
 
   it('write() returns permission error on EACCES', async () => {
     jest.spyOn(require('fs').promises, 'writeFile')

@@ -107,22 +107,25 @@ describe('SafeFilesystemBackend', () => {
   // Test the main methods with actual files that exist in the project
   describe('read', () => {
     test('should read existing file successfully', async () => {
-      const content = await safeBackend.read('package.json');
-      expect(content).toContain('aibo');
+      const result = await safeBackend.read('package.json');
+      expect(result.error).toBeUndefined();
+      expect(result.content).toContain('aibo');
     });
 
-    test('should throw error for files outside project root', async () => {
-      await expect(safeBackend.read('/tmp/outside-project-file.txt')).rejects.toThrow('Access denied');
+    test('should return error for files outside project root', async () => {
+      const result = await safeBackend.read('/tmp/outside-project-file.txt');
+      expect(result.error).toContain('Access denied');
     });
 
-    test('should throw error for blocked file extensions', async () => {
-      // This will fail because the file doesn't exist, but it should fail with the right error
-      await expect(safeBackend.read('nonexistent.bin')).rejects.toThrow('blocked file extension');
+    test('should return error for blocked file extensions', async () => {
+      const result = await safeBackend.read('nonexistent.bin');
+      expect(result.error).toContain('blocked file extension');
     });
 
-    test('should throw error for files exceeding depth limit', async () => {
+    test('should return error for files exceeding depth limit', async () => {
       const deepPath = 'level1/level2/level3/level4/file.txt';
-      await expect(safeBackend.read(deepPath)).rejects.toThrow('exceeds maximum depth limit');
+      const result = await safeBackend.read(deepPath);
+      expect(result.error).toContain('exceeds maximum depth limit');
     });
 
     test('should handle permission errors gracefully', async () => {
@@ -133,7 +136,8 @@ describe('SafeFilesystemBackend', () => {
       // Make file unreadable (this might not work on all systems, so we'll skip if it fails)
       try {
         await fs.promises.chmod(tempFile, 0o000);
-        await expect(safeBackend.read('temp-permission-test.txt')).rejects.toThrow('Permission denied');
+        const result = await safeBackend.read('temp-permission-test.txt');
+        expect(result.error).toContain('Permission denied');
       } catch (error) {
         // Skip this test if we can't change permissions
         console.log('Skipping permission test due to system restrictions');
@@ -148,19 +152,22 @@ describe('SafeFilesystemBackend', () => {
     });
   });
 
-  describe('lsInfo', () => {
+  describe('ls', () => {
     test('should list files in current directory', async () => {
-      const files = await safeBackend.lsInfo('.');
-      expect(files.length).toBeGreaterThan(0);
+      const result = await safeBackend.ls('.');
+      expect(result.error).toBeUndefined();
+      expect(result.files?.length).toBeGreaterThan(0);
     });
 
-    test('should throw error for directories outside project root', async () => {
-      await expect(safeBackend.lsInfo('/tmp')).rejects.toThrow('Access denied');
+    test('should return error for directories outside project root', async () => {
+      const result = await safeBackend.ls('/tmp');
+      expect(result.error).toContain('Access denied');
     });
 
-    test('should throw error for directories exceeding depth limit', async () => {
+    test('should return error for directories exceeding depth limit', async () => {
       const deepPath = 'level1/level2/level3/level4';
-      await expect(safeBackend.lsInfo(deepPath)).rejects.toThrow('exceeds maximum depth limit');
+      const result = await safeBackend.ls(deepPath);
+      expect(result.error).toContain('exceeds maximum depth limit');
     });
 
     test('should handle permission errors gracefully', async () => {
@@ -171,10 +178,11 @@ describe('SafeFilesystemBackend', () => {
       // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
       try {
         await fs.promises.chmod(tempDir, 0o000);
-        await expect(safeBackend.lsInfo('temp-permission-test-dir')).rejects.toThrow('Permission denied');
+        const result = await safeBackend.ls('temp-permission-test-dir');
+        expect(result.error).toContain('Permission denied');
       } catch (error) {
         // Skip this test if we can't change permissions
-        console.log('Skipping lsInfo permission test due to system restrictions');
+        console.log('Skipping ls permission test due to system restrictions');
       } finally {
         // Clean up - first restore permissions, then remove
         try {
@@ -187,15 +195,16 @@ describe('SafeFilesystemBackend', () => {
     });
   });
 
-  describe('grepRaw', () => {
-    test('should return access denied message for directories outside project root', async () => {
-      const result = await safeBackend.grepRaw('pattern', '/tmp');
-      expect(result).toBe('Access denied: /tmp is outside project root');
+  describe('grep', () => {
+    test('should return access denied error for directories outside project root', async () => {
+      const result = await safeBackend.grep('pattern', '/tmp');
+      expect(result.error).toContain('Access denied: /tmp is outside project root');
     });
 
-    test('should return empty array for ignored directories', async () => {
-      const result = await safeBackend.grepRaw('pattern', path.join(testRoot, 'node_modules'));
-      expect(Array.isArray(result)).toBe(true);
+    test('should return empty matches for ignored directories', async () => {
+      const result = await safeBackend.grep('pattern', path.join(testRoot, 'node_modules'));
+      expect(result.matches).toBeDefined();
+      expect(Array.isArray(result.matches)).toBe(true);
     });
 
     test('should handle permission errors gracefully', async () => {
@@ -207,12 +216,11 @@ describe('SafeFilesystemBackend', () => {
       // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
       try {
         await fs.promises.chmod(tempDir, 0o000);
-        const result = await safeBackend.grepRaw('test', 'temp-grep-permission-test-dir');
-        expect(typeof result).toBe('string');
-        expect(result).toContain('Permission denied');
+        const result = await safeBackend.grep('test', 'temp-grep-permission-test-dir');
+        expect(result.error).toContain('Permission denied');
       } catch (error) {
         // Skip this test if we can't change permissions
-        console.log('Skipping grepRaw permission test due to system restrictions');
+        console.log('Skipping grep permission test due to system restrictions');
       } finally {
         // Clean up - first restore permissions, then remove
         try {
@@ -225,19 +233,22 @@ describe('SafeFilesystemBackend', () => {
     });
   });
 
-  describe('globInfo', () => {
+  describe('glob', () => {
     test('should find files with glob pattern', async () => {
-      const files = await safeBackend.globInfo('*.json', '.');
-      expect(files.length).toBeGreaterThan(0);
+      const result = await safeBackend.glob('*.json', '.');
+      expect(result.error).toBeUndefined();
+      expect(result.files?.length).toBeGreaterThan(0);
     });
 
-    test('should throw error for search paths outside project root', async () => {
-      await expect(safeBackend.globInfo('**/*.ts', '/tmp')).rejects.toThrow('Access denied');
+    test('should return error for search paths outside project root', async () => {
+      const result = await safeBackend.glob('**/*.ts', '/tmp');
+      expect(result.error).toContain('Access denied');
     });
 
-    test('should throw error for search paths exceeding depth limit', async () => {
+    test('should return error for search paths exceeding depth limit', async () => {
       const deepPath = 'level1/level2/level3/level4';
-      await expect(safeBackend.globInfo('*.txt', deepPath)).rejects.toThrow('exceeds maximum depth limit');
+      const result = await safeBackend.glob('*.txt', deepPath);
+      expect(result.error).toContain('exceeds maximum depth limit');
     });
 
     test('should handle permission errors gracefully', async () => {
@@ -249,10 +260,11 @@ describe('SafeFilesystemBackend', () => {
       // Make directory unreadable (this might not work on all systems, so we'll skip if it fails)
       try {
         await fs.promises.chmod(tempDir, 0o000);
-        await expect(safeBackend.globInfo('*.txt', 'temp-glob-permission-test-dir')).rejects.toThrow('Permission denied');
+        const result = await safeBackend.glob('*.txt', 'temp-glob-permission-test-dir');
+        expect(result.error).toContain('Permission denied');
       } catch (error) {
         // Skip this test if we can't change permissions
-        console.log('Skipping globInfo permission test due to system restrictions');
+        console.log('Skipping glob permission test due to system restrictions');
       } finally {
         // Clean up - first restore permissions, then remove
         try {

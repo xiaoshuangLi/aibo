@@ -105,7 +105,7 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
     });
   });
 
-  describe('grepRaw - filtering behavior', () => {
+  describe('grep - filtering behavior', () => {
     it('should filter files in ignored directories', async () => {
       // Create a node_modules directory with a matching file
       const nodeModulesDir = path.join(tempDir, 'node_modules');
@@ -117,12 +117,11 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
       await fs.promises.mkdir(srcDir, { recursive: true });
       await fs.promises.writeFile(path.join(srcDir, 'test.ts'), 'const test = true;');
       
-      const result = await safeBackend.grepRaw('const test', tempDir);
+      const result = await safeBackend.grep('const test', tempDir);
       
-      // Result might be a string or array
-      if (Array.isArray(result)) {
+      if (result.matches) {
         // Should not include files from node_modules
-        const nodeModulesMatches = result.filter(m => m.path.includes('node_modules'));
+        const nodeModulesMatches = result.matches.filter(m => m.path.includes('node_modules'));
         expect(nodeModulesMatches.length).toBe(0);
       }
     });
@@ -133,23 +132,24 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
       // Create a .ts file that matches
       await fs.promises.writeFile(path.join(tempDir, 'test.ts'), 'matching content');
       
-      const result = await safeBackend.grepRaw('matching content', tempDir);
+      const result = await safeBackend.grep('matching content', tempDir);
       
-      if (Array.isArray(result)) {
-        const binMatches = result.filter(m => m.path.endsWith('.bin'));
+      if (result.matches) {
+        const binMatches = result.matches.filter(m => m.path.endsWith('.bin'));
         expect(binMatches.length).toBe(0);
       }
     });
   });
 
-  describe('lsInfo - permission error handling', () => {
-    it('should handle EACCES error on lsInfo gracefully', async () => {
+  describe('ls - permission error handling', () => {
+    it('should handle EACCES error on ls gracefully', async () => {
       const restrictedDir = path.join(tempDir, 'restricted');
       await fs.promises.mkdir(restrictedDir, { recursive: true });
       
       try {
         await fs.promises.chmod(restrictedDir, 0o000);
-        await expect(safeBackend.lsInfo(restrictedDir)).rejects.toThrow('Permission denied');
+        const result = await safeBackend.ls(restrictedDir);
+        expect(result.error).toContain('Permission denied');
       } catch (e) {
         // Skip if permissions can't be changed on this system
         console.log('Skipping permission test - cannot change permissions');
@@ -159,7 +159,7 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
     });
   });
 
-  describe('globInfo - filtering behavior', () => {
+  describe('glob - filtering behavior', () => {
     it('should filter out files in ignored directories', async () => {
       // Create a dist directory with a .ts file
       const distDir = path.join(tempDir, 'dist');
@@ -171,8 +171,8 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
       await fs.promises.mkdir(srcDir, { recursive: true });
       await fs.promises.writeFile(path.join(srcDir, 'index.ts'), 'content');
       
-      const files = await safeBackend.globInfo('**/*.ts', tempDir);
-      const distFiles = files.filter(f => f.path.includes(`${path.sep}dist${path.sep}`));
+      const result = await safeBackend.glob('**/*.ts', tempDir);
+      const distFiles = (result.files ?? []).filter(f => f.path.includes(`${path.sep}dist${path.sep}`));
       expect(distFiles.length).toBe(0);
     });
 
@@ -180,8 +180,8 @@ describe('SafeFilesystemBackend - Write Method and Additional Coverage', () => {
       await fs.promises.writeFile(path.join(tempDir, 'image.jpg'), 'binary');
       await fs.promises.writeFile(path.join(tempDir, 'code.ts'), 'content');
       
-      const files = await safeBackend.globInfo('*', tempDir);
-      const jpgFiles = files.filter(f => f.path.endsWith('.jpg'));
+      const result = await safeBackend.glob('*', tempDir);
+      const jpgFiles = (result.files ?? []).filter(f => f.path.endsWith('.jpg'));
       expect(jpgFiles.length).toBe(0);
     });
   });

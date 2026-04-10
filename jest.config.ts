@@ -13,7 +13,7 @@ export default {
   // 添加 transformIgnorePatterns 以处理 ESM 模块
   // 转换所有 node_modules 中的文件（除了明确排除的）
   transformIgnorePatterns: [
-    'node_modules/(?!(ansi-styles|langchain|@langchain|deepagents|@composio|uuid))',
+    'node_modules/(?!(ansi-styles|langchain|@langchain|deepagents|@composio|uuid|p-retry|is-network-error|p-queue|p-timeout))',
   ],
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.ts$',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '\\.d\\.ts$'],

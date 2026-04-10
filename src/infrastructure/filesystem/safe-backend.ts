@@ -1,4 +1,4 @@
-import { FilesystemBackend, GrepMatch, WriteResult } from 'deepagents';
+import { FilesystemBackend, GrepMatch, WriteResult, ReadResult, LsResult, GrepResult, GlobResult } from 'deepagents';
 import * as path from 'path';
 import * as fs from 'fs';
 import { BLOCKED_EXTENSIONS, IGNORED_DIRECTORIES } from '@/shared/constants/filesystem';
@@ -167,34 +167,30 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   /**
    * Enhanced read operation with safety checks
    */
-  async read(filePath: string, offset?: number, limit?: number): Promise<string> {
+  async read(filePath: string, offset?: number, limit?: number): Promise<ReadResult> {
     try {
       filePath = this.redirectDeepagentsPath(filePath);
 
       // Security checks
       if (!this.isWithinProjectRoot(filePath)) {
-        throw new Error(`Access denied: ${filePath} is outside project root`);
+        return { error: `Access denied: ${filePath} is outside project root` };
       }
 
       if (!this.isWithinDepthLimit(filePath)) {
-        throw new Error(`Access denied: ${filePath} exceeds maximum depth limit of ${this.maxDepth}`);
+        return { error: `Access denied: ${filePath} exceeds maximum depth limit of ${this.maxDepth}` };
       }
 
       if (!this.isAllowedExtension(filePath)) {
-        throw new Error(`Access denied: ${filePath} has a blocked file extension`);
+        return { error: `Access denied: ${filePath} has a blocked file extension` };
       }
 
       // Call parent read method with offset and limit parameters
       // The parent class will handle the file size check internally
       return await super.read(filePath, offset, limit);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Access denied')) {
-        throw error;
-      }
-      
       // Handle permission errors gracefully
       if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
-        throw new Error(`Permission denied: Cannot access ${filePath}`);
+        return { error: `Permission denied: Cannot access ${filePath}` };
       }
       
       // Re-throw other errors
@@ -203,37 +199,39 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }
 
   /**
-   * Enhanced lsInfo operation with safety checks
+   * Enhanced ls operation with safety checks
    */
-  async lsInfo(directoryPath: string = process.cwd()): Promise<import('deepagents').FileInfo[]> {
+  async ls(directoryPath: string = process.cwd()): Promise<LsResult> {
     try {
       directoryPath = this.redirectDeepagentsPath(directoryPath);
 
       // Security checks
       if (!this.isWithinProjectRoot(directoryPath)) {
-        throw new Error(`Access denied: ${directoryPath} is outside project root`);
+        return { error: `Access denied: ${directoryPath} is outside project root` };
       }
 
       if (!this.isWithinDepthLimit(directoryPath)) {
-        throw new Error(`Access denied: ${directoryPath} exceeds maximum depth limit of ${this.maxDepth}`);
+        return { error: `Access denied: ${directoryPath} exceeds maximum depth limit of ${this.maxDepth}` };
       }
 
       // Get all files from parent
-      const allFiles = await super.lsInfo(directoryPath);
+      const result = await super.ls(directoryPath);
       
-      // Filter out blocked files
-      return allFiles.filter((file: any) => {
-        const fullPath = file.path;
-        return this.isAllowedExtension(fullPath);
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Access denied')) {
-        throw error;
+      if (result.error || !result.files) {
+        return result;
       }
-      
+
+      // Filter out blocked files
+      return {
+        files: result.files.filter((file) => {
+          const fullPath = file.path;
+          return this.isAllowedExtension(fullPath);
+        }),
+      };
+    } catch (error) {
       // Handle permission errors gracefully
       if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
-        throw new Error(`Permission denied: Cannot access ${directoryPath}`);
+        return { error: `Permission denied: Cannot access ${directoryPath}` };
       }
       
       // Re-throw other errors
@@ -242,36 +240,35 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }
 
   /**
-   * Enhanced grepRaw operation with directory filtering
+   * Enhanced grep operation with directory filtering
    */
-  async grepRaw(
+  async grep(
     pattern: string,
     dirPath: string = process.cwd(),
     glob: string | null = null,
-  ): Promise<GrepMatch[] | string> {
+  ): Promise<GrepResult> {
     try {
       dirPath = this.redirectDeepagentsPath(dirPath);
 
       // Security checks for the base directory
       if (!this.isWithinProjectRoot(dirPath)) {
-        return `Access denied: ${dirPath} is outside project root`;
+        return { error: `Access denied: ${dirPath} is outside project root` };
       }
       
       if (this.shouldIgnoreDirectory(dirPath)) {
         // If the base directory itself is ignored, return empty result
-        return [];
+        return { matches: [] };
       }
 
       // Get results from parent method
-      const result = await super.grepRaw(pattern, dirPath, glob);
+      const result = await super.grep(pattern, dirPath, glob);
       
-      // If result is a string (error), return it as-is
-      if (typeof result === 'string') {
+      if (result.error || !result.matches) {
         return result;
       }
       
       // Filter out files that are in ignored directories
-      const filteredMatches = result.filter((match: GrepMatch) => {
+      const filteredMatches = result.matches.filter((match: GrepMatch) => {
         const fullPath = match.path;
         
         // Check if file is in an ignored directory
@@ -284,15 +281,15 @@ export class SafeFilesystemBackend extends FilesystemBackend {
         return this.isAllowedExtension(fullPath);
       });
       
-      return filteredMatches;
+      return { matches: filteredMatches };
     } catch (error) {
       if (error instanceof Error && error.message.includes('Access denied')) {
-        return error.message;
+        return { error: error.message };
       }
       
       // Handle permission errors gracefully
       if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
-        return `Permission denied: Cannot access ${dirPath}`;
+        return { error: `Permission denied: Cannot access ${dirPath}` };
       }
       
       // Re-throw other errors
@@ -301,45 +298,51 @@ export class SafeFilesystemBackend extends FilesystemBackend {
   }
 
   /**
-   * Enhanced globInfo operation with safety checks and filtering
+   * Enhanced glob operation with safety checks and filtering
    */
-  async globInfo(pattern: string, searchPath: string = process.cwd()): Promise<import('deepagents').FileInfo[]> {
+  async glob(pattern: string, searchPath: string = process.cwd()): Promise<GlobResult> {
     try {
       searchPath = this.redirectDeepagentsPath(searchPath);
 
       // Security checks for the base directory
       if (!this.isWithinProjectRoot(searchPath)) {
-        throw new Error(`Access denied: ${searchPath} is outside project root`);
+        return { error: `Access denied: ${searchPath} is outside project root` };
       }
       
       if (!this.isWithinDepthLimit(searchPath)) {
-        throw new Error(`Access denied: ${searchPath} exceeds maximum depth limit of ${this.maxDepth}`);
+        return { error: `Access denied: ${searchPath} exceeds maximum depth limit of ${this.maxDepth}` };
       }
 
       // Get results from parent method
-      const allFiles = await super.globInfo(pattern, searchPath);
+      const result = await super.glob(pattern, searchPath);
+      
+      if (result.error || !result.files) {
+        return result;
+      }
       
       // Filter out files that are in ignored directories or have blocked extensions
-      return allFiles.filter((file: any) => {
-        const fullPath = file.path;
-        
-        // Check if file is in an ignored directory
-        const fileDir = path.dirname(fullPath);
-        if (this.shouldIgnoreDirectory(fileDir)) {
-          return false;
-        }
-        
-        // Check if file has allowed extension
-        return this.isAllowedExtension(fullPath);
-      });
+      return {
+        files: result.files.filter((file) => {
+          const fullPath = file.path;
+          
+          // Check if file is in an ignored directory
+          const fileDir = path.dirname(fullPath);
+          if (this.shouldIgnoreDirectory(fileDir)) {
+            return false;
+          }
+          
+          // Check if file has allowed extension
+          return this.isAllowedExtension(fullPath);
+        }),
+      };
     } catch (error) {
       if (error instanceof Error && error.message.includes('Access denied')) {
-        throw error;
+        return { error: error.message };
       }
       
       // Handle permission errors gracefully
       if (error instanceof Error && (error.message.includes('EACCES') || error.message.includes('EPERM'))) {
-        throw new Error(`Permission denied: Cannot access ${searchPath}`);
+        return { error: `Permission denied: Cannot access ${searchPath}` };
       }
       
       // Re-throw other errors
