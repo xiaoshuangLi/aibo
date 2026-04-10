@@ -558,7 +558,18 @@ export class LarkAdapter extends DefaultAdapter {
 
     // Flush any buffered progress output before showing the final result
     await this.flushProgressBuffer();
-    
+
+    // Send any images from multimodal tool results (e.g. macos_screenshot)
+    // This must run before the early-return branches below so that images
+    // are always delivered to the chat regardless of how the text is formatted.
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      for (const imageUrl of data.images) {
+        await this.sendImageToChat(imageUrl).catch((err) =>
+          console.error('⚠️ 发送图片到飞书失败:', err?.message ?? err)
+        );
+      }
+    }
+
     // 如果已经有 preview 字段，直接使用（向后兼容）
     if (data.preview !== undefined) {
       // 在 Lark 模式下，确保 preview 内容不被截断
@@ -665,15 +676,6 @@ export class LarkAdapter extends DefaultAdapter {
       }
       const toolResultMessage = styled.toolResult(data.name || "unknown", data.success, preview);
       await this.sendMessage(toolResultMessage);
-    }
-
-    // Send any images from multimodal tool results (e.g. macos_screenshot)
-    if (Array.isArray(data.images) && data.images.length > 0) {
-      for (const imageUrl of data.images) {
-        await this.sendImageToChat(imageUrl).catch((err) =>
-          console.error('⚠️ 发送图片到飞书失败:', err?.message ?? err)
-        );
-      }
     }
   }
 
