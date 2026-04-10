@@ -1,0 +1,481 @@
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
+
+// -----------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------
+
+const TARGET_SIZE_BYTES = 300 * 1024; // 300 KB
+const MAX_WIDTH = 1280;
+const JPEG_QUALITY_INITIAL = 75;
+const JPEG_QUALITY_STEP = 10;
+const JPEG_QUALITY_MIN = 20;
+
+// -----------------------------------------------------------------------
+// Platform guard
+// -----------------------------------------------------------------------
+
+function requireMacos(): string | null {
+  if (process.platform !== "darwin") {
+    return "This tool only works on macOS (darwin). Current platform: " + process.platform;
+  }
+  return null;
+}
+
+// -----------------------------------------------------------------------
+// Lazy imports – avoid hard failures on non-macOS systems
+// -----------------------------------------------------------------------
+
+async function loadScreenshot(): Promise<(opts?: { format?: string }) => Promise<Buffer>> {
+  const mod = await import("screenshot-desktop");
+  return (mod.default ?? mod) as (opts?: { format?: string }) => Promise<Buffer>;
+}
+
+async function loadSharp() {
+  const mod = await import("sharp");
+  return mod.default as typeof import("sharp");
+}
+
+async function loadNutjs() {
+  return import("@nut-tree-fork/nut-js");
+}
+
+// -----------------------------------------------------------------------
+// Screenshot helpers
+// -----------------------------------------------------------------------
+
+/**
+ * Compress a PNG Buffer to JPEG, targeting TARGET_SIZE_BYTES.
+ * Optionally crops to a region first, then scales down to MAX_WIDTH and
+ * iteratively reduces JPEG quality until the output fits within the target.
+ */
+async function compressImage(
+  buffer: Buffer,
+  region?: { x: number; y: number; width: number; height: number }
+): Promise<Buffer> {
+  const sharp = await loadSharp();
+
+  // Step 1: crop to region if requested
+  let source: Buffer = buffer;
+  if (region) {
+    source = await sharp(buffer)
+      .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
+      .toBuffer();
+  }
+
+  // Step 2: resolve target width (scale down to MAX_WIDTH if wider)
+  const meta = await sharp(source).metadata();
+  const srcWidth = meta.width ?? MAX_WIDTH;
+  const targetWidth = srcWidth > MAX_WIDTH ? MAX_WIDTH : srcWidth;
+
+  // Step 3: resize + compress, iterating quality until under TARGET_SIZE_BYTES
+  let quality = JPEG_QUALITY_INITIAL;
+  let result = await sharp(source)
+    .resize(targetWidth, undefined, { fit: "inside" })
+    .jpeg({ quality })
+    .toBuffer();
+
+  while (result.length > TARGET_SIZE_BYTES && quality > JPEG_QUALITY_MIN) {
+    quality -= JPEG_QUALITY_STEP;
+    result = await sharp(source)
+      .resize(targetWidth, undefined, { fit: "inside" })
+      .jpeg({ quality })
+      .toBuffer();
+  }
+
+  return result;
+}
+
+// -----------------------------------------------------------------------
+// Key name parser for nut-js
+// -----------------------------------------------------------------------
+
+/**
+ * Parse a human-readable key string (e.g. "Command+C", "Shift+Enter") into
+ * nut-js Key enum values.  Returns null if any key is unrecognised.
+ */
+async function parseKeys(keyString: string): Promise<number[] | null> {
+  const { Key } = await loadNutjs();
+
+  const aliases: Record<string, keyof typeof Key> = {
+    // Modifiers
+    command: "LeftSuper",
+    cmd: "LeftSuper",
+    ctrl: "LeftControl",
+    control: "LeftControl",
+    alt: "LeftAlt",
+    option: "LeftAlt",
+    shift: "LeftShift",
+    win: "LeftSuper",
+    super: "LeftSuper",
+    // Special
+    enter: "Return",
+    return: "Return",
+    space: "Space",
+    tab: "Tab",
+    backspace: "Backspace",
+    delete: "Delete",
+    escape: "Escape",
+    esc: "Escape",
+    home: "Home",
+    end: "End",
+    pageup: "PageUp",
+    pagedown: "PageDown",
+    left: "Left",
+    right: "Right",
+    up: "Up",
+    down: "Down",
+  };
+
+  const parts = keyString
+    .split("+")
+    .map((k) => k.trim().toLowerCase());
+
+  const result: number[] = [];
+
+  for (const part of parts) {
+    const alias = aliases[part];
+    if (alias) {
+      result.push(Key[alias] as unknown as number);
+      continue;
+    }
+
+    // Function keys: f1-f24
+    const fnMatch = part.match(/^f(\d+)$/);
+    if (fnMatch) {
+      const fnKey = `F${fnMatch[1]}` as keyof typeof Key;
+      if (Key[fnKey] !== undefined) {
+        result.push(Key[fnKey] as unknown as number);
+        continue;
+      }
+    }
+
+    // Single character: A-Z, 0-9
+    const upper = part.toUpperCase();
+    if (Key[upper as keyof typeof Key] !== undefined) {
+      result.push(Key[upper as keyof typeof Key] as unknown as number);
+      continue;
+    }
+
+    return null; // unrecognised key
+  }
+
+  return result;
+}
+
+// -----------------------------------------------------------------------
+// Tools
+// -----------------------------------------------------------------------
+
+/**
+ * 1. macos_screenshot
+ */
+export const macosScreenshotTool = tool(
+  async ({ region, save_path }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const screenshot = await loadScreenshot();
+      const raw = await screenshot({ format: "png" });
+
+      const r = region
+        ? { x: region.x, y: region.y, width: region.width, height: region.height }
+        : undefined;
+
+      const compressed = await compressImage(raw as Buffer, r);
+
+      if (save_path) {
+        const absPath = path.isAbsolute(save_path)
+          ? save_path
+          : path.join(process.cwd(), save_path);
+        fs.mkdirSync(path.dirname(absPath), { recursive: true });
+        fs.writeFileSync(absPath, compressed);
+        return JSON.stringify({
+          success: true,
+          saved_to: absPath,
+          size_kb: Math.round(compressed.length / 1024),
+        });
+      }
+
+      const base64 = compressed.toString("base64");
+      return [{ type: "image_url" as const, image_url: { url: base64 } }] as unknown as string;
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_screenshot",
+    description: `Capture a screenshot of the macOS screen and return it as a compressed JPEG image (≤300 KB).
+Supports full-screen capture or a specific region (x, y, width, height in logical pixels).
+Optionally saves the screenshot to a file path.
+Returns the image as base64-encoded data for visual analysis by the model.
+Only works on macOS.`,
+    schema: z.object({
+      region: z
+        .object({
+          x: z.number().describe("Left edge of the capture region in screen pixels"),
+          y: z.number().describe("Top edge of the capture region in screen pixels"),
+          width: z.number().describe("Width of the capture region in screen pixels"),
+          height: z.number().describe("Height of the capture region in screen pixels"),
+        })
+        .optional()
+        .describe("Optional region to capture. Omit to capture the full screen."),
+      save_path: z
+        .string()
+        .optional()
+        .describe("Optional file path to save the screenshot to (e.g. '/tmp/screen.jpg'). When provided, returns save location instead of image data."),
+    }),
+  }
+);
+
+/**
+ * 2. macos_get_screen_size
+ */
+export const macosGetScreenSizeTool = tool(
+  async () => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { screen } = await loadNutjs();
+      const width = await screen.width();
+      const height = await screen.height();
+      return JSON.stringify({ success: true, width, height });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_get_screen_size",
+    description: "Get the current screen dimensions (width and height in pixels) on macOS. Use this before taking region screenshots or calculating click coordinates.",
+    schema: z.object({}),
+  }
+);
+
+/**
+ * 3. macos_mouse_move
+ */
+export const macosMouseMoveTool = tool(
+  async ({ x, y }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { mouse, Point } = await loadNutjs();
+      await mouse.setPosition(new Point(x, y));
+      return JSON.stringify({ success: true, x, y });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_mouse_move",
+    description: "Move the mouse cursor to the specified screen coordinates (x, y) on macOS.",
+    schema: z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels"),
+      y: z.number().describe("Vertical screen coordinate in pixels"),
+    }),
+  }
+);
+
+/**
+ * 4. macos_mouse_click
+ */
+export const macosMouseClickTool = tool(
+  async ({ x, y, button = "left", double_click = false }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { mouse, Point, Button } = await loadNutjs();
+
+      await mouse.setPosition(new Point(x, y));
+
+      const btn =
+        button === "right"
+          ? Button.RIGHT
+          : button === "middle"
+          ? Button.MIDDLE
+          : Button.LEFT;
+
+      if (double_click) {
+        await mouse.doubleClick(btn);
+      } else {
+        await mouse.click(btn);
+      }
+
+      return JSON.stringify({ success: true, x, y, button, double_click });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_mouse_click",
+    description: "Simulate a mouse click at the specified screen coordinates on macOS. Supports left, right, and middle buttons, as well as double-click.",
+    schema: z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels"),
+      y: z.number().describe("Vertical screen coordinate in pixels"),
+      button: z
+        .enum(["left", "right", "middle"])
+        .optional()
+        .describe("Mouse button to click (default: 'left')"),
+      double_click: z
+        .boolean()
+        .optional()
+        .describe("Whether to perform a double-click (default: false)"),
+    }),
+  }
+);
+
+/**
+ * 5. macos_mouse_scroll
+ */
+export const macosMouseScrollTool = tool(
+  async ({ x, y, direction, amount = 3 }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { mouse, Point } = await loadNutjs();
+
+      await mouse.setPosition(new Point(x, y));
+
+      if (direction === "down") {
+        await mouse.scrollDown(amount);
+      } else if (direction === "up") {
+        await mouse.scrollUp(amount);
+      } else if (direction === "left") {
+        await mouse.scrollLeft(amount);
+      } else {
+        await mouse.scrollRight(amount);
+      }
+
+      return JSON.stringify({ success: true, x, y, direction, amount });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_mouse_scroll",
+    description: "Simulate mouse wheel scrolling at the specified screen coordinates on macOS.",
+    schema: z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels"),
+      y: z.number().describe("Vertical screen coordinate in pixels"),
+      direction: z
+        .enum(["up", "down", "left", "right"])
+        .describe("Scroll direction"),
+      amount: z
+        .number()
+        .optional()
+        .describe("Number of scroll steps (default: 3)"),
+    }),
+  }
+);
+
+/**
+ * 6. macos_keyboard_type
+ */
+export const macosKeyboardTypeTool = tool(
+  async ({ text }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { keyboard } = await loadNutjs();
+      await keyboard.type(text);
+      return JSON.stringify({ success: true, typed: text });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_keyboard_type",
+    description: "Type a string of text using the keyboard on macOS. Simulates real keystrokes character by character. Use this to fill text fields.",
+    schema: z.object({
+      text: z.string().describe("The text to type"),
+    }),
+  }
+);
+
+/**
+ * 7. macos_key_press
+ */
+export const macosKeyPressTool = tool(
+  async ({ keys }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const { keyboard } = await loadNutjs();
+      const keyValues = await parseKeys(keys);
+
+      if (!keyValues) {
+        return JSON.stringify({
+          success: false,
+          error: `Unrecognised key in: "${keys}". Use names like Command, Shift, Ctrl, Alt, Enter, Space, Tab, Escape, A-Z, F1-F24, etc.`,
+        });
+      }
+
+      await keyboard.pressKey(...(keyValues as [number, ...number[]]));
+      await keyboard.releaseKey(...(keyValues as [number, ...number[]]));
+
+      return JSON.stringify({ success: true, keys });
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: "macos_key_press",
+    description: `Simulate pressing a key or key combination on macOS.
+Supported modifier names: Command (Cmd), Ctrl (Control), Alt (Option), Shift.
+Supported special keys: Enter, Space, Tab, Backspace, Delete, Escape, Home, End, PageUp, PageDown, Left, Right, Up, Down, F1-F24.
+Supported regular keys: A-Z, 0-9.
+Use '+' to combine keys (e.g. "Command+C", "Shift+Enter", "Command+Shift+4").`,
+    schema: z.object({
+      keys: z
+        .string()
+        .describe("Key or key combination to press (e.g. 'Command+C', 'Enter', 'Shift+Tab', 'F5')"),
+    }),
+  }
+);
+
+// -----------------------------------------------------------------------
+// Export
+// -----------------------------------------------------------------------
+
+export default async function getMacosControlTools() {
+  return [
+    macosScreenshotTool,
+    macosGetScreenSizeTool,
+    macosMouseMoveTool,
+    macosMouseClickTool,
+    macosMouseScrollTool,
+    macosKeyboardTypeTool,
+    macosKeyPressTool,
+  ];
+}
