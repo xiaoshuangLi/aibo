@@ -48,14 +48,31 @@ async function loadNutjs() {
 // -----------------------------------------------------------------------
 
 /**
+ * Result returned by compressImage, including the compressed buffer and the
+ * original (pre-compression) source dimensions so callers can compute the
+ * scale factor between the image coordinate space and the screen coordinate
+ * space.
+ */
+interface CompressResult {
+  compressed: Buffer;
+  /** Width of the source image BEFORE resizing (screen/crop coordinates) */
+  srcWidth: number;
+  /** Height of the source image BEFORE resizing (screen/crop coordinates) */
+  srcHeight: number;
+}
+
+/**
  * Compress a PNG Buffer to JPEG, targeting TARGET_SIZE_BYTES.
  * Optionally crops to a region first, then scales down to MAX_WIDTH and
  * iteratively reduces JPEG quality until the output fits within the target.
+ *
+ * Returns the compressed buffer together with the original source dimensions
+ * so the caller can expose coordinate scale factors to the LLM.
  */
 async function compressImage(
   buffer: Buffer,
   region?: { x: number; y: number; width: number; height: number }
-): Promise<Buffer> {
+): Promise<CompressResult> {
   const sharp = await loadSharp();
 
   // Step 1: crop to region if requested
@@ -69,6 +86,7 @@ async function compressImage(
   // Step 2: resolve target width (scale down to MAX_WIDTH if wider)
   const meta = await sharp(source).metadata();
   const srcWidth = meta.width ?? MAX_WIDTH;
+  const srcHeight = meta.height ?? 0;
   const targetWidth = srcWidth > MAX_WIDTH ? MAX_WIDTH : srcWidth;
 
   // Step 3: resize + compress, iterating quality until under TARGET_SIZE_BYTES
@@ -86,7 +104,7 @@ async function compressImage(
       .toBuffer();
   }
 
-  return result;
+  return { compressed: result, srcWidth, srcHeight };
 }
 
 // -----------------------------------------------------------------------
@@ -231,7 +249,7 @@ export const macosScreenshotTool = tool(
         ? { x: region.x, y: region.y, width: region.width, height: region.height }
         : undefined;
 
-      const compressed = await compressImage(raw as Buffer, r);
+      const { compressed, srcWidth, srcHeight } = await compressImage(raw as Buffer, r);
 
       if (save_path) {
         const absPath = path.isAbsolute(save_path)
@@ -247,7 +265,29 @@ export const macosScreenshotTool = tool(
       }
 
       const base64 = compressed.toString("base64");
-      return [{ type: "image_url" as const, image_url: { url: base64 } }] as unknown as string;
+
+      // Get compressed image dimensions via sharp so we can expose the scale
+      // factor to the LLM. The LLM reports coordinates relative to the
+      // compressed image; they must be multiplied by the scale factors to
+      // obtain the actual screen coordinates expected by nut-js.
+      const sharp = await loadSharp();
+      const compressedMeta = await sharp(compressed).metadata();
+      const imgWidth = compressedMeta.width ?? srcWidth;
+      const imgHeight = compressedMeta.height ?? srcHeight;
+
+      const scaleX = imgWidth > 0 ? srcWidth / imgWidth : 1;
+      const scaleY = imgHeight > 0 ? srcHeight / imgHeight : 1;
+
+      const coordNote =
+        `[Coordinate mapping] Screenshot source: ${srcWidth}x${srcHeight} px. ` +
+        `Compressed image delivered to you: ${imgWidth}x${imgHeight} px. ` +
+        `To convert a coordinate from the image to a screen coordinate for mouse tools, ` +
+        `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
+
+      return [
+        { type: "text" as const, text: coordNote },
+        { type: "image_url" as const, image_url: { url: base64 } },
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,

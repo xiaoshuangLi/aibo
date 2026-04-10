@@ -33,7 +33,6 @@ jest.mock('sharp', () => {
   sharpInstance.default = sharpInstance;
   return { default: sharpInstance, __esModule: true };
 }, { virtual: true });
-
 const mockPoint = jest.fn().mockImplementation(function (this: any, x: number, y: number) {
   this.x = x;
   this.y = y;
@@ -123,10 +122,16 @@ describe('macos_screenshot', () => {
   it('returns image data on darwin', async () => {
     setPlatform('darwin');
     const result = await macosScreenshotTool.invoke({});
-    // Should return an array with image_url block
+    // Should return an array with a text coordinate block and an image_url block
     expect(Array.isArray(result)).toBe(true);
-    const blocks = result as unknown as Array<{ type: string; image_url: { url: string } }>;
-    expect(blocks[0].type).toBe('image_url');
+    const blocks = result as unknown as Array<{ type: string; text?: string; image_url?: { url: string } }>;
+    const textBlock = blocks.find((b) => b.type === 'text');
+    const imageBlock = blocks.find((b) => b.type === 'image_url');
+    expect(textBlock).toBeDefined();
+    expect(textBlock!.text).toContain('Coordinate mapping');
+    expect(textBlock!.text).toContain('screen_x');
+    expect(imageBlock).toBeDefined();
+    expect(imageBlock!.image_url?.url).toBeTruthy();
   });
 
   it('passes region to extract when provided', async () => {
