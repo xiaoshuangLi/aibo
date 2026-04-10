@@ -103,11 +103,15 @@ async function compressImage(
  * Composite a red crosshair cursor indicator onto a JPEG image buffer.
  *
  * @param imageBuffer - JPEG image to overlay the cursor on
- * @param cx          - Cursor x position in image pixels
- * @param cy          - Cursor y position in image pixels
- * @param imgWidth    - Image width in pixels
- * @param imgHeight   - Image height in pixels
- * @returns New JPEG buffer with cursor drawn
+ * @param cx          - Cursor x position in image pixel coordinates (0 = left edge).
+ *                      Must already be converted from logical screen coordinates using
+ *                      the same scaleX factor applied to compress the screenshot.
+ *                      Values outside [0, imgWidth) are silently clamped to the edge.
+ * @param cy          - Cursor y position in image pixel coordinates (0 = top edge).
+ *                      Same coordinate space as cx.
+ * @param imgWidth    - Width of the image in pixels (used for bounds clamping)
+ * @param imgHeight   - Height of the image in pixels (used for bounds clamping)
+ * @returns New JPEG buffer with the crosshair drawn at (cx, cy)
  */
 async function overlayMouseCursor(
   imageBuffer: Buffer,
@@ -375,8 +379,10 @@ export const macosScreenshotTool = tool(
         if (cursorImgX >= 0 && cursorImgX < imgWidth && cursorImgY >= 0 && cursorImgY < imgHeight) {
           finalImage = await overlayMouseCursor(compressed, cursorImgX, cursorImgY, imgWidth, imgHeight);
         }
-      } catch {
-        // If cursor position is unavailable, return the plain screenshot.
+      } catch (cursorErr) {
+        // If cursor position is unavailable (e.g. nut-js not installed), return
+        // the plain screenshot without the overlay.
+        console.debug('macos_screenshot: cursor overlay skipped:', cursorErr instanceof Error ? cursorErr.message : cursorErr);
       }
 
       const base64 = finalImage.toString("base64");
