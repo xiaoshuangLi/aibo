@@ -275,8 +275,8 @@ export const macosScreenshotTool = tool(
       const imgWidth = compressedMeta.width ?? srcWidth;
       const imgHeight = compressedMeta.height ?? srcHeight;
 
-      const scaleX = imgWidth > 0 ? srcWidth / imgWidth : 1;
-      const scaleY = imgHeight > 0 ? srcHeight / imgHeight : 1;
+      const scaleX = imgWidth > 0 && srcWidth > 0 ? srcWidth / imgWidth : 1;
+      const scaleY = imgHeight > 0 && srcHeight > 0 ? srcHeight / imgHeight : 1;
 
       const coordNote =
         `[Coordinate mapping] Screenshot source: ${srcWidth}x${srcHeight} px. ` +
