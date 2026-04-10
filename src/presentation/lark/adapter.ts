@@ -486,6 +486,57 @@ export class LarkAdapter extends DefaultAdapter {
     return this.chatService.uploadImage(base64);
   }
 
+  /**
+   * 将图片上传到飞书消息图片库，并在当前对话中以原生图片消息形式发送。
+   * 支持 base64 字符串（不带 data URI 前缀）或 HTTP URL。
+   * 如果上传或发送失败，仅打印警告，不抛出异常。
+   */
+  async sendImageToChat(imageUrl: string): Promise<void> {
+    if (!imageUrl) return;
+
+    await this.chatIdReady;
+
+    const larkConfig = this.getLarkConfig();
+    const isChatMode = this.chatId !== null;
+    const targetReceiveId = isChatMode ? this.chatId! : larkConfig.receiveId;
+    const receiveIdType = isChatMode ? 'chat_id' : 'user_id';
+
+    if (!targetReceiveId) {
+      console.warn('⚠️ sendImageToChat: 无接收 ID，跳过图片发送');
+      return;
+    }
+
+    // Upload the image buffer to Lark im.image API to get an image_key
+    let imageBuffer: Buffer;
+    if (imageUrl.startsWith('http')) {
+      // Download from URL
+      const axios = (await import('axios')).default;
+      const resp = await axios.get<ArrayBuffer>(imageUrl, { responseType: 'arraybuffer' });
+      imageBuffer = Buffer.from(resp.data);
+    } else {
+      // Strip data URI prefix if present (e.g. "data:image/jpeg;base64,...")
+      const base64Data = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
+      imageBuffer = Buffer.from(base64Data, 'base64');
+    }
+
+    const uploadResp = await (this.client as any).im.image.create({
+      data: {
+        image_type: 'message',
+        image: imageBuffer,
+      },
+    });
+
+    const imageKey: string | undefined = uploadResp?.data?.image_key;
+    if (!imageKey) {
+      throw new Error(`上传图片到飞书失败，响应: ${JSON.stringify(uploadResp)}`);
+    }
+
+    // Send native image message through the rate-limited queue
+    await this.sendMessage(
+      JSON.stringify({ msg_type: 'image', content: JSON.stringify({ image_key: imageKey }) })
+    );
+  }
+
   // 事件处理器方法
   private async handleAIResponse(data: { content: string }): Promise<void> {
     if (!data?.content) return;
@@ -614,6 +665,15 @@ export class LarkAdapter extends DefaultAdapter {
       }
       const toolResultMessage = styled.toolResult(data.name || "unknown", data.success, preview);
       await this.sendMessage(toolResultMessage);
+    }
+
+    // Send any images from multimodal tool results (e.g. macos_screenshot)
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      for (const imageUrl of data.images) {
+        await this.sendImageToChat(imageUrl).catch((err) =>
+          console.error('⚠️ 发送图片到飞书失败:', err?.message ?? err)
+        );
+      }
     }
   }
 

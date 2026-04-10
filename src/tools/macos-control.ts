@@ -90,6 +90,51 @@ async function compressImage(
 }
 
 // -----------------------------------------------------------------------
+// Coordinate coercion helpers
+// -----------------------------------------------------------------------
+
+/**
+ * Preprocess tool input to fix the common LLM mistake of passing
+ * `{ x: [xVal, yVal] }` instead of `{ x: xVal, y: yVal }`.
+ *
+ * Handles:
+ *  - `{ x: [100, 200] }` → `{ x: 100, y: 200 }`  (y extracted from array)
+ *  - `{ x: [100], y: [200] }` → `{ x: 100, y: 200 }` (both wrapped in array)
+ *  - `{ x: 100, y: 200 }` → unchanged
+ */
+function coerceXY(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const obj = input as Record<string, unknown>;
+
+  // Helper: convert a value to a number; returns undefined if the result is NaN
+  const toNum = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  // Case 1: x is an array containing both coordinates, y is missing
+  if (Array.isArray(obj.x) && obj.x.length >= 2 && (obj.y === undefined || obj.y === null)) {
+    const nx = toNum(obj.x[0]);
+    const ny = toNum(obj.x[1]);
+    if (nx !== undefined && ny !== undefined) {
+      return { ...obj, x: nx, y: ny };
+    }
+  }
+
+  // Case 2: x and/or y are individually wrapped in arrays
+  const result: Record<string, unknown> = { ...obj };
+  if (Array.isArray(obj.x)) {
+    const nx = toNum(obj.x[0]);
+    if (nx !== undefined) result.x = nx;
+  }
+  if (Array.isArray(obj.y)) {
+    const ny = toNum(obj.y[0]);
+    if (ny !== undefined) result.y = ny;
+  }
+  return result;
+}
+
+// -----------------------------------------------------------------------
 // Key name parser for nut-js
 // -----------------------------------------------------------------------
 
@@ -283,11 +328,11 @@ export const macosMouseMoveTool = tool(
   },
   {
     name: "macos_mouse_move",
-    description: "Move the mouse cursor to the specified screen coordinates (x, y) on macOS.",
-    schema: z.object({
-      x: z.number().describe("Horizontal screen coordinate in pixels"),
-      y: z.number().describe("Vertical screen coordinate in pixels"),
-    }),
+    description: "Move the mouse cursor to the specified screen coordinates (x, y) on macOS. IMPORTANT: x and y must each be a plain number (e.g. x: 100, y: 200). Do NOT pass an array for x or y.",
+    schema: z.preprocess(coerceXY, z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels. Must be a single number, NOT an array."),
+      y: z.number().describe("Vertical screen coordinate in pixels. Must be a single number, NOT an array."),
+    })) as any,
   }
 );
 
@@ -327,10 +372,10 @@ export const macosMouseClickTool = tool(
   },
   {
     name: "macos_mouse_click",
-    description: "Simulate a mouse click at the specified screen coordinates on macOS. Supports left, right, and middle buttons, as well as double-click.",
-    schema: z.object({
-      x: z.number().describe("Horizontal screen coordinate in pixels"),
-      y: z.number().describe("Vertical screen coordinate in pixels"),
+    description: "Simulate a mouse click at the specified screen coordinates on macOS. Supports left, right, and middle buttons, as well as double-click. IMPORTANT: x and y must each be a plain number (e.g. x: 100, y: 200). Do NOT pass an array for x or y.",
+    schema: z.preprocess(coerceXY, z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels. Must be a single number, NOT an array."),
+      y: z.number().describe("Vertical screen coordinate in pixels. Must be a single number, NOT an array."),
       button: z
         .enum(["left", "right", "middle"])
         .optional()
@@ -339,7 +384,7 @@ export const macosMouseClickTool = tool(
         .boolean()
         .optional()
         .describe("Whether to perform a double-click (default: false)"),
-    }),
+    })) as any,
   }
 );
 
@@ -376,10 +421,10 @@ export const macosMouseScrollTool = tool(
   },
   {
     name: "macos_mouse_scroll",
-    description: "Simulate mouse wheel scrolling at the specified screen coordinates on macOS.",
-    schema: z.object({
-      x: z.number().describe("Horizontal screen coordinate in pixels"),
-      y: z.number().describe("Vertical screen coordinate in pixels"),
+    description: "Simulate mouse wheel scrolling at the specified screen coordinates on macOS. IMPORTANT: x and y must each be a plain number (e.g. x: 100, y: 200). Do NOT pass an array for x or y.",
+    schema: z.preprocess(coerceXY, z.object({
+      x: z.number().describe("Horizontal screen coordinate in pixels. Must be a single number, NOT an array."),
+      y: z.number().describe("Vertical screen coordinate in pixels. Must be a single number, NOT an array."),
       direction: z
         .enum(["up", "down", "left", "right"])
         .describe("Scroll direction"),
@@ -387,7 +432,7 @@ export const macosMouseScrollTool = tool(
         .number()
         .optional()
         .describe("Number of scroll steps (default: 3)"),
-    }),
+    })) as any,
   }
 );
 

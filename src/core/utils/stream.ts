@@ -317,9 +317,39 @@ export async function handleToolCall(msg: any, state: StreamState, session: any)
 export function handleToolResult(msg: any, state: StreamState, session: any) {
   if (!msg.tool_call_id || state.abortSignal.aborted) return;
 
+  // Handle multimodal content (e.g. macos_screenshot returns an array with image blocks)
+  if (Array.isArray(msg.content)) {
+    const images: string[] = [];
+    const textParts: string[] = [];
+    for (const part of msg.content) {
+      if (part?.type === 'image_url') {
+        const url: string = part?.image_url?.url || '';
+        if (url) images.push(url);
+      } else if (part?.type === 'image') {
+        const url: string = part?.url || part?.source?.url || '';
+        if (url) images.push(url);
+      } else if (part?.type === 'text') {
+        textParts.push(part.text || '');
+      }
+    }
+
+    const textResult = textParts.join('') || '[Image]';
+    session.adapter?.emit({
+      type: 'toolResult',
+      data: {
+        name: state.lastToolCall?.name || 'unknown',
+        success: true,
+        result: textResult,
+        isTextResult: true,
+        images,
+      },
+      timestamp: Date.now(),
+    });
+    return;
+  }
+
   const result = String(msg.content || "");
   const isJson = result.trim().startsWith("{");
-  let preview = "";
 
   if (isJson) {
     handleJsonToolResult(result, state.lastToolCall, session);
