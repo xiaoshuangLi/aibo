@@ -48,18 +48,16 @@ async function loadNutjs() {
 
 /**
  * Result returned by compressImage, including the compressed buffer and the
- * original (pre-compression) source dimensions so callers can compute the
- * scale factor between the image coordinate space and the screen coordinate
- * space.
+ * source image dimensions.
  *
  * The image dimensions are preserved (no resize) — only JPEG quality is
- * reduced, so image coordinates map 1:1 to physical screen pixels.
+ * reduced, so image coordinates map 1:1 to the captured pixel coordinates.
  */
 interface CompressResult {
   compressed: Buffer;
-  /** Width of the source image BEFORE resizing (screen/crop coordinates) */
+  /** Width of the source image in pixels */
   srcWidth: number;
-  /** Height of the source image BEFORE resizing (screen/crop coordinates) */
+  /** Height of the source image in pixels */
   srcHeight: number;
 }
 
@@ -103,11 +101,8 @@ async function compressImage(
  *
  * @param imageBuffer - JPEG image to overlay the cursor on
  * @param cx          - Cursor x position in image pixel coordinates (0 = left edge).
- *                      Must already be converted from logical screen coordinates using
- *                      the same scaleX factor applied to compress the screenshot.
  *                      Values outside [0, imgWidth) are silently clamped to the edge.
  * @param cy          - Cursor y position in image pixel coordinates (0 = top edge).
- *                      Same coordinate space as cx.
  * @param imgWidth    - Width of the image in pixels (used for bounds clamping)
  * @param imgHeight   - Height of the image in pixels (used for bounds clamping)
  * @returns New JPEG buffer with the cursor arrow drawn with its tip at (cx, cy)
@@ -307,57 +302,13 @@ export const macosScreenshotTool = tool(
       }
 
       // Image dimensions are preserved (no resize), so image coordinates map
-      // 1:1 to physical screen pixels. The only scale factor needed is the
-      // device pixel ratio (DPR) to convert physical → logical coordinates
-      // expected by nut-js.
+      // 1:1 to the captured screen pixels.
       const imgWidth = srcWidth;
       const imgHeight = srcHeight;
 
-      // Retrieve logical screen dimensions from nut-js to compute the DPR.
-      // On a 2× Retina display screenshot-desktop captures at physical
-      // resolution (e.g. 2880×1800) while nut-js uses logical pixels
-      // (e.g. 1440×900).  Fall back to 1:1 when nut-js is unavailable.
-      let logicalScreenWidth = srcWidth;
-      let logicalScreenHeight = srcHeight;
-      try {
-        const { screen } = await loadNutjs();
-        const lw = await screen.width();
-        const lh = await screen.height();
-        if (lw > 0 && lh > 0) {
-          logicalScreenWidth = lw;
-          logicalScreenHeight = lh;
-        }
-      } catch {
-        // Ignore; scale will be approximate
-      }
-
-      // scaleX/scaleY == 1/dpr so that:
-      //   screen_x = image_x * scaleX  (both full-screen and region captures)
-      let scaleX: number;
-      let scaleY: number;
-
-      if (r) {
-        // Region capture: srcWidth is the region width, not the full screen
-        // width, so derive DPR from the full raw screenshot dimensions.
-        const sharpRaw = await loadSharp();
-        const rawMeta = await sharpRaw(raw as Buffer).metadata();
-        const physW = rawMeta.width ?? logicalScreenWidth;
-        const physH = rawMeta.height ?? logicalScreenHeight;
-        const dprX = physW > 0 && logicalScreenWidth > 0 ? physW / logicalScreenWidth : 1;
-        const dprY = physH > 0 && logicalScreenHeight > 0 ? physH / logicalScreenHeight : 1;
-        scaleX = 1 / dprX;
-        scaleY = 1 / dprY;
-      } else {
-        // Full-screen capture: image coords are physical pixels.
-        scaleX = imgWidth > 0 && logicalScreenWidth > 0 ? logicalScreenWidth / imgWidth : 1;
-        scaleY = imgHeight > 0 && logicalScreenHeight > 0 ? logicalScreenHeight / imgHeight : 1;
-      }
-
       const coordNote =
-        `[Coordinate mapping] Image size: ${imgWidth}x${imgHeight} px (physical). ` +
-        `Logical screen: ${logicalScreenWidth}x${logicalScreenHeight} px. ` +
-        `Image coordinates equal physical screen pixels — to get nut-js logical coordinates, ` +
-        `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
+        `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px. ` +
+        `Use image coordinates directly with all mouse tools.`;
 
       // Overlay the current mouse cursor position as a realistic arrow cursor
       // so that the LLM can use it as a visual reference when adjusting coordinates.
@@ -365,13 +316,10 @@ export const macosScreenshotTool = tool(
       try {
         const { mouse: nutMouse } = await loadNutjs();
         const cursorPos = await nutMouse.getPosition();
-        // Convert logical screen coordinates to image (physical pixel) coordinates.
-        // For full-screen: image_x = mouse_x / scaleX
-        // For region: image_x = (mouse_x − region.x) / scaleX  (origin offset)
         const originX = r ? r.x : 0;
         const originY = r ? r.y : 0;
-        const cursorImgX = Math.round((cursorPos.x - originX) / scaleX);
-        const cursorImgY = Math.round((cursorPos.y - originY) / scaleY);
+        const cursorImgX = Math.round(cursorPos.x - originX);
+        const cursorImgY = Math.round(cursorPos.y - originY);
         if (cursorImgX >= 0 && cursorImgX < imgWidth && cursorImgY >= 0 && cursorImgY < imgHeight) {
           finalImage = await overlayMouseCursor(compressed, cursorImgX, cursorImgY, imgWidth, imgHeight);
         }
