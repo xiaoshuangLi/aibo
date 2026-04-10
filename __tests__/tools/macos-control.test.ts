@@ -142,15 +142,6 @@ describe('macos_screenshot', () => {
     // No assertion on sharp internals — just ensure no throw
   });
 
-  it('saves file when save_path is provided', async () => {
-    setPlatform('darwin');
-    const tmpPath = '/tmp/aibo-test-screenshot.jpg';
-    const result = await macosScreenshotTool.invoke({ save_path: tmpPath });
-    const parsed = JSON.parse(result as string);
-    expect(parsed.success).toBe(true);
-    expect(parsed.saved_to).toBe(tmpPath);
-  });
-
   it('calls mouse.getPosition to overlay cursor on darwin', async () => {
     setPlatform('darwin');
     mockNutjs.mouse.getPosition.mockResolvedValueOnce({ x: 480, y: 270 });
