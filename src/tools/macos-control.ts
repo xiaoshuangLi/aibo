@@ -274,7 +274,7 @@ async function parseKeys(keyString: string): Promise<number[] | null> {
  * 1. macos_screenshot
  */
 export const macosScreenshotTool = tool(
-  async ({ region, save_path }) => {
+  async ({ region }) => {
     const platformError = requireMacos();
     if (platformError) return JSON.stringify({ success: false, error: platformError });
 
@@ -287,19 +287,6 @@ export const macosScreenshotTool = tool(
         : undefined;
 
       const { compressed, srcWidth, srcHeight } = await compressImage(raw as Buffer, r);
-
-      if (save_path) {
-        const absPath = path.isAbsolute(save_path)
-          ? save_path
-          : path.join(process.cwd(), save_path);
-        fs.mkdirSync(path.dirname(absPath), { recursive: true });
-        fs.writeFileSync(absPath, compressed);
-        return JSON.stringify({
-          success: true,
-          saved_to: absPath,
-          size_kb: Math.round(compressed.length / 1024),
-        });
-      }
 
       // Image dimensions are preserved (no resize), so image coordinates map
       // 1:1 to the captured screen pixels.
@@ -346,7 +333,6 @@ export const macosScreenshotTool = tool(
     name: "macos_screenshot",
     description: `Capture a screenshot of the macOS screen and return it as a compressed JPEG image (≤300 KB).
 Supports full-screen capture or a specific region (x, y, width, height in logical pixels).
-Optionally saves the screenshot to a file path.
 Returns the image as base64-encoded data for visual analysis by the model.
 Only works on macOS.`,
     schema: z.object({
@@ -359,10 +345,6 @@ Only works on macOS.`,
         })
         .optional()
         .describe("Optional region to capture. Omit to capture the full screen."),
-      save_path: z
-        .string()
-        .optional()
-        .describe("Optional file path to save the screenshot to (e.g. '/tmp/screen.jpg'). When provided, returns save location instead of image data."),
     }),
   }
 );
