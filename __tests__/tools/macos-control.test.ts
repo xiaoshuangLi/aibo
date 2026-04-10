@@ -188,6 +188,25 @@ describe('macos_mouse_move', () => {
     expect(parsed.y).toBe(250);
     expect(mockNutjs.mouse.setPosition).toHaveBeenCalled();
   });
+
+  it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
+    setPlatform('darwin');
+    // Simulate LLM mistake: x is an array containing both coordinates
+    const result = await macosMouseMoveTool.invoke({ x: [150, 250] } as any);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(true);
+    expect(parsed.x).toBe(150);
+    expect(parsed.y).toBe(250);
+  });
+
+  it('coerces {x: [x], y: [y]} to {x, y} on darwin', async () => {
+    setPlatform('darwin');
+    const result = await macosMouseMoveTool.invoke({ x: [150], y: [250] } as any);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(true);
+    expect(parsed.x).toBe(150);
+    expect(parsed.y).toBe(250);
+  });
 });
 
 describe('macos_mouse_click', () => {
@@ -230,6 +249,15 @@ describe('macos_mouse_click', () => {
     expect(parsed.double_click).toBe(true);
     expect(mockNutjs.mouse.doubleClick).toHaveBeenCalled();
   });
+
+  it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
+    setPlatform('darwin');
+    const result = await macosMouseClickTool.invoke({ x: [200, 300] } as any);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(true);
+    expect(parsed.x).toBe(200);
+    expect(parsed.y).toBe(300);
+  });
 });
 
 describe('macos_mouse_scroll', () => {
@@ -270,6 +298,15 @@ describe('macos_mouse_scroll', () => {
     setPlatform('darwin');
     await macosMouseScrollTool.invoke({ x: 400, y: 300, direction: 'right' });
     expect(mockNutjs.mouse.scrollRight).toHaveBeenCalled();
+  });
+
+  it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
+    setPlatform('darwin');
+    const result = await macosMouseScrollTool.invoke({ x: [400, 300], direction: 'down' } as any);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(true);
+    expect(parsed.x).toBe(400);
+    expect(parsed.y).toBe(300);
   });
 });
 
