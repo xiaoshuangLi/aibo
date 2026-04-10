@@ -788,11 +788,10 @@ export class LarkAdapter extends DefaultAdapter {
     }
   }
 
-  private async handleImageUploaded(data: { url: string }): Promise<void> {
-    if (!data?.url) return;
-    await this.sendImageToChat(data.url).catch((err) =>
-      console.error('⚠️ 发送图片预览到飞书失败:', err?.message ?? err)
-    );
+  private async handleImageUploaded(_data: { url: string }): Promise<void> {
+    // Tool-result images (e.g. macos_screenshot) are already sent to chat by
+    // handleToolResult via data.images.  Sending them again here would produce
+    // a duplicate message, so this handler is intentionally a no-op in Lark.
   }
 
   /**

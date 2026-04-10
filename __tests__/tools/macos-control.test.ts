@@ -25,6 +25,7 @@ jest.mock('sharp', () => {
       resize: jest.fn().mockReturnThis(),
       jpeg: jest.fn().mockReturnThis(),
       clone: jest.fn().mockReturnThis(),
+      composite: jest.fn().mockReturnThis(),
       metadata: jest.fn().mockResolvedValue({ width: 1920, height: 1080 }),
       toBuffer: jest.fn().mockResolvedValue(Buffer.alloc(100)),
     };
@@ -48,6 +49,7 @@ const mockNutjs = {
     scrollUp: jest.fn().mockResolvedValue(undefined),
     scrollLeft: jest.fn().mockResolvedValue(undefined),
     scrollRight: jest.fn().mockResolvedValue(undefined),
+    getPosition: jest.fn().mockResolvedValue({ x: 960, y: 540 }),
   },
   keyboard: {
     type: jest.fn().mockResolvedValue(undefined),
@@ -147,6 +149,22 @@ describe('macos_screenshot', () => {
     const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(true);
     expect(parsed.saved_to).toBe(tmpPath);
+  });
+
+  it('calls mouse.getPosition to overlay cursor on darwin', async () => {
+    setPlatform('darwin');
+    mockNutjs.mouse.getPosition.mockResolvedValueOnce({ x: 480, y: 270 });
+    await macosScreenshotTool.invoke({});
+    expect(mockNutjs.mouse.getPosition).toHaveBeenCalled();
+  });
+
+  it('still returns image when getPosition throws', async () => {
+    setPlatform('darwin');
+    mockNutjs.mouse.getPosition.mockRejectedValueOnce(new Error('no cursor'));
+    const result = await macosScreenshotTool.invoke({});
+    expect(Array.isArray(result)).toBe(true);
+    const blocks = result as unknown as Array<{ type: string }>;
+    expect(blocks.find((b) => b.type === 'image_url')).toBeDefined();
   });
 });
 
