@@ -309,6 +309,8 @@ export const macosScreenshotTool = tool(
         const physicalScreenHeight = rawMeta.height ?? srcHeight;
         const dprX = physicalScreenWidth > 0 && logicalScreenWidth > 0 ? physicalScreenWidth / logicalScreenWidth : 1;
         const dprY = physicalScreenHeight > 0 && logicalScreenHeight > 0 ? physicalScreenHeight / logicalScreenHeight : 1;
+        // Convert: compressed → physical region → logical screen
+        // scale = (physical_region / compressed) / dpr = compressed → logical
         scaleX = imgWidth > 0 && srcWidth > 0 ? (srcWidth / imgWidth) / dprX : 1;
         scaleY = imgHeight > 0 && srcHeight > 0 ? (srcHeight / imgHeight) / dprY : 1;
       } else {

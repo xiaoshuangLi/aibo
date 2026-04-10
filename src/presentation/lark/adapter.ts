@@ -527,6 +527,9 @@ export class LarkAdapter extends DefaultAdapter {
       },
     });
 
+    // The Lark IM SDK may return image_key at the root level of the response
+    // object or nested under a `data` key depending on the SDK version; check
+    // both locations for compatibility.
     const imageKey: string | undefined = uploadResp?.image_key ?? uploadResp?.data?.image_key;
     if (!imageKey) {
       throw new Error(`上传图片到飞书失败，响应: ${JSON.stringify(uploadResp)}`);
