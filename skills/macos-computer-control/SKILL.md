@@ -75,7 +75,7 @@ macos_screenshot({ save_path: "/tmp/screen.jpg" })
 ```
 macos_get_screen_size()   → { width: 2560, height: 1600 }
 ```
-Use the returned dimensions to calculate region coordinates or to understand the scale of the screen.
+Use the returned dimensions to calculate region coordinates for `macos_screenshot`.
 
 ## 🖱️ Mouse Control Tips
 
@@ -168,7 +168,7 @@ macos_key_press({ keys: "Command+Shift+4" })
 
 - **macOS only**: All tools return an error on non-macOS platforms.
 - **Permissions**: macOS requires Screen Recording and Accessibility permissions. Grant these to the Terminal / app running AIBO in System Settings → Privacy & Security.
-- **Retina displays**: Logical coordinates (what you pass to tools) are in CSS/logical pixels. On a Retina display the screenshot image will be at double the logical resolution. Use `macos_get_screen_size` to get logical dimensions.
+- **Coordinate system**: Screenshot image coordinates correspond directly to the screen coordinates used by all mouse tools — no scaling or conversion needed.
 - **Coordinate accuracy**: Always take a screenshot first and estimate coordinates from the image before clicking. Re-verify after clicking.
 - **Timing**: If an action triggers an animation or loading, take a screenshot after a brief wait to ensure the UI has settled before the next action.
 - **Region screenshots**: Prefer region screenshots to reduce image size and improve model focus on the relevant area.

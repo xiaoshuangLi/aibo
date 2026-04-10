@@ -130,8 +130,8 @@ describe('macos_screenshot', () => {
     const textBlock = blocks.find((b) => b.type === 'text');
     const imageBlock = blocks.find((b) => b.type === 'image_url');
     expect(textBlock).toBeDefined();
-    expect(textBlock!.text).toContain('Coordinate mapping');
-    expect(textBlock!.text).toContain('screen_x');
+    expect(textBlock!.text).toContain('Image info');
+    expect(textBlock!.text).toContain('Screenshot size');
     expect(imageBlock).toBeDefined();
     expect(imageBlock!.image_url?.url).toBeTruthy();
   });
