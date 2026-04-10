@@ -65,6 +65,7 @@ export class TerminalAdapter extends DefaultAdapter {
     this.on('rawText', this.handleRawText.bind(this));
     this.on('toolProgress', this.handleToolProgress.bind(this));
     this.on('acpResponse', this.handleAcpResponse.bind(this));
+    this.on('imageUploaded', this.handleImageUploaded.bind(this));
   }
 
   private setupProcessHandlers(): void {
@@ -283,6 +284,12 @@ export class TerminalAdapter extends DefaultAdapter {
   private handleRawText(data: { text: string }): void {
     if (data?.text) {
       console.log(data.text);
+    }
+  }
+
+  private handleImageUploaded(data: { url: string }): void {
+    if (data?.url) {
+      console.log(styled.system(`🖼️ 图片上传完成: ${data.url}`));
     }
   }
 

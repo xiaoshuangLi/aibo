@@ -271,11 +271,9 @@ export class Session {
   async uploadImage(base64: string): Promise<string> {
     const uploaded = await this.adapter.uploadImage(base64);
 
-    const message = `上传生成：\`${uploaded}\``;
-
     this.adapter.emit({
-      type: 'systemMessage',
-      data: { message },
+      type: 'imageUploaded',
+      data: { url: uploaded },
       timestamp: Date.now()
     });
 

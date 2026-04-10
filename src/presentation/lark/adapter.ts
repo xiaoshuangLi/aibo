@@ -158,6 +158,7 @@ export class LarkAdapter extends DefaultAdapter {
     this.on('rawText', this.handleRawText.bind(this));
     this.on('toolProgress', this.handleToolProgress.bind(this));
     this.on('acpResponse', this.handleAcpResponse.bind(this));
+    this.on('imageUploaded', this.handleImageUploaded.bind(this));
   }
 
   /**
@@ -526,7 +527,7 @@ export class LarkAdapter extends DefaultAdapter {
       },
     });
 
-    const imageKey: string | undefined = uploadResp?.data?.image_key;
+    const imageKey: string | undefined = uploadResp?.image_key ?? uploadResp?.data?.image_key;
     if (!imageKey) {
       throw new Error(`上传图片到飞书失败，响应: ${JSON.stringify(uploadResp)}`);
     }
@@ -782,6 +783,13 @@ export class LarkAdapter extends DefaultAdapter {
     if (data?.text) {
       await this.sendMessage(styled.system('📃 原始文本', data.text));
     }
+  }
+
+  private async handleImageUploaded(data: { url: string }): Promise<void> {
+    if (!data?.url) return;
+    await this.sendImageToChat(data.url).catch((err) =>
+      console.error('⚠️ 发送图片预览到飞书失败:', err?.message ?? err)
+    );
   }
 
   /**

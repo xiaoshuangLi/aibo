@@ -30,6 +30,7 @@ export type OutputEventType =
   | 'rawText'             // 原始文本输出
   | 'toolProgress'        // 工具执行过程中的实时输出
   | 'acpResponse'         // ACP 直传模式：从编程工具收到的响应
+  | 'imageUploaded'       // 图片上传完成，携带访问 URL
 
 /**
  * 输出事件数据接口
