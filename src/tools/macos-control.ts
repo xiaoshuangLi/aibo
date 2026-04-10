@@ -275,13 +275,54 @@ export const macosScreenshotTool = tool(
       const imgWidth = compressedMeta.width ?? srcWidth;
       const imgHeight = compressedMeta.height ?? srcHeight;
 
-      const scaleX = imgWidth > 0 && srcWidth > 0 ? srcWidth / imgWidth : 1;
-      const scaleY = imgHeight > 0 && srcHeight > 0 ? srcHeight / imgHeight : 1;
+      // Retrieve logical screen dimensions from nut-js so that the computed
+      // scale factors account for Retina/HiDPI pixel doubling.  On a 2×
+      // Retina display screenshot-desktop captures at physical resolution
+      // (e.g. 2880×1800) while nut-js mouse coordinates are in logical pixels
+      // (e.g. 1440×900).  Falling back to srcWidth/srcHeight when nut-js is
+      // unavailable keeps the tool functional on non-macOS systems.
+      let logicalScreenWidth = srcWidth;
+      let logicalScreenHeight = srcHeight;
+      try {
+        const { screen } = await loadNutjs();
+        const lw = await screen.width();
+        const lh = await screen.height();
+        if (lw > 0 && lh > 0) {
+          logicalScreenWidth = lw;
+          logicalScreenHeight = lh;
+        }
+      } catch {
+        // Ignore; scale will be approximate
+      }
+
+      let scaleX: number;
+      let scaleY: number;
+
+      if (r) {
+        // Region capture: srcWidth/srcHeight are the physical pixel dimensions
+        // of the cropped region.  Derive the device pixel ratio from the
+        // physical screenshot dimensions vs logical screen size, then apply
+        // it to get the logical scale.
+        const sharpRaw = await loadSharp();
+        const rawMeta = await sharpRaw(raw as Buffer).metadata();
+        const physicalScreenWidth = rawMeta.width ?? srcWidth;
+        const physicalScreenHeight = rawMeta.height ?? srcHeight;
+        const dprX = physicalScreenWidth > 0 && logicalScreenWidth > 0 ? physicalScreenWidth / logicalScreenWidth : 1;
+        const dprY = physicalScreenHeight > 0 && logicalScreenHeight > 0 ? physicalScreenHeight / logicalScreenHeight : 1;
+        // Convert: compressed → physical region → logical screen
+        // scale = (physical_region / compressed) / dpr = compressed → logical
+        scaleX = imgWidth > 0 && srcWidth > 0 ? (srcWidth / imgWidth) / dprX : 1;
+        scaleY = imgHeight > 0 && srcHeight > 0 ? (srcHeight / imgHeight) / dprY : 1;
+      } else {
+        // Full-screen capture: map directly from image coords to logical coords.
+        scaleX = imgWidth > 0 && logicalScreenWidth > 0 ? logicalScreenWidth / imgWidth : 1;
+        scaleY = imgHeight > 0 && logicalScreenHeight > 0 ? logicalScreenHeight / imgHeight : 1;
+      }
 
       const coordNote =
-        `[Coordinate mapping] Screenshot source: ${srcWidth}x${srcHeight} px. ` +
+        `[Coordinate mapping] Logical screen: ${logicalScreenWidth}x${logicalScreenHeight} px. ` +
         `Compressed image delivered to you: ${imgWidth}x${imgHeight} px. ` +
-        `To convert a coordinate from the image to a screen coordinate for mouse tools, ` +
+        `To convert a coordinate from the image to a nut-js screen coordinate for mouse tools, ` +
         `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
 
       return [
