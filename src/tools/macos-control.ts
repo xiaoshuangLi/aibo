@@ -204,8 +204,8 @@ async function captureScreenBlocks(
   const imgHeight = srcHeight;
 
   const coordNote =
-    `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px. ` +
-    `Use logical screen coordinates with all mouse tools.`;
+    `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px (physical/Retina pixels). ` +
+    `Use logical screen coordinates (not physical pixels) with all mouse tools.`;
 
   let finalImage = compressed;
   if (cursorPos !== null) {
