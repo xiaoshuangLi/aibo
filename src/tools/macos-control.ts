@@ -106,15 +106,31 @@ function coerceXY(input: unknown): unknown {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
   const obj = input as Record<string, unknown>;
 
+  // Helper: convert a value to a number; returns undefined if the result is NaN
+  const toNum = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
   // Case 1: x is an array containing both coordinates, y is missing
   if (Array.isArray(obj.x) && obj.x.length >= 2 && (obj.y === undefined || obj.y === null)) {
-    return { ...obj, x: Number(obj.x[0]), y: Number(obj.x[1]) };
+    const nx = toNum(obj.x[0]);
+    const ny = toNum(obj.x[1]);
+    if (nx !== undefined && ny !== undefined) {
+      return { ...obj, x: nx, y: ny };
+    }
   }
 
   // Case 2: x and/or y are individually wrapped in arrays
   const result: Record<string, unknown> = { ...obj };
-  if (Array.isArray(obj.x)) result.x = Number(obj.x[0]);
-  if (Array.isArray(obj.y)) result.y = Number(obj.y[0]);
+  if (Array.isArray(obj.x)) {
+    const nx = toNum(obj.x[0]);
+    if (nx !== undefined) result.x = nx;
+  }
+  if (Array.isArray(obj.y)) {
+    const ny = toNum(obj.y[0]);
+    if (ny !== undefined) result.y = ny;
+  }
   return result;
 }
 
