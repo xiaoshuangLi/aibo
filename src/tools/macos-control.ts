@@ -48,39 +48,40 @@ async function loadNutjs() {
 
 /**
  * Result returned by compressImage, including the compressed buffer and the
- * original (pre-compression) source dimensions so callers can compute the
- * scale factor between the image coordinate space and the screen coordinate
- * space.
+ * final image dimensions after any optional resize.
  *
- * The image dimensions are preserved (no resize) — only JPEG quality is
- * reduced, so image coordinates map 1:1 to physical screen pixels.
+ * When targetWidth/targetHeight are provided the image is resized to those
+ * dimensions so that image pixel coordinates map 1:1 to logical screen
+ * coordinates — no scale factor is required by the caller.
  */
 interface CompressResult {
   compressed: Buffer;
-  /** Width of the source image BEFORE resizing (screen/crop coordinates) */
-  srcWidth: number;
-  /** Height of the source image BEFORE resizing (screen/crop coordinates) */
-  srcHeight: number;
+  /** Width of the output image in pixels */
+  imgWidth: number;
+  /** Height of the output image in pixels */
+  imgHeight: number;
 }
 
 async function compressImage(
   buffer: Buffer,
-  region?: { x: number; y: number; width: number; height: number }
+  targetWidth?: number,
+  targetHeight?: number,
 ): Promise<CompressResult> {
   const sharp = await loadSharp();
 
-  // Step 1: crop to region if requested
+  // Step 1: resize to target dimensions if provided (e.g. logical screen size
+  // on a Retina display so that image coords == logical screen coords).
   let source: Buffer = buffer;
-  if (region) {
+  if (targetWidth && targetHeight) {
     source = await sharp(buffer)
-      .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
+      .resize(targetWidth, targetHeight, { fit: "fill" })
       .toBuffer();
   }
 
-  // Step 2: read source dimensions (preserved in output — no resize)
+  // Step 2: read output dimensions
   const meta = await sharp(source).metadata();
-  const srcWidth = meta.width ?? 0;
-  const srcHeight = meta.height ?? 0;
+  const imgWidth = meta.width ?? 0;
+  const imgHeight = meta.height ?? 0;
 
   // Step 3: compress to JPEG, iterating quality until under TARGET_SIZE_BYTES
   let quality = JPEG_QUALITY_INITIAL;
@@ -95,19 +96,17 @@ async function compressImage(
       .toBuffer();
   }
 
-  return { compressed: result, srcWidth, srcHeight };
+  return { compressed: result, imgWidth, imgHeight };
 }
 
 /**
  * Composite a realistic arrow cursor indicator onto a JPEG image buffer.
  *
  * @param imageBuffer - JPEG image to overlay the cursor on
- * @param cx          - Cursor x position in image pixel coordinates (0 = left edge).
- *                      Must already be converted from logical screen coordinates using
- *                      the same scaleX factor applied to compress the screenshot.
- *                      Values outside [0, imgWidth) are silently clamped to the edge.
- * @param cy          - Cursor y position in image pixel coordinates (0 = top edge).
- *                      Same coordinate space as cx.
+ * @param cx          - Cursor x in image pixel coordinates (== logical screen_x
+ *                      because the image is pre-resized to logical dimensions).
+ *                      Values outside [0, imgWidth) are silently clamped.
+ * @param cy          - Cursor y in image pixel coordinates. Same space as cx.
  * @param imgWidth    - Width of the image in pixels (used for bounds clamping)
  * @param imgHeight   - Height of the image in pixels (used for bounds clamping)
  * @returns New JPEG buffer with the cursor arrow drawn with its tip at (cx, cy)
@@ -279,7 +278,7 @@ async function parseKeys(keyString: string): Promise<number[] | null> {
  * 1. macos_screenshot
  */
 export const macosScreenshotTool = tool(
-  async ({ region, save_path }) => {
+  async ({ save_path }) => {
     const platformError = requireMacos();
     if (platformError) return JSON.stringify({ success: false, error: platformError });
 
@@ -287,11 +286,31 @@ export const macosScreenshotTool = tool(
       const screenshot = await loadScreenshot();
       const raw = await screenshot({ format: "png" });
 
-      const r = region
-        ? { x: region.x, y: region.y, width: region.width, height: region.height }
-        : undefined;
+      // Retrieve logical screen dimensions from nut-js.
+      // On a 2× Retina display screenshot-desktop captures at physical
+      // resolution (e.g. 2880×1800) while nut-js uses logical pixels
+      // (e.g. 1440×900).  By resizing the image to logical dimensions we
+      // ensure image pixel coordinates equal logical screen coordinates
+      // directly — no scale factor is needed.
+      let logicalScreenWidth: number | undefined;
+      let logicalScreenHeight: number | undefined;
+      try {
+        const { screen } = await loadNutjs();
+        const lw = await screen.width();
+        const lh = await screen.height();
+        if (lw > 0 && lh > 0) {
+          logicalScreenWidth = lw;
+          logicalScreenHeight = lh;
+        }
+      } catch {
+        // Ignore; will use physical dimensions
+      }
 
-      const { compressed, srcWidth, srcHeight } = await compressImage(raw as Buffer, r);
+      const { compressed, imgWidth, imgHeight } = await compressImage(
+        raw as Buffer,
+        logicalScreenWidth,
+        logicalScreenHeight,
+      );
 
       if (save_path) {
         const absPath = path.isAbsolute(save_path)
@@ -306,58 +325,18 @@ export const macosScreenshotTool = tool(
         });
       }
 
-      // Image dimensions are preserved (no resize), so image coordinates map
-      // 1:1 to physical screen pixels. The only scale factor needed is the
-      // device pixel ratio (DPR) to convert physical → logical coordinates
-      // expected by nut-js.
-      const imgWidth = srcWidth;
-      const imgHeight = srcHeight;
-
-      // Retrieve logical screen dimensions from nut-js to compute the DPR.
-      // On a 2× Retina display screenshot-desktop captures at physical
-      // resolution (e.g. 2880×1800) while nut-js uses logical pixels
-      // (e.g. 1440×900).  Fall back to 1:1 when nut-js is unavailable.
-      let logicalScreenWidth = srcWidth;
-      let logicalScreenHeight = srcHeight;
-      try {
-        const { screen } = await loadNutjs();
-        const lw = await screen.width();
-        const lh = await screen.height();
-        if (lw > 0 && lh > 0) {
-          logicalScreenWidth = lw;
-          logicalScreenHeight = lh;
-        }
-      } catch {
-        // Ignore; scale will be approximate
-      }
-
-      // scaleX/scaleY == 1/dpr so that:
-      //   screen_x = image_x * scaleX  (both full-screen and region captures)
-      let scaleX: number;
-      let scaleY: number;
-
-      if (r) {
-        // Region capture: srcWidth is the region width, not the full screen
-        // width, so derive DPR from the full raw screenshot dimensions.
-        const sharpRaw = await loadSharp();
-        const rawMeta = await sharpRaw(raw as Buffer).metadata();
-        const physW = rawMeta.width ?? logicalScreenWidth;
-        const physH = rawMeta.height ?? logicalScreenHeight;
-        const dprX = physW > 0 && logicalScreenWidth > 0 ? physW / logicalScreenWidth : 1;
-        const dprY = physH > 0 && logicalScreenHeight > 0 ? physH / logicalScreenHeight : 1;
-        scaleX = 1 / dprX;
-        scaleY = 1 / dprY;
-      } else {
-        // Full-screen capture: image coords are physical pixels.
-        scaleX = imgWidth > 0 && logicalScreenWidth > 0 ? logicalScreenWidth / imgWidth : 1;
-        scaleY = imgHeight > 0 && logicalScreenHeight > 0 ? logicalScreenHeight / imgHeight : 1;
-      }
+      // The image has been resized to logical screen dimensions, so every
+      // pixel in the image corresponds directly to one logical screen pixel.
+      // screen_x == image_x and screen_y == image_y — no scaling needed.
+      const screenW = imgWidth;
+      const screenH = imgHeight;
 
       const coordNote =
-        `[Coordinate mapping] Image size: ${imgWidth}x${imgHeight} px (physical). ` +
-        `Logical screen: ${logicalScreenWidth}x${logicalScreenHeight} px. ` +
-        `Image coordinates equal physical screen pixels — to get nut-js logical coordinates, ` +
-        `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
+        `[Coordinate system] This is a full-screen screenshot resized to the logical screen resolution: ${screenW}×${screenH} px. ` +
+        `IMPORTANT: image pixel coordinates map 1-to-1 to screen coordinates. ` +
+        `screen_x = image_x, screen_y = image_y — do NOT apply any scale factor. ` +
+        `The top-left corner of the screen is (0, 0). The bottom-right corner is (${screenW - 1}, ${screenH - 1}). ` +
+        `To find the coordinates of a UI element, locate it visually in the image and read its pixel position directly.`;
 
       // Overlay the current mouse cursor position as a realistic arrow cursor
       // so that the LLM can use it as a visual reference when adjusting coordinates.
@@ -365,13 +344,9 @@ export const macosScreenshotTool = tool(
       try {
         const { mouse: nutMouse } = await loadNutjs();
         const cursorPos = await nutMouse.getPosition();
-        // Convert logical screen coordinates to image (physical pixel) coordinates.
-        // For full-screen: image_x = mouse_x / scaleX
-        // For region: image_x = (mouse_x − region.x) / scaleX  (origin offset)
-        const originX = r ? r.x : 0;
-        const originY = r ? r.y : 0;
-        const cursorImgX = Math.round((cursorPos.x - originX) / scaleX);
-        const cursorImgY = Math.round((cursorPos.y - originY) / scaleY);
+        // Image is at logical resolution, so cursor logical coords == image coords.
+        const cursorImgX = Math.round(cursorPos.x);
+        const cursorImgY = Math.round(cursorPos.y);
         if (cursorImgX >= 0 && cursorImgX < imgWidth && cursorImgY >= 0 && cursorImgY < imgHeight) {
           finalImage = await overlayMouseCursor(compressed, cursorImgX, cursorImgY, imgWidth, imgHeight);
         }
@@ -396,21 +371,12 @@ export const macosScreenshotTool = tool(
   },
   {
     name: "macos_screenshot",
-    description: `Capture a screenshot of the macOS screen and return it as a compressed JPEG image (≤300 KB).
-Supports full-screen capture or a specific region (x, y, width, height in logical pixels).
+    description: `Capture a full-screen screenshot of the macOS display and return it as a compressed JPEG image (≤300 KB).
+The image is automatically resized to match the logical screen resolution so that image pixel coordinates equal screen coordinates directly.
 Optionally saves the screenshot to a file path.
 Returns the image as base64-encoded data for visual analysis by the model.
 Only works on macOS.`,
     schema: z.object({
-      region: z
-        .object({
-          x: z.number().describe("Left edge of the capture region in screen pixels"),
-          y: z.number().describe("Top edge of the capture region in screen pixels"),
-          width: z.number().describe("Width of the capture region in screen pixels"),
-          height: z.number().describe("Height of the capture region in screen pixels"),
-        })
-        .optional()
-        .describe("Optional region to capture. Omit to capture the full screen."),
       save_path: z
         .string()
         .optional()
@@ -441,7 +407,7 @@ export const macosGetScreenSizeTool = tool(
   },
   {
     name: "macos_get_screen_size",
-    description: "Get the current screen dimensions (width and height in pixels) on macOS. Use this before taking region screenshots or calculating click coordinates.",
+    description: "Get the current logical screen dimensions (width and height in pixels) on macOS. The screenshot image is resized to these dimensions, so image coordinates equal screen coordinates directly.",
     schema: z.object({}),
   }
 );

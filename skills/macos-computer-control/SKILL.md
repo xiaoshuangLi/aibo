@@ -9,7 +9,7 @@ description: Control a macOS computer through vision — take compressed screens
 
 This skill lets the agent **see and operate a macOS desktop** to complete any goal the user describes. It combines:
 
-- **Vision**: compressed screenshots (≤300 KB JPEG) of the full screen or a specific region
+- **Vision**: full-screen compressed screenshots (≤300 KB JPEG) at logical screen resolution
 - **Mouse control**: move cursor, left/right/middle click, double-click, scroll
 - **Keyboard control**: type text character by character, press key combinations
 
@@ -24,8 +24,8 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 
 | Tool | Purpose |
 |------|---------|
-| `macos_screenshot` | Capture full screen or a region as a compressed JPEG (≤300 KB) |
-| `macos_get_screen_size` | Return screen width × height in pixels |
+| `macos_screenshot` | Capture the full screen as a compressed JPEG (≤300 KB) |
+| `macos_get_screen_size` | Return logical screen width × height in pixels |
 | `macos_mouse_move` | Move the cursor to (x, y) |
 | `macos_mouse_click` | Click at (x, y) — left / right / middle, single or double |
 | `macos_mouse_scroll` | Scroll up / down / left / right at (x, y) |
@@ -38,8 +38,8 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 1. GET SCREEN STATE
    └─ macos_screenshot() → see what is currently on screen
 
-2. PLAN the next action
-   └─ identify target element and its approximate (x, y) coordinates
+2. IDENTIFY COORDINATES
+   └─ examine the returned image carefully; read pixel positions directly
 
 3. ACT
    ├─ macos_mouse_click(x, y)        — click a button / link
@@ -52,30 +52,36 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 5. REPEAT until goal is complete
 ```
 
-## 🖼️ Screenshot Tips
+## 🖼️ Screenshot & Coordinate Reading
 
-### Full-screen capture (default)
+### Full-screen capture (always)
 ```
 macos_screenshot()
 ```
 
-### Region capture — reduces token cost and focuses attention
+The screenshot is **always the full screen**, automatically resized to the logical screen resolution. This means:
+
+> **image_x = screen_x** and **image_y = screen_y** — pixel coordinates in the image ARE the coordinates to pass to mouse tools. No conversion or scaling is needed.
+
+### How to read coordinates from the screenshot
+
+1. **Look at the full image** — it represents the entire screen at logical resolution.
+2. **Locate the target element** (button, input field, link, icon, etc.) visually.
+3. **Estimate its center pixel position** in the image — that is your `(x, y)`.
+4. **Use those values directly** in `macos_mouse_click`, `macos_mouse_move`, etc.
+
+> ⚠️ The coordinate note returned with each screenshot tells you the exact image dimensions (= screen dimensions). Use them as a sanity check: coordinates must be within `[0, width-1]` × `[0, height-1]`.
+
+### Getting screen dimensions
 ```
-macos_screenshot({
-  region: { x: 100, y: 50, width: 800, height: 600 }
-})
+macos_get_screen_size()   → { width: 1440, height: 900 }
 ```
+The screenshot image will be exactly this size, so coordinates are directly comparable.
 
 ### Save to file (e.g. for debugging)
 ```
 macos_screenshot({ save_path: "/tmp/screen.jpg" })
 ```
-
-### Getting screen dimensions first
-```
-macos_get_screen_size()   → { width: 2560, height: 1600 }
-```
-Use the returned dimensions to calculate region coordinates or to understand the scale of the screen.
 
 ## 🖱️ Mouse Control Tips
 
@@ -146,10 +152,10 @@ macos_key_press({ keys: "Command+Shift+4" })
 ## 🔄 Example: Click a Button by Location
 
 ```
-1. macos_screenshot()                              // See screen
-2. Identify button at approximately (760, 540)
-3. macos_mouse_click({ x: 760, y: 540 })           // Click it
-4. macos_screenshot()                              // Confirm result
+1. macos_screenshot()
+   → Image is 1440×900. Spot the "Submit" button at roughly x=760, y=540 in the image.
+2. macos_mouse_click({ x: 760, y: 540 })   // Use image coords directly
+3. macos_screenshot()                      // Confirm result
 ```
 
 ## 🔄 Example: Fill a Form
@@ -168,10 +174,9 @@ macos_key_press({ keys: "Command+Shift+4" })
 
 - **macOS only**: All tools return an error on non-macOS platforms.
 - **Permissions**: macOS requires Screen Recording and Accessibility permissions. Grant these to the Terminal / app running AIBO in System Settings → Privacy & Security.
-- **Retina displays**: Logical coordinates (what you pass to tools) are in CSS/logical pixels. On a Retina display the screenshot image will be at double the logical resolution. Use `macos_get_screen_size` to get logical dimensions.
-- **Coordinate accuracy**: Always take a screenshot first and estimate coordinates from the image before clicking. Re-verify after clicking.
+- **Coordinate accuracy**: The screenshot is resized to logical screen resolution. Image pixel = screen coordinate — read positions directly from the image without any scaling. Take a new screenshot before each action to get fresh coordinates.
+- **Cursor overlay**: The screenshot includes a visual arrow cursor showing where the mouse currently is. Use it to confirm your last click landed in the right place.
 - **Timing**: If an action triggers an animation or loading, take a screenshot after a brief wait to ensure the UI has settled before the next action.
-- **Region screenshots**: Prefer region screenshots to reduce image size and improve model focus on the relevant area.
 
 ## 🚫 Anti-Patterns
 
@@ -179,6 +184,6 @@ macos_key_press({ keys: "Command+Shift+4" })
 |---|---|---|
 | Acting without a screenshot | You may click the wrong place | Always screenshot first |
 | Hardcoding coordinates | Screen layout changes | Re-screenshot each step |
+| Applying a scale factor to image coordinates | The image is already at logical resolution — scaling creates errors | Use image pixel coords directly as screen coords |
 | Typing without focusing the field | Keystrokes go nowhere | Click the field first |
-| Large full-screen screenshots for every step | Wastes tokens | Use region screenshots for follow-up steps |
 | Not verifying after action | Silent failures go undetected | Screenshot after every action |

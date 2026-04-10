@@ -130,16 +130,10 @@ describe('macos_screenshot', () => {
     const textBlock = blocks.find((b) => b.type === 'text');
     const imageBlock = blocks.find((b) => b.type === 'image_url');
     expect(textBlock).toBeDefined();
-    expect(textBlock!.text).toContain('Coordinate mapping');
-    expect(textBlock!.text).toContain('screen_x');
+    expect(textBlock!.text).toContain('Coordinate system');
+    expect(textBlock!.text).toContain('screen_x = image_x');
     expect(imageBlock).toBeDefined();
     expect(imageBlock!.image_url?.url).toBeTruthy();
-  });
-
-  it('passes region to extract when provided', async () => {
-    setPlatform('darwin');
-    await macosScreenshotTool.invoke({ region: { x: 10, y: 20, width: 300, height: 200 } });
-    // No assertion on sharp internals — just ensure no throw
   });
 
   it('saves file when save_path is provided', async () => {
