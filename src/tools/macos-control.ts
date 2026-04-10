@@ -303,7 +303,8 @@ export const macosScreenshotTool = tool(
           logicalScreenHeight = lh;
         }
       } catch {
-        // Ignore; will use physical dimensions
+        // Ignore; resize step will be skipped and the image will stay at
+        // physical resolution — the coordinate note below reflects this.
       }
 
       const { compressed, imgWidth, imgHeight } = await compressImage(
@@ -325,18 +326,25 @@ export const macosScreenshotTool = tool(
         });
       }
 
-      // The image has been resized to logical screen dimensions, so every
-      // pixel in the image corresponds directly to one logical screen pixel.
-      // screen_x == image_x and screen_y == image_y — no scaling needed.
-      const screenW = imgWidth;
-      const screenH = imgHeight;
-
-      const coordNote =
-        `[Coordinate system] This is a full-screen screenshot resized to the logical screen resolution: ${screenW}×${screenH} px. ` +
-        `IMPORTANT: image pixel coordinates map 1-to-1 to screen coordinates. ` +
-        `screen_x = image_x, screen_y = image_y — do NOT apply any scale factor. ` +
-        `The top-left corner of the screen is (0, 0). The bottom-right corner is (${screenW - 1}, ${screenH - 1}). ` +
-        `To find the coordinates of a UI element, locate it visually in the image and read its pixel position directly.`;
+      // Build coordinate note.  When nut-js provided logical dimensions the
+      // image was resized to match them, so image coords == screen coords (1:1).
+      // When nut-js was unavailable the image remains at physical resolution
+      // and the LLM must apply a scale factor using macos_get_screen_size.
+      let coordNote: string;
+      if (logicalScreenWidth && logicalScreenHeight) {
+        coordNote =
+          `[Coordinate system] This is a full-screen screenshot resized to the logical screen resolution: ${imgWidth}×${imgHeight} px. ` +
+          `IMPORTANT: image pixel coordinates map 1-to-1 to screen coordinates. ` +
+          `screen_x = image_x, screen_y = image_y — do NOT apply any scale factor. ` +
+          `The top-left corner of the screen is (0, 0). The bottom-right corner is (${imgWidth - 1}, ${imgHeight - 1}). ` +
+          `To find the coordinates of a UI element, locate it visually in the image and read its pixel position directly.`;
+      } else {
+        coordNote =
+          `[Coordinate system] This is a full-screen screenshot at the raw capture resolution: ${imgWidth}×${imgHeight} px. ` +
+          `WARNING: logical screen dimensions could not be determined. ` +
+          `Call macos_get_screen_size to get the logical screen size, then compute: ` +
+          `screen_x = image_x × (logical_width / ${imgWidth}), screen_y = image_y × (logical_height / ${imgHeight}).`;
+      }
 
       // Overlay the current mouse cursor position as a realistic arrow cursor
       // so that the LLM can use it as a visual reference when adjusting coordinates.
