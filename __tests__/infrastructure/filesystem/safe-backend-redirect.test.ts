@@ -106,7 +106,7 @@ describe('SafeFilesystemBackend – redirectDeepagentsPath', () => {
     fs.writeFileSync(expectedFile, content, 'utf-8');
 
     const readResult = await backend.read(virtualPath);
-    expect(readResult).toContain('Session data here.');
+    expect(readResult.content).toContain('Session data here.');
 
     // Cleanup
     fs.rmSync(expectedFile, { force: true });
