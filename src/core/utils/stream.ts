@@ -616,7 +616,8 @@ export async function processStreamChunks(
       
       // 使用更可靠的去重机制 - 基于消息内容或ID
       const newMessages = messages.filter((msg: any) => {
-        const messageId = msg.id || msg.content?.substring(0, 50) || JSON.stringify(msg);
+        const contentStr = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+        const messageId = msg.id || contentStr?.substring(0, 50) || JSON.stringify(msg);
         if (processedMessageIds.has(messageId)) {
           return false;
         }

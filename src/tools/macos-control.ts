@@ -100,7 +100,7 @@ async function compressImage(
 }
 
 /**
- * Composite a red crosshair cursor indicator onto a JPEG image buffer.
+ * Composite a realistic arrow cursor indicator onto a JPEG image buffer.
  *
  * @param imageBuffer - JPEG image to overlay the cursor on
  * @param cx          - Cursor x position in image pixel coordinates (0 = left edge).
@@ -111,7 +111,7 @@ async function compressImage(
  *                      Same coordinate space as cx.
  * @param imgWidth    - Width of the image in pixels (used for bounds clamping)
  * @param imgHeight   - Height of the image in pixels (used for bounds clamping)
- * @returns New JPEG buffer with the crosshair drawn at (cx, cy)
+ * @returns New JPEG buffer with the cursor arrow drawn with its tip at (cx, cy)
  */
 async function overlayMouseCursor(
   imageBuffer: Buffer,
@@ -121,25 +121,28 @@ async function overlayMouseCursor(
   imgHeight: number,
 ): Promise<Buffer> {
   const sharp = await loadSharp();
-  const radius = 7;
-  const armLen = 11;
-  const halfSize = radius + armLen + 1;
-  const svgSize = halfSize * 2 + 1;
-  const c = halfSize; // center of SVG
 
+  // Realistic macOS-style arrow cursor.
+  // The tip of the arrow is at (2, 2) within the SVG, so we offset the SVG
+  // placement by (-2, -2) so the tip lands exactly on (cx, cy) in the image.
+  const svgWidth = 18;
+  const svgHeight = 22;
+  const tipX = 2;
+  const tipY = 2;
+
+  // Arrow path: tip at (2,2), body extends down-right, with a tail notch.
+  //   Tip → left edge down → inner notch → tail bottom-right → tail top-right
+  //   → inner upper notch → right shoulder → back to tip
   const svg = [
-    `<svg width="${svgSize}" height="${svgSize}" xmlns="http://www.w3.org/2000/svg">`,
-    `<circle cx="${c}" cy="${c}" r="${radius}" fill="none" stroke="#FF3B30" stroke-width="2.5"/>`,
-    `<circle cx="${c}" cy="${c}" r="2.5" fill="#FF3B30"/>`,
-    `<line x1="0" y1="${c}" x2="${c - radius - 2}" y2="${c}" stroke="#FF3B30" stroke-width="2"/>`,
-    `<line x1="${c + radius + 2}" y1="${c}" x2="${svgSize - 1}" y2="${c}" stroke="#FF3B30" stroke-width="2"/>`,
-    `<line x1="${c}" y1="0" x2="${c}" y2="${c - radius - 2}" stroke="#FF3B30" stroke-width="2"/>`,
-    `<line x1="${c}" y1="${c + radius + 2}" x2="${c}" y2="${svgSize - 1}" stroke="#FF3B30" stroke-width="2"/>`,
+    `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">`,
+    `<path d="M 2 2 L 2 18 L 6 14 L 9 20.5 L 11.5 19.5 L 8.5 13 L 14 13 Z"`,
+    `  fill="white" stroke="black" stroke-width="1.5"`,
+    `  stroke-linejoin="round" stroke-linecap="round"/>`,
     `</svg>`,
   ].join('');
 
-  const left = Math.max(0, Math.min(imgWidth - svgSize, cx - c));
-  const top = Math.max(0, Math.min(imgHeight - svgSize, cy - c));
+  const left = Math.max(0, Math.min(imgWidth - svgWidth, cx - tipX));
+  const top = Math.max(0, Math.min(imgHeight - svgHeight, cy - tipY));
 
   return sharp(imageBuffer)
     .composite([{ input: Buffer.from(svg), blend: 'over', left, top }])
@@ -363,8 +366,8 @@ export const macosScreenshotTool = tool(
         `To convert a coordinate from the image to a nut-js screen coordinate for mouse tools, ` +
         `multiply: screen_x = image_x × ${scaleX.toFixed(4)}, screen_y = image_y × ${scaleY.toFixed(4)}.`;
 
-      // Overlay the current mouse cursor position as a red crosshair so that
-      // the LLM can use it as a visual reference when adjusting coordinates.
+      // Overlay the current mouse cursor position as a realistic arrow cursor
+      // so that the LLM can use it as a visual reference when adjusting coordinates.
       let finalImage = compressed;
       try {
         const { mouse: nutMouse } = await loadNutjs();
