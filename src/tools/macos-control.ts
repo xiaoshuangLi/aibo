@@ -61,6 +61,10 @@ interface CompressResult {
   srcHeight: number;
 }
 
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 async function compressImage(
   buffer: Buffer,
   region?: { x: number; y: number; width: number; height: number }
@@ -142,6 +146,102 @@ async function overlayMouseCursor(
     .composite([{ input: Buffer.from(svg), blend: 'over', left, top }])
     .jpeg({ quality: 85 })
     .toBuffer();
+}
+
+/**
+ * Capture a screenshot and return LangChain content blocks (text info +
+ * image).  Handles HiDPI/Retina displays by computing the pixel ratio between
+ * the physical screenshot dimensions and the logical screen size reported by
+ * nut-js, then scaling both the optional crop region and the cursor overlay
+ * position accordingly.
+ *
+ * @param region - Optional crop region in **logical** screen pixels.
+ */
+async function captureScreenBlocks(
+  region?: { x: number; y: number; width: number; height: number }
+): Promise<ContentBlock[]> {
+  const screenshot = await loadScreenshot();
+  const raw = await screenshot({ format: "png" });
+  const sharp = await loadSharp();
+
+  // Determine the HiDPI pixel ratio and current cursor position.
+  // On a 2x Retina display screenshot-desktop returns physical pixels but
+  // nut-js reports logical (point) coordinates, so we must scale.
+  let pixelRatio = 1;
+  let cursorPos: { x: number; y: number } | null = null;
+  try {
+    const nutjs = await loadNutjs();
+    const [logicalWidth, pos] = await Promise.all([
+      nutjs.screen.width(),
+      nutjs.mouse.getPosition(),
+    ]);
+    const rawMeta = await sharp(raw as Buffer).metadata();
+    const physicalWidth = rawMeta.width ?? 0;
+    if (logicalWidth > 0 && physicalWidth > 0) {
+      pixelRatio = physicalWidth / logicalWidth;
+    }
+    cursorPos = pos;
+  } catch {
+    // nut-js unavailable – fall back to ratio 1, skip cursor overlay
+  }
+
+  // Scale region from logical to physical pixels before passing to sharp
+  const physicalRegion = region
+    ? {
+        x: Math.round(region.x * pixelRatio),
+        y: Math.round(region.y * pixelRatio),
+        width: Math.round(region.width * pixelRatio),
+        height: Math.round(region.height * pixelRatio),
+      }
+    : undefined;
+
+  const { compressed, srcWidth, srcHeight } = await compressImage(
+    raw as Buffer,
+    physicalRegion
+  );
+
+  const imgWidth = srcWidth;
+  const imgHeight = srcHeight;
+
+  const coordNote =
+    `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px (physical/Retina pixels). ` +
+    `Use logical screen coordinates (not physical pixels) with all mouse tools.`;
+
+  let finalImage = compressed;
+  if (cursorPos !== null) {
+    try {
+      const originX = region ? region.x : 0;
+      const originY = region ? region.y : 0;
+      // Scale logical cursor coordinates to physical image pixel coordinates
+      const cursorImgX = Math.round((cursorPos.x - originX) * pixelRatio);
+      const cursorImgY = Math.round((cursorPos.y - originY) * pixelRatio);
+      if (
+        cursorImgX >= 0 &&
+        cursorImgX < imgWidth &&
+        cursorImgY >= 0 &&
+        cursorImgY < imgHeight
+      ) {
+        finalImage = await overlayMouseCursor(
+          compressed,
+          cursorImgX,
+          cursorImgY,
+          imgWidth,
+          imgHeight
+        );
+      }
+    } catch (cursorErr) {
+      console.debug(
+        "macos_screenshot: cursor overlay skipped:",
+        cursorErr instanceof Error ? cursorErr.message : cursorErr
+      );
+    }
+  }
+
+  const base64 = finalImage.toString("base64");
+  return [
+    { type: "text", text: coordNote },
+    { type: "image_url", image_url: { url: base64 } },
+  ];
 }
 
 // -----------------------------------------------------------------------
@@ -279,49 +379,8 @@ export const macosScreenshotTool = tool(
     if (platformError) return JSON.stringify({ success: false, error: platformError });
 
     try {
-      const screenshot = await loadScreenshot();
-      const raw = await screenshot({ format: "png" });
-
-      const r = region
-        ? { x: region.x, y: region.y, width: region.width, height: region.height }
-        : undefined;
-
-      const { compressed, srcWidth, srcHeight } = await compressImage(raw as Buffer, r);
-
-      // Image dimensions are preserved (no resize), so image coordinates map
-      // 1:1 to the captured screen pixels.
-      const imgWidth = srcWidth;
-      const imgHeight = srcHeight;
-
-      const coordNote =
-        `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px. ` +
-        `Use image coordinates directly with all mouse tools.`;
-
-      // Overlay the current mouse cursor position as a realistic arrow cursor
-      // so that the LLM can use it as a visual reference when adjusting coordinates.
-      let finalImage = compressed;
-      try {
-        const { mouse: nutMouse } = await loadNutjs();
-        const cursorPos = await nutMouse.getPosition();
-        const originX = r ? r.x : 0;
-        const originY = r ? r.y : 0;
-        const cursorImgX = Math.round(cursorPos.x - originX);
-        const cursorImgY = Math.round(cursorPos.y - originY);
-        if (cursorImgX >= 0 && cursorImgX < imgWidth && cursorImgY >= 0 && cursorImgY < imgHeight) {
-          finalImage = await overlayMouseCursor(compressed, cursorImgX, cursorImgY, imgWidth, imgHeight);
-        }
-      } catch (cursorErr) {
-        // If cursor position is unavailable (e.g. nut-js not installed), return
-        // the plain screenshot without the overlay.
-        console.debug('macos_screenshot: cursor overlay skipped:', cursorErr instanceof Error ? cursorErr.message : cursorErr);
-      }
-
-      const base64 = finalImage.toString("base64");
-
-      return [
-        { type: "text" as const, text: coordNote },
-        { type: "image_url" as const, image_url: { url: base64 } },
-      ] as unknown as string;
+      const blocks = await captureScreenBlocks(region);
+      return blocks as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,
@@ -332,8 +391,8 @@ export const macosScreenshotTool = tool(
   {
     name: "macos_screenshot",
     description: `Capture a screenshot of the macOS screen and return it as a compressed JPEG image (≤300 KB).
-Supports full-screen capture or a specific region (x, y, width, height in logical pixels).
-Returns the image as base64-encoded data for visual analysis by the model.
+Supports full-screen capture or a specific region (x, y, width, height in **logical** screen pixels, matching the coordinate space used by all mouse tools).
+Returns the image as base64-encoded data for visual analysis by the model. The current cursor position is overlaid as an arrow indicator.
 Only works on macOS.`,
     schema: z.object({
       region: z
@@ -387,7 +446,12 @@ export const macosMouseMoveTool = tool(
     try {
       const { mouse, Point } = await loadNutjs();
       await mouse.setPosition(new Point(x, y));
-      return JSON.stringify({ success: true, x, y });
+      const actionResult = JSON.stringify({ success: true, x, y });
+      const screenshotBlocks = await captureScreenBlocks();
+      return [
+        { type: "text" as const, text: actionResult },
+        ...screenshotBlocks,
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,
@@ -431,7 +495,12 @@ export const macosMouseClickTool = tool(
         await mouse.click(btn);
       }
 
-      return JSON.stringify({ success: true, x, y, button, double_click });
+      const actionResult = JSON.stringify({ success: true, x, y, button, double_click });
+      const screenshotBlocks = await captureScreenBlocks();
+      return [
+        { type: "text" as const, text: actionResult },
+        ...screenshotBlocks,
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,
@@ -480,7 +549,12 @@ export const macosMouseScrollTool = tool(
         await mouse.scrollRight(amount);
       }
 
-      return JSON.stringify({ success: true, x, y, direction, amount });
+      const actionResult = JSON.stringify({ success: true, x, y, direction, amount });
+      const screenshotBlocks = await captureScreenBlocks();
+      return [
+        { type: "text" as const, text: actionResult },
+        ...screenshotBlocks,
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,
@@ -516,7 +590,12 @@ export const macosKeyboardTypeTool = tool(
     try {
       const { keyboard } = await loadNutjs();
       await keyboard.type(text);
-      return JSON.stringify({ success: true, typed: text });
+      const actionResult = JSON.stringify({ success: true, typed: text });
+      const screenshotBlocks = await captureScreenBlocks();
+      return [
+        { type: "text" as const, text: actionResult },
+        ...screenshotBlocks,
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,
@@ -555,7 +634,12 @@ export const macosKeyPressTool = tool(
       await keyboard.pressKey(...(keyValues as [number, ...number[]]));
       await keyboard.releaseKey(...(keyValues as [number, ...number[]]));
 
-      return JSON.stringify({ success: true, keys });
+      const actionResult = JSON.stringify({ success: true, keys });
+      const screenshotBlocks = await captureScreenBlocks();
+      return [
+        { type: "text" as const, text: actionResult },
+        ...screenshotBlocks,
+      ] as unknown as string;
     } catch (err) {
       return JSON.stringify({
         success: false,

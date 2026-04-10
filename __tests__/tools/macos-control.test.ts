@@ -89,6 +89,28 @@ afterAll(() => {
 });
 
 // -----------------------------------------------------------------------
+// Helper: action tools now return content blocks [actionResult, screenshot…]
+// -----------------------------------------------------------------------
+
+type Block = { type: string; text?: string; image_url?: { url: string } };
+
+/** Parse the action-result JSON from the first text block of a content-block array. */
+function parseActionResult(result: unknown): Record<string, unknown> {
+  if (Array.isArray(result)) {
+    const textBlock = (result as Block[]).find((b) => b.type === 'text');
+    if (textBlock?.text) return JSON.parse(textBlock.text);
+  }
+  return JSON.parse(result as string);
+}
+
+/** Assert that a result contains an image_url block (auto-screenshot). */
+function expectScreenshot(result: unknown): void {
+  expect(Array.isArray(result)).toBe(true);
+  const blocks = result as Block[];
+  expect(blocks.find((b) => b.type === 'image_url')).toBeDefined();
+}
+
+// -----------------------------------------------------------------------
 // Tests
 // -----------------------------------------------------------------------
 
@@ -134,6 +156,18 @@ describe('macos_screenshot', () => {
     expect(textBlock!.text).toContain('Screenshot size');
     expect(imageBlock).toBeDefined();
     expect(imageBlock!.image_url?.url).toBeTruthy();
+  });
+
+  it('scales cursor position by pixel ratio (Retina fix)', async () => {
+    setPlatform('darwin');
+    // Simulate 2x Retina: screenshot is 1920×1080 but logical screen is 960 wide
+    mockNutjs.screen.width.mockResolvedValueOnce(960);
+    // Cursor at logical (480, 270) → physical (960, 540) in the screenshot
+    mockNutjs.mouse.getPosition.mockResolvedValueOnce({ x: 480, y: 270 });
+    const result = await macosScreenshotTool.invoke({});
+    expect(Array.isArray(result)).toBe(true);
+    // overlayMouseCursor should have been called (cursor in bounds)
+    expect(mockNutjs.mouse.getPosition).toHaveBeenCalled();
   });
 
   it('passes region to extract when provided', async () => {
@@ -196,18 +230,19 @@ describe('macos_mouse_move', () => {
   it('moves mouse on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseMoveTool.invoke({ x: 150, y: 250 });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.x).toBe(150);
     expect(parsed.y).toBe(250);
     expect(mockNutjs.mouse.setPosition).toHaveBeenCalled();
+    expectScreenshot(result);
   });
 
   it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
     setPlatform('darwin');
     // Simulate LLM mistake: x is an array containing both coordinates
     const result = await macosMouseMoveTool.invoke({ x: [150, 250] } as any);
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.x).toBe(150);
     expect(parsed.y).toBe(250);
@@ -216,7 +251,7 @@ describe('macos_mouse_move', () => {
   it('coerces {x: [x], y: [y]} to {x, y} on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseMoveTool.invoke({ x: [150], y: [250] } as any);
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.x).toBe(150);
     expect(parsed.y).toBe(250);
@@ -240,16 +275,17 @@ describe('macos_mouse_click', () => {
   it('left-clicks on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseClickTool.invoke({ x: 200, y: 300 });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.button).toBe('left');
     expect(mockNutjs.mouse.click).toHaveBeenCalledWith(mockNutjs.Button.LEFT);
+    expectScreenshot(result);
   });
 
   it('right-clicks on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseClickTool.invoke({ x: 200, y: 300, button: 'right' });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.button).toBe('right');
     expect(mockNutjs.mouse.click).toHaveBeenCalledWith(mockNutjs.Button.RIGHT);
@@ -258,7 +294,7 @@ describe('macos_mouse_click', () => {
   it('double-clicks on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseClickTool.invoke({ x: 200, y: 300, double_click: true });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.double_click).toBe(true);
     expect(mockNutjs.mouse.doubleClick).toHaveBeenCalled();
@@ -267,7 +303,7 @@ describe('macos_mouse_click', () => {
   it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseClickTool.invoke({ x: [200, 300] } as any);
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.x).toBe(200);
     expect(parsed.y).toBe(300);
@@ -291,9 +327,10 @@ describe('macos_mouse_scroll', () => {
   it('scrolls down on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseScrollTool.invoke({ x: 400, y: 300, direction: 'down', amount: 5 });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(mockNutjs.mouse.scrollDown).toHaveBeenCalledWith(5);
+    expectScreenshot(result);
   });
 
   it('scrolls up on darwin', async () => {
@@ -317,7 +354,7 @@ describe('macos_mouse_scroll', () => {
   it('coerces {x: [x, y]} to {x, y} on darwin', async () => {
     setPlatform('darwin');
     const result = await macosMouseScrollTool.invoke({ x: [400, 300], direction: 'down' } as any);
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.x).toBe(400);
     expect(parsed.y).toBe(300);
@@ -341,10 +378,11 @@ describe('macos_keyboard_type', () => {
   it('types text on darwin', async () => {
     setPlatform('darwin');
     const result = await macosKeyboardTypeTool.invoke({ text: 'hello world' });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(parsed.typed).toBe('hello world');
     expect(mockNutjs.keyboard.type).toHaveBeenCalledWith('hello world');
+    expectScreenshot(result);
   });
 });
 
@@ -365,23 +403,24 @@ describe('macos_key_press', () => {
   it('presses Enter on darwin', async () => {
     setPlatform('darwin');
     const result = await macosKeyPressTool.invoke({ keys: 'Enter' });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
     expect(mockNutjs.keyboard.pressKey).toHaveBeenCalled();
     expect(mockNutjs.keyboard.releaseKey).toHaveBeenCalled();
+    expectScreenshot(result);
   });
 
   it('presses Command+C on darwin', async () => {
     setPlatform('darwin');
     const result = await macosKeyPressTool.invoke({ keys: 'Command+C' });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
   });
 
   it('presses F5 on darwin', async () => {
     setPlatform('darwin');
     const result = await macosKeyPressTool.invoke({ keys: 'F5' });
-    const parsed = JSON.parse(result as string);
+    const parsed = parseActionResult(result);
     expect(parsed.success).toBe(true);
   });
 
