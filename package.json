@@ -1,6 +1,6 @@
 {
   "name": "@boay/aibo",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "AI bot with DeepAgents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
