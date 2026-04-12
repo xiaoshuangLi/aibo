@@ -158,11 +158,11 @@ describe('macos_screenshot', () => {
     expect(imageBlock!.image_url?.url).toBeTruthy();
   });
 
-  it('scales cursor position by pixel ratio (Retina fix)', async () => {
+  it('resizes screenshot to logical dimensions on Retina display', async () => {
     setPlatform('darwin');
     // Simulate 2x Retina: screenshot is 1920×1080 but logical screen is 960 wide
     mockNutjs.screen.width.mockResolvedValueOnce(960);
-    // Cursor at logical (480, 270) → physical (960, 540) in the screenshot
+    // Cursor at logical (480, 270) maps directly to image coordinates after resize
     mockNutjs.mouse.getPosition.mockResolvedValueOnce({ x: 480, y: 270 });
     const result = await macosScreenshotTool.invoke({});
     expect(Array.isArray(result)).toBe(true);
