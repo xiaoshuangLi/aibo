@@ -150,10 +150,10 @@ async function overlayMouseCursor(
 
 /**
  * Capture a screenshot and return LangChain content blocks (text info +
- * image).  Handles HiDPI/Retina displays by computing the pixel ratio between
- * the physical screenshot dimensions and the logical screen size reported by
- * nut-js, then scaling both the optional crop region and the cursor overlay
- * position accordingly.
+ * image).  Handles HiDPI/Retina displays by resizing the raw screenshot from
+ * physical pixel dimensions down to logical (point) dimensions so that image
+ * pixel coordinates correspond 1:1 to the logical coordinates expected by all
+ * mouse tools.
  *
  * @param region - Optional crop region in **logical** screen pixels.
  */
@@ -166,9 +166,10 @@ async function captureScreenBlocks(
 
   // Determine the HiDPI pixel ratio and current cursor position.
   // On a 2x Retina display screenshot-desktop returns physical pixels but
-  // nut-js reports logical (point) coordinates, so we must scale.
-  let pixelRatio = 1;
+  // nut-js reports logical (point) coordinates.  We resize the screenshot down
+  // to logical dimensions so image pixel coordinates equal mouse coordinates.
   let cursorPos: { x: number; y: number } | null = null;
+  let processedRaw = raw as Buffer;
   try {
     const nutjs = await loadNutjs();
     const [logicalWidth, pos] = await Promise.all([
@@ -177,44 +178,44 @@ async function captureScreenBlocks(
     ]);
     const rawMeta = await sharp(raw as Buffer).metadata();
     const physicalWidth = rawMeta.width ?? 0;
+    const physicalHeight = rawMeta.height ?? 0;
     if (logicalWidth > 0 && physicalWidth > 0) {
-      pixelRatio = physicalWidth / logicalWidth;
+      const pixelRatio = physicalWidth / logicalWidth;
+      if (pixelRatio !== 1 && physicalHeight > 0) {
+        const logicalWidth = Math.round(physicalWidth / pixelRatio);
+        const logicalHeight = Math.round(physicalHeight / pixelRatio);
+        processedRaw = await sharp(raw as Buffer)
+          .resize(logicalWidth, logicalHeight)
+          .toBuffer();
+      }
     }
     cursorPos = pos;
   } catch {
-    // nut-js unavailable – fall back to ratio 1, skip cursor overlay
+    // nut-js unavailable – fall back to original buffer, skip cursor overlay
   }
 
-  // Scale region from logical to physical pixels before passing to sharp
-  const physicalRegion = region
-    ? {
-        x: Math.round(region.x * pixelRatio),
-        y: Math.round(region.y * pixelRatio),
-        width: Math.round(region.width * pixelRatio),
-        height: Math.round(region.height * pixelRatio),
-      }
-    : undefined;
-
+  // processedRaw is now at logical pixel dimensions; use the region as-is.
   const { compressed, srcWidth, srcHeight } = await compressImage(
-    raw as Buffer,
-    physicalRegion
+    processedRaw,
+    region
   );
 
   const imgWidth = srcWidth;
   const imgHeight = srcHeight;
 
   const coordNote =
-    `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px (physical/Retina pixels). ` +
-    `Use logical screen coordinates (not physical pixels) with all mouse tools.`;
+    `[Image info] Screenshot size: ${imgWidth}×${imgHeight} px. ` +
+    `Image pixel coordinates correspond directly to mouse tool coordinates.`;
 
   let finalImage = compressed;
   if (cursorPos !== null) {
     try {
       const originX = region ? region.x : 0;
       const originY = region ? region.y : 0;
-      // Scale logical cursor coordinates to physical image pixel coordinates
-      const cursorImgX = Math.round((cursorPos.x - originX) * pixelRatio);
-      const cursorImgY = Math.round((cursorPos.y - originY) * pixelRatio);
+      // processedRaw is at logical dimensions, so cursor logical coords map
+      // directly to image pixel coordinates.
+      const cursorImgX = Math.round(cursorPos.x - originX);
+      const cursorImgY = Math.round(cursorPos.y - originY);
       if (
         cursorImgX >= 0 &&
         cursorImgX < imgWidth &&
