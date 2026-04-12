@@ -13,10 +13,22 @@ import getMacosControlTools from '../../src/tools/macos-control';
 // Mock heavy native dependencies so the tests work on any platform
 // -----------------------------------------------------------------------
 
-jest.mock('screenshot-desktop', () => {
-  const fn = jest.fn().mockResolvedValue(Buffer.from('fakepng'));
-  return { default: fn, __esModule: true };
-}, { virtual: true });
+// Mock child_process.execFile used by capturePhysicalScreen() to avoid
+// actually running screencapture on the test runner.
+// The implementation pipes PNG to stdout via `screencapture … -`, so the
+// mock resolves with a fake PNG buffer as stdout.
+jest.mock('child_process', () => ({
+  execFile: jest.fn().mockImplementation(
+    (
+      _cmd: string,
+      _args: string[],
+      _opts: object,
+      callback: (err: Error | null, stdout: Buffer, stderr: Buffer) => void
+    ) => {
+      callback(null, Buffer.from('fakepng'), Buffer.alloc(0));
+    }
+  ),
+}));
 
 jest.mock('sharp', () => {
   const sharpInstance = () => {
