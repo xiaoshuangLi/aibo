@@ -182,10 +182,10 @@ async function captureScreenBlocks(
     if (logicalWidth > 0 && physicalWidth > 0) {
       const pixelRatio = physicalWidth / logicalWidth;
       if (pixelRatio !== 1 && physicalHeight > 0) {
-        const logicalW = Math.round(physicalWidth / pixelRatio);
-        const logicalH = Math.round(physicalHeight / pixelRatio);
+        const logicalWidth = Math.round(physicalWidth / pixelRatio);
+        const logicalHeight = Math.round(physicalHeight / pixelRatio);
         processedRaw = await sharp(raw as Buffer)
-          .resize(logicalW, logicalH)
+          .resize(logicalWidth, logicalHeight)
           .toBuffer();
       }
     }
