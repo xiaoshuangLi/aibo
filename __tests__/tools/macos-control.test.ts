@@ -8,6 +8,7 @@ import {
   macosKeyPressTool,
 } from '../../src/tools/macos-control';
 import getMacosControlTools from '../../src/tools/macos-control';
+import { execFile } from 'child_process';
 
 // -----------------------------------------------------------------------
 // Mock heavy native dependencies so the tests work on any platform
@@ -202,6 +203,19 @@ describe('macos_screenshot', () => {
     expect(Array.isArray(result)).toBe(true);
     const blocks = result as unknown as Array<{ type: string }>;
     expect(blocks.find((b) => b.type === 'image_url')).toBeDefined();
+  });
+
+  it('returns helpful error when screencapture output is empty (missing Screen Recording permission)', async () => {
+    setPlatform('darwin');
+    (execFile as unknown as jest.Mock).mockImplementationOnce(
+      (_cmd: string, _args: string[], _opts: object, callback: (err: Error | null, stdout: Buffer, stderr: Buffer) => void) => {
+        callback(null, Buffer.alloc(0), Buffer.alloc(0));
+      }
+    );
+    const result = await macosScreenshotTool.invoke({});
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('Screen Recording');
   });
 });
 

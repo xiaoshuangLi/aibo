@@ -76,8 +76,20 @@ async function capturePhysicalScreen(): Promise<Buffer> {
       ["-x", "-t", "png", "-"],
       { encoding: "buffer" },
       (err, stdout) => {
-        if (err) reject(err);
-        else resolve(stdout);
+        if (err) {
+          reject(err);
+        } else if (!stdout || stdout.length === 0) {
+          reject(
+            new Error(
+              "screencapture returned empty output. " +
+              "Please grant Screen Recording permission in " +
+              "System Preferences → Privacy & Security → Screen Recording, " +
+              "then restart the application."
+            )
+          );
+        } else {
+          resolve(stdout);
+        }
       }
     );
   });
