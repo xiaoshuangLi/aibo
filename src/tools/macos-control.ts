@@ -1,8 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import * as os from "os";
-import * as path from "path";
-import * as fs from "fs";
+import { execFile } from "child_process";
 
 // -----------------------------------------------------------------------
 // Constants
@@ -27,11 +25,6 @@ function requireMacos(): string | null {
 // -----------------------------------------------------------------------
 // Lazy imports – avoid hard failures on non-macOS systems
 // -----------------------------------------------------------------------
-
-async function loadScreenshot(): Promise<(opts?: { format?: string }) => Promise<Buffer>> {
-  const mod = await import("screenshot-desktop");
-  return (mod.default ?? mod) as (opts?: { format?: string }) => Promise<Buffer>;
-}
 
 async function loadSharp() {
   const mod = await import("sharp");
@@ -64,6 +57,31 @@ interface CompressResult {
 type ContentBlock =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
+
+/**
+ * Capture a screenshot of the entire screen at the native physical resolution
+ * (Retina / HiDPI) using macOS `screencapture`.
+ *
+ * Unlike `screenshot-desktop`, invoking `screencapture -x -t png -` directly
+ * preserves the full 2× (or 3×) physical pixel count — e.g. 3024 px on a
+ * 1512-point wide display — without any downsampling.
+ *
+ * Passing `-` as the output path causes screencapture to write the PNG to
+ * stdout, which is captured here as a Buffer without touching the filesystem.
+ */
+async function capturePhysicalScreen(): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    execFile(
+      "screencapture",
+      ["-x", "-t", "png", "-"],
+      { encoding: "buffer" },
+      (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout);
+      }
+    );
+  });
+}
 
 async function compressImage(
   buffer: Buffer,
@@ -160,8 +178,7 @@ async function overlayMouseCursor(
 async function captureScreenBlocks(
   region?: { x: number; y: number; width: number; height: number }
 ): Promise<ContentBlock[]> {
-  const screenshot = await loadScreenshot();
-  const raw = await screenshot({ format: "png" });
+  const raw = await capturePhysicalScreen();
   const sharp = await loadSharp();
 
   // Determine the HiDPI pixel ratio and current cursor position.
