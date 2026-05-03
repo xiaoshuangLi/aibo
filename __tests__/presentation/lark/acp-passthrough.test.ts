@@ -164,13 +164,13 @@ describe('handleAcpCommand', () => {
   it('should activate passthrough mode for a known agent', async () => {
     const result = await handleAcpCommand(mockSession, ['codex']);
     expect(result).toBe(true);
-    expect(getAcpPassthroughState()).toEqual({ agent: 'codex', sessionName: undefined });
+    expect(getAcpPassthroughState()).toEqual({ agent: 'codex', sessionName: undefined, cwd: process.cwd() });
   });
 
   it('should activate passthrough mode with a named session', async () => {
     const result = await handleAcpCommand(mockSession, ['codex', 'backend']);
     expect(result).toBe(true);
-    expect(getAcpPassthroughState()).toEqual({ agent: 'codex', sessionName: 'backend' });
+    expect(getAcpPassthroughState()).toEqual({ agent: 'codex', sessionName: 'backend', cwd: process.cwd() });
   });
 
   it('should deactivate passthrough mode with "stop"', async () => {
