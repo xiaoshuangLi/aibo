@@ -28,7 +28,7 @@ export const webFetchTool = tool(
         transformResponse: [(data) => data], // keep raw string
       });
 
-      const contentType: string = response.headers["content-type"] || "unknown";
+      const contentType: string = String(response.headers["content-type"] || "unknown");
       const limit = max_length || MAX_CONTENT_LENGTH;
       const rawString: string =
         typeof response.data === "string"

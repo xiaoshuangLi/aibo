@@ -457,7 +457,7 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
     return true;
   }
 
-  setAcpSessionState({ agent, sessionName });
+  setAcpSessionState({ agent, sessionName, cwd: process.cwd() });
 
   const displayName = getAcpAgentDisplayName(agent);
   const sessionInfo = sessionName ? `（命名会话: \`${sessionName}\`）` : '';

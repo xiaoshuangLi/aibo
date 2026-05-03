@@ -77,13 +77,13 @@ describe('handleAcpCommand', () => {
   it('activates passthrough for a known agent', async () => {
     const result = await handleAcpCommand(session, ['codex']);
     expect(result).toBe(true);
-    expect(getAcpSessionState()).toEqual({ agent: 'codex', sessionName: undefined });
+    expect(getAcpSessionState()).toEqual({ agent: 'codex', sessionName: undefined, cwd: process.cwd() });
   });
 
   it('activates passthrough with a named session', async () => {
     const result = await handleAcpCommand(session, ['claude', 'review']);
     expect(result).toBe(true);
-    expect(getAcpSessionState()).toEqual({ agent: 'claude', sessionName: 'review' });
+    expect(getAcpSessionState()).toEqual({ agent: 'claude', sessionName: 'review', cwd: process.cwd() });
   });
 
   it('deactivates passthrough with "stop"', async () => {
@@ -184,7 +184,7 @@ describe('createHandleInternalCommand /acp routing', () => {
   it('routes /acp codex review with session name', async () => {
     const handler = createHandleInternalCommand(session, agent);
     await handler('/acp codex review');
-    expect(getAcpSessionState()).toEqual({ agent: 'codex', sessionName: 'review' });
+    expect(getAcpSessionState()).toEqual({ agent: 'codex', sessionName: 'review', cwd: process.cwd() });
   });
 
   it('routes /acp with no args when inactive', async () => {

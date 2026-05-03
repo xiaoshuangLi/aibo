@@ -739,7 +739,7 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
     return true;
   }
 
-  setAcpPassthroughState({ agent, sessionName });
+  setAcpPassthroughState({ agent, sessionName, cwd: process.cwd() });
 
   const sessionInfo = sessionName ? `（命名会话: \`${sessionName}\`）` : '';
   await emitMessage(`🔗 **ACP 直传模式已激活**\n\n现在您的消息将直接透传给 \`${agent}\` ${sessionInfo}，不经过 AI 大模型处理。\n\n发送 \`/acp stop\` 退出直传模式，或 \`/acp status\` 查看状态。`);
