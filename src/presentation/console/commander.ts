@@ -507,25 +507,23 @@ export async function handleExitCommand(session: any): Promise<boolean> {
  * 中文名称：处理未知命令
  * 
  * 预期行为：
- * - 显示未知命令错误信息
- * - 提示用户输入/help查看可用命令
- * - 返回true表示命令处理完成
+ * - 不报错，直接返回false，让调用方将消息透传到对话中
+ * - 返回false表示命令未被处理，需继续走正常消息流程
  * 
  * 行为分支：
- * 1. 正常情况：显示错误信息和帮助提示，返回true
- * 2. 无异常情况：该函数不抛出异常，始终返回true
+ * 1. 正常情况：静默返回false，消息继续传递到 ACP 直传或 LLM
+ * 2. 无异常情况：该函数不抛出异常
  * 
- * @param command - 用户输入的未知命令字符串
- * @returns Promise<boolean> - 始终返回true，表示命令处理完成
+ * @param _command - 用户输入的未知命令字符串（未使用）
+ * @returns Promise<boolean> - 始终返回false，表示命令未被处理
  * 
  * @example
  * ```typescript
- * await handleUnknownCommand("/unknown"); // 显示未知命令错误
+ * await handleUnknownCommand("/model"); // 静默返回 false，消息透传
  * ```
  */
-export async function handleUnknownCommand(command: string): Promise<boolean> {
-  console.log(styled.error(`未知命令: ${command}\n输入 /help 查看可用命令`));
-  return true;
+export async function handleUnknownCommand(_command: string): Promise<boolean> {
+  return false;
 }
 
 // ==================== 内部命令处理器 (柯里化) ====================

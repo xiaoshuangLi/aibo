@@ -201,11 +201,9 @@ describe('handleCompactCommand', () => {
 
 // ===== handleUnknownCommand =====
 describe('handleUnknownCommand', () => {
-  it('should return true and print error', async () => {
+  it('should return false without printing error', async () => {
     const result = await handleUnknownCommand('/bogus');
-    expect(result).toBe(true);
-    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-    expect(output).toContain('/bogus');
+    expect(result).toBe(false);
   });
 });
 
@@ -237,14 +235,12 @@ describe('createHandleInternalCommand', () => {
     expect(result).toBe(true);
   });
 
-  it('should route unknown commands to handleUnknownCommand', async () => {
+  it('should return false for unknown commands without printing error', async () => {
     const session: any = {};
     const agent: any = {};
     const handler = createHandleInternalCommand(session, agent);
     const result = await handler('/nonexistent');
-    expect(result).toBe(true);
-    const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-    expect(output).toContain('/nonexistent');
+    expect(result).toBe(false);
   });
 });
 
