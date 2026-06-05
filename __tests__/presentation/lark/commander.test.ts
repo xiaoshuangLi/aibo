@@ -353,13 +353,12 @@ describe('Lark Command Handlers', () => {
   });
 
   describe('handleUnknownCommand', () => {
-    it('should display unknown command error and return true', async () => {
+    it('should return false without printing error', async () => {
       const unknownCommand = '/unknown';
       const result = await handleUnknownCommand(unknownCommand);
       
-      expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('未知命令'));
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('请输入 `/help` 查看所有可用命令'));
+      expect(result).toBe(false);
+      expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('未知命令'));
     });
   });
 
@@ -1070,10 +1069,10 @@ describe('Lark Command Handlers', () => {
       expect(mockProcessExit).toHaveBeenCalledWith(0);
     });
 
-    it('should handle unknown command', async () => {
+    it('should handle unknown command by returning false without error', async () => {
       const result = await handleCommand('/unknown');
-      expect(result).toBe(true);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('未知命令'));
+      expect(result).toBe(false);
+      expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('未知命令'));
     });
   });
 

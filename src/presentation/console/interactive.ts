@@ -148,17 +148,21 @@ export async function handleConsoleAcpPassthrough(input: string, session: Sessio
 export const onLine = (session: Session, handleInternalCommand: any, agent: any) => async (input: string = '') => {
   const trimmed = input.trim();
   
-  // Handle internal commands (always processed even in ACP passthrough mode)
-  if (trimmed.startsWith("/")) {
-    await handleInternalCommand(trimmed);
-    session.requestUserInput();
-    return;
-  }
-  
   // Empty input
   if (!trimmed) {
     session.requestUserInput();
     return;
+  }
+
+  // Handle internal commands (always processed even in ACP passthrough mode).
+  // If the command is not recognised (returns false), fall through so the
+  // raw text is forwarded to ACP passthrough or the LLM as a regular message.
+  if (trimmed.startsWith("/")) {
+    const handled = await handleInternalCommand(trimmed);
+    if (handled) {
+      session.requestUserInput();
+      return;
+    }
   }
 
   // ACP passthrough mode: forward messages directly to ACP, bypass the LLM

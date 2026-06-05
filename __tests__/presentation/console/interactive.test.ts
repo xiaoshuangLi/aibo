@@ -37,12 +37,24 @@ describe('Interactive Mode Functions', () => {
   });
 
   describe('onLine', () => {
-    it('should handle internal commands (starting with /)', async () => {
+    it('should handle internal commands (starting with /) when recognised', async () => {
+      mockHandleInternalCommand.mockResolvedValue(true);
       const handler = onLine(mockSession, mockHandleInternalCommand, mockAgent);
       await handler('/help');
       
       expect(mockHandleInternalCommand).toHaveBeenCalledWith('/help');
       expect(mockSession.requestUserInput).toHaveBeenCalled();
+    });
+
+    it('should pass unrecognised slash-prefixed messages through as regular input', async () => {
+      const { handleUserInput } = require('@/presentation/console/input');
+      mockHandleInternalCommand.mockResolvedValue(false);
+      const handler = onLine(mockSession, mockHandleInternalCommand, mockAgent);
+      await handler('/model');
+      
+      expect(mockHandleInternalCommand).toHaveBeenCalledWith('/model');
+      expect(handleUserInput).toHaveBeenCalledWith('/model', mockSession, mockAgent);
+      expect(mockSession.requestUserInput).not.toHaveBeenCalled();
     });
 
     it('should handle empty input', async () => {

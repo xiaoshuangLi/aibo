@@ -928,9 +928,8 @@ export async function handleAcpCancelCommand(session: any): Promise<boolean> {
   return true;
 }
 
-export async function handleUnknownCommand(command: string): Promise<boolean> {
-  console.log(styled.error(`❌ **未知命令**\n\n您输入的命令 \`${command}\` 无法识别。\n\n💡 请输入 \`/help\` 查看所有可用命令。`));
-  return true;
+export async function handleUnknownCommand(_command: string): Promise<boolean> {
+  return false;
 }
 
 // ==================== 文件差异可视化命令处理器 ====================

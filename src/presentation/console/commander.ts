@@ -523,9 +523,8 @@ export async function handleExitCommand(session: any): Promise<boolean> {
  * await handleUnknownCommand("/unknown"); // 显示未知命令错误
  * ```
  */
-export async function handleUnknownCommand(command: string): Promise<boolean> {
-  console.log(styled.error(`未知命令: ${command}\n输入 /help 查看可用命令`));
-  return true;
+export async function handleUnknownCommand(_command: string): Promise<boolean> {
+  return false;
 }
 
 // ==================== 内部命令处理器 (柯里化) ====================
