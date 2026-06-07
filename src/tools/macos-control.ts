@@ -45,6 +45,25 @@ async function loadNutjs() {
   return import("@nut-tree-fork/nut-js");
 }
 
+// Memoised OpenCV handle – WASM init only runs once per process.
+let _cvReady: Promise<any> | null = null;
+
+async function loadOpenCV(): Promise<any> {
+  if (!_cvReady) {
+    _cvReady = (async () => {
+      const mod = await import("@techstark/opencv-js");
+      const cv = (mod.default ?? mod) as any;
+      if (!cv.Mat) {
+        await new Promise<void>((resolve) => {
+          cv.onRuntimeInitialized = resolve;
+        });
+      }
+      return cv;
+    })();
+  }
+  return _cvReady;
+}
+
 // -----------------------------------------------------------------------
 // Screenshot helpers
 // -----------------------------------------------------------------------
@@ -399,6 +418,153 @@ async function getWindowsFromOsascript(): Promise<WindowInfo[]> {
   }
 
   return windows;
+}
+
+// -----------------------------------------------------------------------
+// Shape detection helpers (OpenCV.js-based, pure Node.js)
+// -----------------------------------------------------------------------
+
+interface ShapeInfo {
+  type: 'rectangle' | 'rounded-rectangle' | 'circle' | 'ellipse';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Detect geometric shapes (rectangles, rounded rectangles, circles, ellipses)
+ * in an image buffer using OpenCV.js.  Returns at most 40 shapes, sorted by
+ * descending area so the most prominent ones appear first.
+ *
+ * @param imageBuffer - JPEG/PNG image buffer at the final display resolution.
+ * @param imgWidth    - Image width in pixels.
+ * @param imgHeight   - Image height in pixels.
+ */
+async function detectShapes(
+  imageBuffer: Buffer,
+  imgWidth: number,
+  imgHeight: number,
+): Promise<ShapeInfo[]> {
+  const cv = await loadOpenCV();
+  const sharp = await loadSharp();
+
+  // Convert to raw RGBA so we can hand it to OpenCV
+  const rawBuf = await sharp(imageBuffer).ensureAlpha().raw().toBuffer();
+
+  const src = cv.matFromImageData({
+    data: new Uint8ClampedArray(rawBuf),
+    width: imgWidth,
+    height: imgHeight,
+  });
+  const gray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const edges = new cv.Mat();
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+
+  const shapes: ShapeInfo[] = [];
+
+  try {
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+    cv.Canny(blurred, edges, 50, 150);
+    cv.findContours(
+      edges, contours, hierarchy,
+      cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE,
+    );
+
+    // Ignore shapes smaller than 0.05 % or larger than 90 % of the screen area.
+    const screenArea = imgWidth * imgHeight;
+    const minArea = Math.max(400, screenArea * 0.0005);
+    const maxArea = screenArea * 0.9;
+
+    for (let i = 0; i < contours.size(); i++) {
+      const contour = contours.get(i);
+      try {
+        const area = cv.contourArea(contour);
+        if (area < minArea || area > maxArea) continue;
+
+        const peri = cv.arcLength(contour, true);
+        if (peri === 0) continue;
+
+        const approx = new cv.Mat();
+        try {
+          cv.approxPolyDP(contour, approx, 0.04 * peri, true);
+          const vertices = approx.rows;
+          const rect = cv.boundingRect(contour);
+          const circularity = (4 * Math.PI * area) / (peri * peri);
+
+          let shapeType: ShapeInfo['type'];
+          if (circularity > 0.75) {
+            // Near-circular contour → circle or ellipse
+            const ar = rect.width / (rect.height || 1);
+            shapeType = ar > 0.8 && ar < 1.25 ? 'circle' : 'ellipse';
+          } else if (vertices === 4) {
+            shapeType = 'rectangle';
+          } else if (vertices > 4 && vertices <= 16) {
+            shapeType = 'rounded-rectangle';
+          } else {
+            continue; // Skip triangles, complex polygons, etc.
+          }
+
+          shapes.push({ type: shapeType, x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+        } finally {
+          approx.delete();
+        }
+      } finally {
+        contour.delete();
+      }
+    }
+  } finally {
+    src.delete();
+    gray.delete();
+    blurred.delete();
+    edges.delete();
+    contours.delete();
+    hierarchy.delete();
+  }
+
+  // Largest shapes first; limit to 40 to keep the overlay readable
+  shapes.sort((a, b) => b.width * b.height - a.width * a.height);
+  return shapes.slice(0, 40);
+}
+
+/**
+ * Build an SVG overlay that draws colour-coded outlines around detected
+ * geometric shapes.
+ */
+function buildShapeAnnotationSVG(
+  imgWidth: number,
+  imgHeight: number,
+  shapes: ShapeInfo[],
+): Buffer {
+  const COLOR: Record<ShapeInfo['type'], string> = {
+    'rectangle': '#00bcd4',
+    'rounded-rectangle': '#4caf50',
+    'circle': '#ff9800',
+    'ellipse': '#9c27b0',
+  };
+
+  let svgElements = '';
+  for (const shape of shapes) {
+    const color = COLOR[shape.type];
+    if (shape.type === 'circle' || shape.type === 'ellipse') {
+      const cx = shape.x + shape.width / 2;
+      const cy = shape.y + shape.height / 2;
+      const rx = shape.width / 2;
+      const ry = shape.height / 2;
+      svgElements += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
+    } else if (shape.type === 'rounded-rectangle') {
+      const r = Math.round(Math.min(shape.width, shape.height) * 0.15);
+      svgElements += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="${r}" ry="${r}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
+    } else {
+      svgElements += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
+    }
+  }
+
+  const svg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
+  return Buffer.from(svg);
 }
 
 /**
@@ -852,6 +1018,12 @@ Use '+' to combine keys (e.g. "Command+C", "Shift+Enter", "Command+Shift+4").`,
 
 /**
  * 8. macos_annotate_screenshot
+ *
+ * Takes a screenshot using the Node.js-based `screenshot-desktop` package,
+ * then annotates the image with:
+ *   • Colour-coded outlines of all visible windows (via osascript)
+ *   • Geometric shape detection (rectangles, rounded rectangles, circles,
+ *     ellipses) using OpenCV.js – a pure Node.js WASM build of OpenCV.
  */
 export const macosAnnotateScreenshotTool = tool(
   async ({ region }) => {
@@ -859,6 +1031,7 @@ export const macosAnnotateScreenshotTool = tool(
     if (platformError) return JSON.stringify({ success: false, error: platformError });
 
     try {
+      // ── 1. Capture raw screenshot via Node.js (screenshot-desktop) ──────
       const screenshot = await loadScreenshot();
       const raw = await screenshot({ format: "png" });
       const sharp = await loadSharp();
@@ -885,7 +1058,15 @@ export const macosAnnotateScreenshotTool = tool(
 
       const { compressed, srcWidth, srcHeight } = await compressImage(processedRaw, region);
 
-      // Get window list from osascript
+      // ── 2. Detect geometric shapes via OpenCV.js (Node.js WASM) ─────────
+      let shapes: ShapeInfo[] = [];
+      try {
+        shapes = await detectShapes(compressed, srcWidth, srcHeight);
+      } catch {
+        // Shape detection is best-effort; never block the screenshot result
+      }
+
+      // ── 3. Get window list from osascript ────────────────────────────────
       let windows: WindowInfo[] = [];
       try {
         windows = await getWindowsFromOsascript();
@@ -893,34 +1074,57 @@ export const macosAnnotateScreenshotTool = tool(
         // osascript failed – still return an unannotated image
       }
 
-      // Build annotated image with window outlines
+      // ── 4. Composite all annotation overlays onto the image ──────────────
       let finalImage = compressed;
-      if (windows.length > 0 && srcWidth > 0 && srcHeight > 0) {
+      if (srcWidth > 0 && srcHeight > 0) {
         try {
-          const svgOverlay = buildWindowAnnotationSVG(srcWidth, srcHeight, windows, region);
-          let overlaid = await sharp(compressed)
-            .composite([{ input: svgOverlay, blend: "over" }])
-            .jpeg({ quality: 85 })
-            .toBuffer();
-          // Re-compress if the overlay pushed the size over the target
-          let q = 70;
-          while (overlaid.length > TARGET_SIZE_BYTES && q > 20) {
-            overlaid = await sharp(overlaid).jpeg({ quality: q }).toBuffer();
-            q -= 10;
+          const compositeInputs: Parameters<ReturnType<typeof sharp>['composite']>[0] = [];
+
+          if (windows.length > 0) {
+            const windowSvg = buildWindowAnnotationSVG(srcWidth, srcHeight, windows, region);
+            compositeInputs.push({ input: windowSvg, blend: "over" });
           }
-          finalImage = overlaid;
+
+          if (shapes.length > 0) {
+            const shapeSvg = buildShapeAnnotationSVG(srcWidth, srcHeight, shapes);
+            compositeInputs.push({ input: shapeSvg, blend: "over" });
+          }
+
+          if (compositeInputs.length > 0) {
+            let overlaid = await sharp(compressed)
+              .composite(compositeInputs)
+              .jpeg({ quality: 85 })
+              .toBuffer();
+            // Re-compress if the overlay pushed the size over the target
+            let q = 70;
+            while (overlaid.length > TARGET_SIZE_BYTES && q > 20) {
+              overlaid = await sharp(overlaid).jpeg({ quality: q }).toBuffer();
+              q -= 10;
+            }
+            finalImage = overlaid;
+          }
         } catch {
           // overlay failed – fall back to unmodified compressed image
         }
       }
 
+      // ── 5. Build text summary ────────────────────────────────────────────
       const base64 = finalImage.toString("base64");
+
+      const shapeSummary = shapes.length > 0
+        ? `\nDetected ${shapes.length} geometric shape(s):\n` +
+          shapes
+            .map((s, i) => `  [Shape ${i + 1}] ${s.type} x=${s.x}, y=${s.y}, w=${s.width}, h=${s.height}`)
+            .join("\n")
+        : "";
+
       const coordNote =
         `[Annotated Screenshot] Size: ${srcWidth}×${srcHeight} px. ` +
         `Detected ${windows.length} window(s):\n` +
         windows
           .map((w, i) => `  [${i + 1}] ${w.app} — "${w.title}" x=${w.x}, y=${w.y}, w=${w.width}, h=${w.height}`)
-          .join("\n");
+          .join("\n") +
+        shapeSummary;
 
       return [
         { type: "text" as const, text: coordNote },
@@ -935,7 +1139,10 @@ export const macosAnnotateScreenshotTool = tool(
   },
   {
     name: "macos_annotate_screenshot",
-    description: `Capture a screenshot and annotate it with colour-coded outlines showing all visible windows and their coordinates. Use this to understand the current screen layout before using mouse tool coordinates to click or interact with elements. Only works on macOS.`,
+    description: `Capture a screenshot using a Node.js-based approach and annotate it with colour-coded outlines showing:
+• All visible windows and their coordinates (via osascript)
+• Detected geometric shapes — rectangles, rounded rectangles, circles, and ellipses (via OpenCV.js)
+Use this to understand the current screen layout and identify UI elements before using mouse tool coordinates. Only works on macOS.`,
     schema: z.object({
       region: z
         .object({
@@ -952,13 +1159,12 @@ export const macosAnnotateScreenshotTool = tool(
 
 export default async function getMacosControlTools() {
   return [
-    macosScreenshotTool,
+    macosAnnotateScreenshotTool,
     macosGetScreenSizeTool,
     macosMouseMoveTool,
     macosMouseClickTool,
     macosMouseScrollTool,
     macosKeyboardTypeTool,
     macosKeyPressTool,
-    macosAnnotateScreenshotTool,
   ];
 }
