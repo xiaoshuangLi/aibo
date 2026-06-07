@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
+import { createWorker } from "tesseract.js";
 
 // -----------------------------------------------------------------------
 // Constants
@@ -240,10 +241,32 @@ async function captureScreenBlocks(
   }
 
   const base64 = finalImage.toString("base64");
-  return [
+
+  // OCR: automatically extract text from the screenshot using tesseract.js
+  let ocrNote = "";
+  try {
+    const worker = await createWorker("eng");
+    try {
+      const { data } = await worker.recognize(finalImage);
+      const ocrText = data.text.trim();
+      if (ocrText) {
+        ocrNote = `[OCR text] ${ocrText}`;
+      }
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    // OCR is best-effort; never block the screenshot result
+  }
+
+  const blocks: ContentBlock[] = [
     { type: "text", text: coordNote },
     { type: "image_url", image_url: { url: base64 } },
   ];
+  if (ocrNote) {
+    blocks.push({ type: "text", text: ocrNote });
+  }
+  return blocks;
 }
 
 // -----------------------------------------------------------------------

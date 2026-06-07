@@ -17,6 +17,7 @@ import getAcpTools from '@/tools/acp';
 import getLocalMcpTools from '@/tools/local-mcp';
 import getPlaywrightTools from '@/tools/playwright';
 import getReadImageTools from '@/tools/read-image';
+import getProcessImageTools from '@/tools/process-image';
 import getMacosControlTools from '@/tools/macos-control';
 import { Session } from '@/core/agent';
 
@@ -47,6 +48,7 @@ export default async function getTools(session?: Session) {
     localMcpTools,
     playwrightTools,
     readImageTools,
+    processImageTools,
     macosControlTools,
   ] = await Promise.all([
     getBashTools(session),
@@ -68,6 +70,7 @@ export default async function getTools(session?: Session) {
     getLocalMcpTools(),
     getPlaywrightTools(),
     getReadImageTools(),
+    getProcessImageTools(),
     getMacosControlTools(),
   ]);
   
@@ -91,6 +94,7 @@ export default async function getTools(session?: Session) {
     ...localMcpTools,
     ...playwrightTools,
     ...readImageTools,
+    ...processImageTools,
     ...macosControlTools,
   ];
 }

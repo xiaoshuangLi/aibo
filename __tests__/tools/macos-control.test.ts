@@ -91,6 +91,15 @@ const mockNutjs = {
 
 jest.mock('@nut-tree-fork/nut-js', () => mockNutjs, { virtual: true });
 
+jest.mock('tesseract.js', () => ({
+  createWorker: jest.fn().mockResolvedValue({
+    recognize: jest.fn().mockResolvedValue({
+      data: { text: 'Sample OCR text' },
+    }),
+    terminate: jest.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 // -----------------------------------------------------------------------
 // Platform simulation helpers
 // -----------------------------------------------------------------------
@@ -208,6 +217,16 @@ describe('macos_screenshot', () => {
     expect(Array.isArray(result)).toBe(true);
     const blocks = result as unknown as Array<{ type: string }>;
     expect(blocks.find((b) => b.type === 'image_url')).toBeDefined();
+  });
+
+  it('includes OCR text block when text is recognized', async () => {
+    setPlatform('darwin');
+    const result = await macosScreenshotTool.invoke({});
+    expect(Array.isArray(result)).toBe(true);
+    const blocks = result as unknown as Array<{ type: string; text?: string }>;
+    const ocrBlock = blocks.find((b) => b.type === 'text' && b.text?.startsWith('[OCR text]'));
+    expect(ocrBlock).toBeDefined();
+    expect(ocrBlock!.text).toContain('Sample OCR text');
   });
 });
 
