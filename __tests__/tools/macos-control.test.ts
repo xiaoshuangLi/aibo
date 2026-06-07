@@ -6,6 +6,7 @@ import {
   macosMouseScrollTool,
   macosKeyboardTypeTool,
   macosKeyPressTool,
+  macosAnnotateScreenshotTool,
 } from '../../src/tools/macos-control';
 import getMacosControlTools from '../../src/tools/macos-control';
 
@@ -17,6 +18,22 @@ jest.mock('screenshot-desktop', () => {
   const fn = jest.fn().mockResolvedValue(Buffer.from('fakepng'));
   return { default: fn, __esModule: true };
 }, { virtual: true });
+
+jest.mock('child_process', () => ({
+  execFile: jest.fn((
+    _file: string,
+    _args: string[],
+    optsOrCb: unknown,
+    cb?: (err: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    const callback = typeof optsOrCb === 'function'
+      ? (optsOrCb as (err: Error | null, stdout: string, stderr: string) => void)
+      : cb;
+    if (callback) {
+      callback(null, 'Finder\tDesktop\t0\t23\t1440\t900\nSafari\tGitHub\t100\t50\t800\t600\n', '');
+    }
+  }),
+}));
 
 jest.mock('sharp', () => {
   const sharpInstance = () => {
@@ -115,9 +132,9 @@ function expectScreenshot(result: unknown): void {
 // -----------------------------------------------------------------------
 
 describe('getMacosControlTools', () => {
-  it('returns all 7 tools', async () => {
+  it('returns all 8 tools', async () => {
     const tools = await getMacosControlTools();
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
     const names = tools.map((t) => t.name);
     expect(names).toContain('macos_screenshot');
     expect(names).toContain('macos_get_screen_size');
@@ -126,6 +143,7 @@ describe('getMacosControlTools', () => {
     expect(names).toContain('macos_mouse_scroll');
     expect(names).toContain('macos_keyboard_type');
     expect(names).toContain('macos_key_press');
+    expect(names).toContain('macos_annotate_screenshot');
   });
 });
 
@@ -430,5 +448,59 @@ describe('macos_key_press', () => {
     const parsed = JSON.parse(result as string);
     expect(parsed.success).toBe(false);
     expect(parsed.error).toContain('Unrecognised key');
+  });
+});
+
+describe('macos_annotate_screenshot', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('has correct name and description', () => {
+    expect(macosAnnotateScreenshotTool.name).toBe('macos_annotate_screenshot');
+    expect(macosAnnotateScreenshotTool.description).toContain('coordinates');
+    expect(macosAnnotateScreenshotTool.description).toContain('mouse tool');
+  });
+
+  it('returns platform error on non-macOS', async () => {
+    setPlatform('linux');
+    const result = await macosAnnotateScreenshotTool.invoke({});
+    const parsed = JSON.parse(result as string);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('macOS');
+  });
+
+  it('returns annotated image with window info on darwin', async () => {
+    setPlatform('darwin');
+    const result = await macosAnnotateScreenshotTool.invoke({});
+    expect(Array.isArray(result)).toBe(true);
+    const blocks = result as unknown as Block[];
+    const textBlock = blocks.find((b) => b.type === 'text');
+    const imageBlock = blocks.find((b) => b.type === 'image_url');
+    expect(textBlock).toBeDefined();
+    expect(textBlock!.text).toContain('Annotated Screenshot');
+    expect(textBlock!.text).toContain('Detected');
+    expect(imageBlock).toBeDefined();
+    expect(imageBlock!.image_url?.url).toBeTruthy();
+  });
+
+  it('still returns an image when osascript fails', async () => {
+    setPlatform('darwin');
+    const childProcess = jest.requireMock('child_process') as { execFile: jest.Mock };
+    childProcess.execFile.mockImplementationOnce(
+      (_file: string, _args: string[], _opts: unknown, cb?: Function) => {
+        if (cb) cb(new Error('permission denied'), '', '');
+      },
+    );
+    const result = await macosAnnotateScreenshotTool.invoke({});
+    expect(Array.isArray(result)).toBe(true);
+    const blocks = result as unknown as Block[];
+    expect(blocks.find((b) => b.type === 'image_url')).toBeDefined();
+  });
+
+  it('passes region to extract when provided', async () => {
+    setPlatform('darwin');
+    const result = await macosAnnotateScreenshotTool.invoke({
+      region: { x: 0, y: 23, width: 1440, height: 877 },
+    });
+    expect(Array.isArray(result)).toBe(true);
   });
 });
