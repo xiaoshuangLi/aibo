@@ -43,6 +43,8 @@ jest.mock('sharp', () => {
       jpeg: jest.fn().mockReturnThis(),
       clone: jest.fn().mockReturnThis(),
       composite: jest.fn().mockReturnThis(),
+      ensureAlpha: jest.fn().mockReturnThis(),
+      raw: jest.fn().mockReturnThis(),
       metadata: jest.fn().mockResolvedValue({ width: 1920, height: 1080 }),
       toBuffer: jest.fn().mockResolvedValue(Buffer.alloc(100)),
     };
@@ -99,6 +101,49 @@ jest.mock('tesseract.js', () => ({
     terminate: jest.fn().mockResolvedValue(undefined),
   }),
 }));
+
+// Mock OpenCV.js (@techstark/opencv-js).  The real package ships a WASM build
+// whose runtime never finishes initialising under Jest, which would hang the
+// suite.  This lightweight mock makes loadOpenCV() resolve instantly and yields
+// a single rectangle contour so the shape-detection / annotation path can be
+// exercised deterministically.
+jest.mock('@techstark/opencv-js', () => {
+  const makeMat = () => ({ rows: 4, delete: jest.fn() });
+  function MatVector(this: any) {
+    this._items = [];
+    this.size = () => this._items.length;
+    this.get = (i: number) => this._items[i];
+    this.delete = jest.fn();
+  }
+  function Mat(this: any) {
+    return makeMat();
+  }
+  function Size(this: any, w: number, h: number) {
+    this.width = w;
+    this.height = h;
+  }
+  const cv = {
+    Mat,
+    MatVector,
+    Size,
+    COLOR_RGBA2GRAY: 0,
+    RETR_EXTERNAL: 0,
+    CHAIN_APPROX_SIMPLE: 0,
+    matFromImageData: () => makeMat(),
+    cvtColor: jest.fn(),
+    GaussianBlur: jest.fn(),
+    Canny: jest.fn(),
+    // Populate the supplied MatVector with one fake rectangle contour
+    findContours: (_edges: any, contours: any) => {
+      contours._items.push({ delete: jest.fn() });
+    },
+    contourArea: () => 30000, // 200×150 rectangle
+    arcLength: () => 1000, // perimeter chosen so circularity < 0.75 → rectangle
+    approxPolyDP: jest.fn(),
+    boundingRect: () => ({ x: 100, y: 100, width: 200, height: 150 }),
+  };
+  return { __esModule: true, default: cv };
+}, { virtual: true });
 
 // -----------------------------------------------------------------------
 // Platform simulation helpers
@@ -487,7 +532,7 @@ describe('macos_annotate_screenshot', () => {
     expect(parsed.error).toContain('macOS');
   });
 
-  it('returns annotated image with window info on darwin', async () => {
+  it('returns annotated image with detected shape info on darwin', async () => {
     setPlatform('darwin');
     const result = await macosAnnotateScreenshotTool.invoke({});
     expect(Array.isArray(result)).toBe(true);
@@ -496,19 +541,28 @@ describe('macos_annotate_screenshot', () => {
     const imageBlock = blocks.find((b) => b.type === 'image_url');
     expect(textBlock).toBeDefined();
     expect(textBlock!.text).toContain('Annotated Screenshot');
-    expect(textBlock!.text).toContain('Detected');
+    expect(textBlock!.text).toContain('Detected 1 geometric shape');
+    // Rectangle at (100,100,200,150) → click-centre at (200, 175)
+    expect(textBlock!.text).toContain('rectangle');
+    expect(textBlock!.text).toContain('click-centre(200, 175)');
     expect(imageBlock).toBeDefined();
     expect(imageBlock!.image_url?.url).toBeTruthy();
   });
 
-  it('still returns an image when osascript fails', async () => {
+  it('offsets shape coordinates by the region origin (click-tool space)', async () => {
     setPlatform('darwin');
-    const childProcess = jest.requireMock('child_process') as { execFile: jest.Mock };
-    childProcess.execFile.mockImplementationOnce(
-      (_file: string, _args: string[], _opts: unknown, cb?: Function) => {
-        if (cb) cb(new Error('permission denied'), '', '');
-      },
-    );
+    const result = await macosAnnotateScreenshotTool.invoke({
+      region: { x: 50, y: 30, width: 1440, height: 900 },
+    });
+    const blocks = result as unknown as Block[];
+    const textBlock = blocks.find((b) => b.type === 'text');
+    // bounds x/y shifted by region origin: x=150, y=130; centre=(250, 205)
+    expect(textBlock!.text).toContain('bounds(x=150, y=130, w=200, h=150)');
+    expect(textBlock!.text).toContain('click-centre(250, 205)');
+  });
+
+  it('still returns an image when shape detection fails', async () => {
+    setPlatform('darwin');
     const result = await macosAnnotateScreenshotTool.invoke({});
     expect(Array.isArray(result)).toBe(true);
     const blocks = result as unknown as Block[];

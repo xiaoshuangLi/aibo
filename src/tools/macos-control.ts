@@ -532,12 +532,26 @@ async function detectShapes(
 
 /**
  * Build an SVG overlay that draws colour-coded outlines around detected
- * geometric shapes.
+ * geometric shapes, marks each shape's clickable centre, and labels it with
+ * the centre coordinate.
+ *
+ * The geometry is drawn in image-pixel space (the overlay is composited onto
+ * the captured image), but the **label text** reports the coordinate in the
+ * same space used by the mouse/click tools.  When a crop `region` is supplied,
+ * its origin is added back so the displayed coordinates remain directly
+ * clickable.
+ *
+ * @param imgWidth  - Image width in pixels.
+ * @param imgHeight - Image height in pixels.
+ * @param shapes    - Detected shapes in image-pixel coordinates.
+ * @param region    - Optional crop region; its x/y offset is added to the
+ *                    labelled coordinates so they match the click tool space.
  */
 function buildShapeAnnotationSVG(
   imgWidth: number,
   imgHeight: number,
   shapes: ShapeInfo[],
+  region?: { x: number; y: number; width: number; height: number },
 ): Buffer {
   const COLOR: Record<ShapeInfo['type'], string> = {
     'rectangle': '#00bcd4',
@@ -546,21 +560,54 @@ function buildShapeAnnotationSVG(
     'ellipse': '#9c27b0',
   };
 
+  const FONT_SIZE = 12;
+  const LABEL_PAD = 4;
+  const LABEL_HEIGHT = FONT_SIZE + LABEL_PAD * 2;
+  const CHAR_WIDTH = 7;
+  const originX = region ? region.x : 0;
+  const originY = region ? region.y : 0;
+
   let svgElements = '';
-  for (const shape of shapes) {
+  for (let i = 0; i < shapes.length; i++) {
+    const shape = shapes[i];
     const color = COLOR[shape.type];
+
+    // Centre of the shape: this is the click target the mouse tools should use.
+    const centreImgX = shape.x + shape.width / 2;
+    const centreImgY = shape.y + shape.height / 2;
+
+    // Outline
     if (shape.type === 'circle' || shape.type === 'ellipse') {
-      const cx = shape.x + shape.width / 2;
-      const cy = shape.y + shape.height / 2;
       const rx = shape.width / 2;
       const ry = shape.height / 2;
-      svgElements += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
+      svgElements += `<ellipse cx="${centreImgX}" cy="${centreImgY}" rx="${rx}" ry="${ry}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
     } else if (shape.type === 'rounded-rectangle') {
       const r = Math.round(Math.min(shape.width, shape.height) * 0.15);
       svgElements += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="${r}" ry="${r}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
     } else {
       svgElements += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>`;
     }
+
+    // Clickable centre marker (crosshair dot)
+    svgElements +=
+      `<circle cx="${centreImgX}" cy="${centreImgY}" r="3" fill="${color}" stroke="white" stroke-width="1"/>`;
+
+    // Coordinate label: index + click coordinate (in mouse-tool space)
+    const clickX = Math.round(centreImgX + originX);
+    const clickY = Math.round(centreImgY + originY);
+    const label = `[${i + 1}] ${clickX},${clickY}`;
+    const labelW = label.length * CHAR_WIDTH + LABEL_PAD * 2;
+    // Place the label just above the shape, or below if there is no room.
+    const labelAbove = shape.y >= LABEL_HEIGHT;
+    const labelBgY = labelAbove
+      ? shape.y - LABEL_HEIGHT
+      : Math.min(shape.y + shape.height, imgHeight - LABEL_HEIGHT);
+    const labelTxtY = labelBgY + FONT_SIZE + LABEL_PAD - 2;
+    const labelX = Math.max(0, Math.min(shape.x, imgWidth - labelW));
+
+    svgElements +=
+      `<rect x="${labelX}" y="${labelBgY}" width="${labelW}" height="${LABEL_HEIGHT}" fill="${color}" opacity="0.85" rx="3"/>` +
+      `<text x="${labelX + LABEL_PAD}" y="${labelTxtY}" font-family="monospace" font-size="${FONT_SIZE}" fill="white" font-weight="bold">${label}</text>`;
   }
 
   const svg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
@@ -1019,11 +1066,14 @@ Use '+' to combine keys (e.g. "Command+C", "Shift+Enter", "Command+Shift+4").`,
 /**
  * 8. macos_annotate_screenshot
  *
- * Takes a screenshot using the Node.js-based `screenshot-desktop` package,
- * then annotates the image with:
- *   • Colour-coded outlines of all visible windows (via osascript)
- *   • Geometric shape detection (rectangles, rounded rectangles, circles,
- *     ellipses) using OpenCV.js – a pure Node.js WASM build of OpenCV.
+ * Takes a screenshot using the Node.js-based `screenshot-desktop` package, then
+ * detects geometric shapes (rectangles, rounded rectangles, circles, ellipses)
+ * directly from the screenshot pixels using OpenCV.js – a pure Node.js WASM
+ * build of OpenCV. Each detected shape is highlighted with a colour-coded
+ * outline, a clickable centre marker, and a coordinate label. The reported
+ * coordinates are in the same space as the mouse/click tools (the crop region
+ * origin is added back when a region is supplied), so a shape's click-centre
+ * can be passed straight to the click tool. No window/system metadata is read.
  */
 export const macosAnnotateScreenshotTool = tool(
   async ({ region }) => {
@@ -1066,64 +1116,52 @@ export const macosAnnotateScreenshotTool = tool(
         // Shape detection is best-effort; never block the screenshot result
       }
 
-      // ── 3. Get window list from osascript ────────────────────────────────
-      let windows: WindowInfo[] = [];
-      try {
-        windows = await getWindowsFromOsascript();
-      } catch {
-        // osascript failed – still return an unannotated image
-      }
-
-      // ── 4. Composite all annotation overlays onto the image ──────────────
+      // ── 3. Composite the shape annotation overlay onto the image ─────────
       let finalImage = compressed;
-      if (srcWidth > 0 && srcHeight > 0) {
+      if (srcWidth > 0 && srcHeight > 0 && shapes.length > 0) {
         try {
-          const compositeInputs: Parameters<ReturnType<typeof sharp>['composite']>[0] = [];
-
-          if (windows.length > 0) {
-            const windowSvg = buildWindowAnnotationSVG(srcWidth, srcHeight, windows, region);
-            compositeInputs.push({ input: windowSvg, blend: "over" });
+          const shapeSvg = buildShapeAnnotationSVG(srcWidth, srcHeight, shapes, region);
+          let overlaid = await sharp(compressed)
+            .composite([{ input: shapeSvg, blend: "over" }])
+            .jpeg({ quality: 85 })
+            .toBuffer();
+          // Re-compress if the overlay pushed the size over the target
+          let q = 70;
+          while (overlaid.length > TARGET_SIZE_BYTES && q > 20) {
+            overlaid = await sharp(overlaid).jpeg({ quality: q }).toBuffer();
+            q -= 10;
           }
-
-          if (shapes.length > 0) {
-            const shapeSvg = buildShapeAnnotationSVG(srcWidth, srcHeight, shapes);
-            compositeInputs.push({ input: shapeSvg, blend: "over" });
-          }
-
-          if (compositeInputs.length > 0) {
-            let overlaid = await sharp(compressed)
-              .composite(compositeInputs)
-              .jpeg({ quality: 85 })
-              .toBuffer();
-            // Re-compress if the overlay pushed the size over the target
-            let q = 70;
-            while (overlaid.length > TARGET_SIZE_BYTES && q > 20) {
-              overlaid = await sharp(overlaid).jpeg({ quality: q }).toBuffer();
-              q -= 10;
-            }
-            finalImage = overlaid;
-          }
+          finalImage = overlaid;
         } catch {
           // overlay failed – fall back to unmodified compressed image
         }
       }
 
-      // ── 5. Build text summary ────────────────────────────────────────────
+      // ── 4. Build text summary ────────────────────────────────────────────
       const base64 = finalImage.toString("base64");
 
+      // Coordinates are reported in the mouse/click tool space: when a crop
+      // region is supplied, add its origin back so they are directly clickable.
+      const originX = region ? region.x : 0;
+      const originY = region ? region.y : 0;
+
       const shapeSummary = shapes.length > 0
-        ? `\nDetected ${shapes.length} geometric shape(s):\n` +
-          shapes
-            .map((s, i) => `  [Shape ${i + 1}] ${s.type} x=${s.x}, y=${s.y}, w=${s.width}, h=${s.height}`)
+        ? shapes
+            .map((s, i) => {
+              const x = s.x + originX;
+              const y = s.y + originY;
+              const cx = Math.round(x + s.width / 2);
+              const cy = Math.round(y + s.height / 2);
+              return `  [${i + 1}] ${s.type} bounds(x=${x}, y=${y}, w=${s.width}, h=${s.height}) click-centre(${cx}, ${cy})`;
+            })
             .join("\n")
-        : "";
+        : "  (none)";
 
       const coordNote =
         `[Annotated Screenshot] Size: ${srcWidth}×${srcHeight} px. ` +
-        `Detected ${windows.length} window(s):\n` +
-        windows
-          .map((w, i) => `  [${i + 1}] ${w.app} — "${w.title}" x=${w.x}, y=${w.y}, w=${w.width}, h=${w.height}`)
-          .join("\n") +
+        `Geometric shapes are detected directly from the screenshot pixels (OpenCV.js). ` +
+        `Coordinates match the mouse/click tool space; use the click-centre to click a shape.\n` +
+        `Detected ${shapes.length} geometric shape(s):\n` +
         shapeSummary;
 
       return [
@@ -1139,10 +1177,8 @@ export const macosAnnotateScreenshotTool = tool(
   },
   {
     name: "macos_annotate_screenshot",
-    description: `Capture a screenshot using a Node.js-based approach and annotate it with colour-coded outlines showing:
-• All visible windows and their coordinates (via osascript)
-• Detected geometric shapes — rectangles, rounded rectangles, circles, and ellipses (via OpenCV.js)
-Use this to understand the current screen layout and identify UI elements before using mouse tool coordinates. Only works on macOS.`,
+    description: `Capture a screenshot and detect geometric shapes (rectangles, rounded rectangles, circles, ellipses) directly from the screenshot pixels using OpenCV.js (open-source, pure Node.js). Each detected shape is highlighted with a colour-coded outline, a clickable centre marker, and a label showing its coordinates.
+The reported and labelled coordinates are in the same space used by the mouse tool, so the click-centre of any shape can be passed straight to the click tool. Use this to identify clickable UI elements from the image itself (no window/system metadata is read). Only works on macOS.`,
     schema: z.object({
       region: z
         .object({
@@ -1159,6 +1195,7 @@ Use this to understand the current screen layout and identify UI elements before
 
 export default async function getMacosControlTools() {
   return [
+    macosScreenshotTool,
     macosAnnotateScreenshotTool,
     macosGetScreenSizeTool,
     macosMouseMoveTool,
