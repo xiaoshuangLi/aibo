@@ -8,7 +8,6 @@ describe('AgentFactory - FilterDuplicateToolsMiddleware Integration', () => {
     memory: {},
     output: { verbose: false },
     tencentCloud: {},
-    composio: { apiKey: 'test', externalUserId: 'test' },
     lark: {},
     advanced: { maxConcurrentSubtasks: 5 },
     specialKeyword: { keyword: '干活' },

@@ -57,10 +57,6 @@ export const getToolType = (name: string): string => {
   if (['claude_execute', 'cursor_execute', 'cursor_open', 'gemini_execute', 'codex_execute'].includes(name)) {
     return 'agent_runner';
   }
-  // Composio工具
-  if (name.startsWith('COMPOSIO_')) {
-    return 'composio';
-  }
   // 其他工具
   return 'other';
 };
@@ -553,28 +549,6 @@ export const formatThinkResult = (result: any): string => {
 };
 
 /**
- * 格式化Composio工具结果
- */
-export const formatComposioResult = (name: string, result: any): string => {
-  // Composio工具通常返回结构化的数据，尝试提取有用信息
-  if (result.data) {
-    if (Array.isArray(result.data)) {
-      if (result.data.length === 0) return '无数据返回';
-      // 尝试识别常见的Composio响应格式
-      if (result.data[0].subject || result.data[0].title) {
-        return `🔌 **${name.replace('COMPOSIO_', '')} 结果 (${result.data.length} 项)**\n\n` + 
-               result.data.slice(0, 3).map((item: any, index: number) => 
-                 `- **${item.subject || item.title || '无标题'}**\n  ${item.body || item.content || item.snippet || '无内容'}`
-               ).join('\n\n');
-      }
-    } else if (typeof result.data === 'object') {
-      return `🔌 **${name.replace('COMPOSIO_', '')} 结果**\n\n\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``;
-    }
-  }
-  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-};
-
-/**
  * 格式化 AI 代理执行工具结果
  */
 export const formatAgentRunnerResult = (name: string, result: any): string => {
@@ -815,8 +789,6 @@ export const formatToolResultByType = (name: string, toolType: string, success: 
       return formatSearchResult(parsedResult);
     case 'task_management':
       return formatTaskManagementResult(name, parsedResult);
-    case 'composio':
-      return formatComposioResult(name, parsedResult);
     case 'agent_runner':
       return formatAgentRunnerResult(name, parsedResult);
     default:

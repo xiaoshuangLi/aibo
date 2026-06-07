@@ -351,10 +351,6 @@ describe('Tool Call Formatter Comprehensive Tests', () => {
       expect(formatToolCallArgs('TencentWsaSearch', '{}')).toContain('```json');
     });
 
-    it('should route composio tools to default', () => {
-      expect(formatToolCallArgs('COMPOSIO_SEARCH_TOOLS', '{}')).toContain('```json');
-    });
-
     it('should route other tools to default', () => {
       expect(formatToolCallArgs('unknown_tool', '{}')).toContain('```json');
     });
@@ -416,10 +412,6 @@ describe('Tool Call Formatter Comprehensive Tests', () => {
 
     it('should return correct emoji for task_management tools', () => {
       expect(getToolCallTitle('write_todos', {})).toBe('📋 工具调用: write_todos');
-    });
-
-    it('should return correct emoji for composio tools', () => {
-      expect(getToolCallTitle('COMPOSIO_SEARCH_TOOLS', {})).toBe('🔌 工具调用: COMPOSIO_SEARCH_TOOLS');
     });
 
     it('should return default emoji for unknown tools', () => {

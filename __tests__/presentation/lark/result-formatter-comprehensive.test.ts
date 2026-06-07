@@ -82,10 +82,6 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       expect(getToolType('task')).toBe('task_management');
     });
 
-    it('should return composio for COMPOSIO_ tools', () => {
-      expect(getToolType('COMPOSIO_GMAIL_SEND_EMAIL')).toBe('composio');
-    });
-
     it('should return other for unknown tools', () => {
       expect(getToolType('unknown_tool')).toBe('other');
     });
@@ -567,44 +563,6 @@ describe('Tool Result Formatter - Comprehensive Tests', () => {
       const result = formatToolResultByType('write_todos', 'task_management', true, { message: 'no todos' });
       expect(result).toContain('```json');
       expect(result).toContain('"message": "no todos"');
-    });
-  });
-
-  describe('formatToolResultByType - Composio Tools', () => {
-    it('should format Composio result with data array containing subject/title', () => {
-      const result = formatToolResultByType('COMPOSIO_GMAIL_SEND_EMAIL', 'composio', true, {
-        data: [
-          { subject: 'Email Subject', body: 'Email body content' },
-          { title: 'Another Item', content: 'Item content' }
-        ]
-      });
-      expect(result).toContain('🔌 **GMAIL_SEND_EMAIL 结果 (2 项)**');
-      expect(result).toContain('- **Email Subject**');
-      expect(result).toContain('Email body content');
-      expect(result).toContain('- **Another Item**');
-      expect(result).toContain('Item content');
-    });
-
-    it('should format Composio result with empty data array', () => {
-      const result = formatToolResultByType('COMPOSIO_GMAIL_SEND_EMAIL', 'composio', true, {
-        data: []
-      });
-      expect(result).toBe('无数据返回');
-    });
-
-    it('should format Composio result with object data', () => {
-      const result = formatToolResultByType('COMPOSIO_GMAIL_SEND_EMAIL', 'composio', true, {
-        data: { success: true, message: 'sent' }
-      });
-      expect(result).toContain('🔌 **GMAIL_SEND_EMAIL 结果**');
-      expect(result).toContain('"success": true');
-      expect(result).toContain('"message": "sent"');
-    });
-
-    it('should format Composio result without data as JSON', () => {
-      const result = formatToolResultByType('COMPOSIO_GMAIL_SEND_EMAIL', 'composio', true, { error: 'auth failed' });
-      expect(result).toContain('```json');
-      expect(result).toContain('"error": "auth failed"');
     });
   });
 

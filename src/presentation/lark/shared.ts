@@ -336,10 +336,6 @@ export const getToolType = (name: string): string => {
   if (['claude_execute', 'cursor_execute', 'cursor_open', 'gemini_execute', 'codex_execute'].includes(name)) {
     return 'agent_runner';
   }
-  // Composio工具
-  if (name.startsWith('COMPOSIO_')) {
-    return 'composio';
-  }
   // 其他工具
   return 'other';
 };
@@ -357,7 +353,6 @@ export const TOOL_TYPE_EMOJIS: Record<string, string> = {
   knowledge: '📚',
   search: '🌐',
   task_management: '📋',
-  composio: '🔌',
   agent_runner: '🤖',
   other: '🔧'
 };

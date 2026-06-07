@@ -18,7 +18,6 @@ cp .env.example .env
 - [语言配置](#语言配置)
 - [人设 / 交流风格配置](#人设--交流风格配置)
 - [腾讯云 ASR 配置](#腾讯云-asr-配置)
-- [Composio 配置](#composio-配置)
 - [Lark 飞书配置](#lark-飞书配置)
 - [子任务并发配置](#子任务并发配置)
 - [特殊关键词配置](#特殊关键词配置)
@@ -248,30 +247,6 @@ AIBO_TENCENTCLOUD_REGION=ap-guangzhou
    - 访问 [https://console.cloud.tencent.com/asr](https://console.cloud.tencent.com/asr)。
    - 点击**立即开通**，按提示完成服务开通。
 5. 将上述信息分别填入对应的环境变量。
-
----
-
-## Composio 配置
-
-用于通过 [Composio](https://composio.dev) 集成第三方工具与 SaaS 服务。
-
-| 变量名 | 是否必填 | 默认值 | 说明 |
-|--------|----------|--------|------|
-| `AIBO_COMPOSIO_API_KEY` | ✅（Composio 功能） | — | Composio 平台 API Key |
-| `AIBO_COMPOSIO_EXTERNAL_USER_ID` | ✅（Composio 功能） | — | 外部用户 ID，用于关联 Composio 账户 |
-
-```dotenv
-AIBO_COMPOSIO_API_KEY=your-composio-api-key
-AIBO_COMPOSIO_EXTERNAL_USER_ID=your-external-user-id
-```
-
-### 如何获取 Composio API Key
-
-1. 访问 [https://app.composio.dev](https://app.composio.dev) 并注册 / 登录。
-2. 登录后进入控制台首页，点击左侧菜单 **Settings** 或 **API Keys**。
-3. 点击 **Generate API Key**（或 **Create new key**），输入名称后确认。
-4. 复制生成的 API Key，填入 `AIBO_COMPOSIO_API_KEY`。
-5. `AIBO_COMPOSIO_EXTERNAL_USER_ID` 可以设为任意唯一字符串（如用户邮箱或自定义 ID），用于将 Composio 连接与特定用户绑定。
 
 ---
 
