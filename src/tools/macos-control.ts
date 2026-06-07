@@ -12,6 +12,7 @@ const TARGET_SIZE_BYTES = 300 * 1024; // 300 KB
 const JPEG_QUALITY_INITIAL = 75;
 const JPEG_QUALITY_STEP = 10;
 const JPEG_QUALITY_MIN = 20;
+const OSASCRIPT_TIMEOUT_MS = 6000;
 
 // -----------------------------------------------------------------------
 // Platform guard
@@ -312,6 +313,7 @@ interface WindowInfo {
 async function getWindowBoundsViaOsascript(): Promise<WindowInfo[]> {
   const { execFile } = await import('child_process');
   const { promisify } = await import('util');
+  const { randomBytes } = await import('crypto');
   const execFileAsync = promisify(execFile);
 
   // AppleScript: enumerate foreground-app windows with their logical bounds.
@@ -343,11 +345,11 @@ end tell
 return output
 `;
 
-  const tmpFile = path.join(os.tmpdir(), `aibo-windows-${Date.now()}.applescript`);
+  const tmpFile = path.join(os.tmpdir(), `aibo-windows-${randomBytes(8).toString('hex')}.applescript`);
   fs.writeFileSync(tmpFile, script, 'utf8');
 
   try {
-    const { stdout } = await execFileAsync('osascript', [tmpFile], { timeout: 6000 });
+    const { stdout } = await execFileAsync('osascript', [tmpFile], { timeout: OSASCRIPT_TIMEOUT_MS });
     const windows: WindowInfo[] = [];
     let idx = 0;
 
@@ -395,7 +397,7 @@ function buildAnnotationSVG(
   const FONT_SIZE = 12;
   const LABEL_PAD = 4;
   const LABEL_HEIGHT = FONT_SIZE + LABEL_PAD * 2;
-  const CHAR_WIDTH = 7; // approximate monospace character width at font-size 12
+  const CHAR_WIDTH = 7; // empirical monospace glyph width (px) at font-size 12 in SVG renderers
 
   const escXml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
