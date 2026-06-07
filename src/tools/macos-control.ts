@@ -4,6 +4,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { createWorker } from "tesseract.js";
 
+// Promisified execFile — used to run osascript for retrieving window information.
 const execFileAsync = promisify(execFile);
 
 // -----------------------------------------------------------------------
@@ -379,8 +380,16 @@ async function getWindowsFromOsascript(): Promise<WindowInfo[]> {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const parts = trimmed.split('\t');
+    // Last 4 fields are always integers: x, y, width, height.
+    // Treat everything between the first field and the last 4 as the title
+    // so that tab characters inside a window title are handled gracefully.
     if (parts.length < 6) continue;
-    const [app, title, xStr, yStr, wStr, hStr] = parts;
+    const app = parts[0];
+    const hStr = parts[parts.length - 1];
+    const wStr = parts[parts.length - 2];
+    const yStr = parts[parts.length - 3];
+    const xStr = parts[parts.length - 4];
+    const title = parts.slice(1, parts.length - 4).join('\t');
     const x = parseInt(xStr, 10);
     const y = parseInt(yStr, 10);
     const width = parseInt(wStr, 10);
