@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
+import { createWorker } from "tesseract.js";
 
 // -----------------------------------------------------------------------
 // Constants
@@ -12,6 +13,7 @@ const TARGET_SIZE_BYTES = 300 * 1024; // 300 KB
 const JPEG_QUALITY_INITIAL = 75;
 const JPEG_QUALITY_STEP = 10;
 const JPEG_QUALITY_MIN = 20;
+const OSASCRIPT_TIMEOUT_MS = 6000;
 
 // -----------------------------------------------------------------------
 // Platform guard
@@ -239,10 +241,32 @@ async function captureScreenBlocks(
   }
 
   const base64 = finalImage.toString("base64");
-  return [
+
+  // OCR: automatically extract text from the screenshot using tesseract.js
+  let ocrNote = "";
+  try {
+    const worker = await createWorker("eng");
+    try {
+      const { data } = await worker.recognize(finalImage);
+      const ocrText = data.text.trim();
+      if (ocrText) {
+        ocrNote = `[OCR text] ${ocrText}`;
+      }
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    // OCR is best-effort; never block the screenshot result
+  }
+
+  const blocks: ContentBlock[] = [
     { type: "text", text: coordNote },
     { type: "image_url", image_url: { url: base64 } },
   ];
+  if (ocrNote) {
+    blocks.push({ type: "text", text: ocrNote });
+  }
+  return blocks;
 }
 
 // -----------------------------------------------------------------------
@@ -288,6 +312,155 @@ function coerceXY(input: unknown): unknown {
     if (ny !== undefined) result.y = ny;
   }
   return result;
+}
+
+// -----------------------------------------------------------------------
+// Annotate-screenshot helpers
+// -----------------------------------------------------------------------
+
+interface WindowInfo {
+  app: string;
+  title: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  index: number;
+}
+
+/**
+ * Retrieve visible on-screen window bounds via osascript / System Events.
+ * Returns logical screen coordinates, which are the same coordinate space
+ * used by all mouse tools (nut-js Point).
+ */
+async function getWindowBoundsViaOsascript(): Promise<WindowInfo[]> {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const { randomBytes } = await import('crypto');
+  const execFileAsync = promisify(execFile);
+
+  // AppleScript: enumerate foreground-app windows with their logical bounds.
+  // Fields are tab-separated; rows are newline-separated.
+  const script = `
+set output to ""
+tell application "System Events"
+  set allProcesses to processes where background only is false
+  repeat with proc in allProcesses
+    set procName to name of proc
+    try
+      set wins to windows of proc
+      repeat with win in wins
+        try
+          set {wx, wy} to position of win
+          set {ww, wh} to size of win
+          if ww > 20 and wh > 20 then
+            set winTitle to ""
+            try
+              set winTitle to title of win as text
+            end try
+            set output to output & procName & "\\t" & winTitle & "\\t" & wx & "\\t" & wy & "\\t" & ww & "\\t" & wh & "\\n"
+          end if
+        end try
+      end repeat
+    end try
+  end repeat
+end tell
+return output
+`;
+
+  const tmpFile = path.join(os.tmpdir(), `aibo-windows-${randomBytes(8).toString('hex')}.applescript`);
+  fs.writeFileSync(tmpFile, script, 'utf8');
+
+  try {
+    const { stdout } = await execFileAsync('osascript', [tmpFile], { timeout: OSASCRIPT_TIMEOUT_MS });
+    const windows: WindowInfo[] = [];
+    let idx = 0;
+
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const parts = trimmed.split('\t');
+      if (parts.length < 6) continue;
+      const x = parseInt(parts[2], 10);
+      const y = parseInt(parts[3], 10);
+      const w = parseInt(parts[4], 10);
+      const h = parseInt(parts[5], 10);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || w <= 0 || h <= 0) continue;
+      windows.push({ app: parts[0], title: parts[1], x, y, width: w, height: h, index: idx++ });
+    }
+
+    return windows;
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+  }
+}
+
+/**
+ * Build an SVG buffer that draws colour-coded dashed rectangles for each
+ * window, with a label showing the screen coordinates (same space as mouse
+ * tools).
+ *
+ * @param imgWidth       Width of the target image in pixels
+ * @param imgHeight      Height of the target image in pixels
+ * @param windows        Window list from getWindowBoundsViaOsascript
+ * @param regionOffsetX  X offset when a screenshot region was used (default 0)
+ * @param regionOffsetY  Y offset when a screenshot region was used (default 0)
+ */
+function buildAnnotationSVG(
+  imgWidth: number,
+  imgHeight: number,
+  windows: WindowInfo[],
+  regionOffsetX: number = 0,
+  regionOffsetY: number = 0,
+): Buffer {
+  const PALETTE = [
+    '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
+    '#9b59b6', '#1abc9c', '#e67e22', '#e91e63',
+  ];
+  const FONT_SIZE = 12;
+  const LABEL_PAD = 4;
+  const LABEL_HEIGHT = FONT_SIZE + LABEL_PAD * 2;
+  const CHAR_WIDTH = 7; // empirical monospace glyph width (px) at font-size 12 in SVG renderers
+
+  const escXml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  let shapes = '';
+
+  for (const win of windows) {
+    const color = PALETTE[win.index % PALETTE.length];
+
+    // Translate screen coordinates to image coordinates
+    const rx = win.x - regionOffsetX;
+    const ry = win.y - regionOffsetY;
+    const rw = win.width;
+    const rh = win.height;
+
+    // Skip rectangles that are completely outside the image
+    if (rx + rw <= 0 || ry + rh <= 0 || rx >= imgWidth || ry >= imgHeight) continue;
+
+    // Build label text; truncate if it would overflow the image width
+    const rawLabel = `${win.app}  x=${win.x} y=${win.y} w=${win.width} h=${win.height}`;
+    const maxChars = Math.floor((imgWidth - Math.max(0, rx)) / CHAR_WIDTH);
+    const label = rawLabel.length > maxChars
+      ? rawLabel.slice(0, Math.max(6, maxChars - 1)) + '…'
+      : rawLabel;
+    const labelW = label.length * CHAR_WIDTH + LABEL_PAD * 2;
+
+    // Place label above the rect when there is enough vertical space; below otherwise
+    const labelAbove = ry >= LABEL_HEIGHT;
+    const labelBgY = labelAbove ? ry - LABEL_HEIGHT : Math.min(ry + rh, imgHeight - LABEL_HEIGHT);
+    const labelTxtY = labelBgY + FONT_SIZE + LABEL_PAD - 2;
+    const labelX = Math.max(0, Math.min(rx, imgWidth - labelW));
+
+    shapes +=
+      `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5" rx="2"/>` +
+      `<rect x="${labelX}" y="${labelBgY}" width="${labelW}" height="${LABEL_HEIGHT}" fill="${color}" opacity="0.85" rx="3"/>` +
+      `<text x="${labelX + LABEL_PAD}" y="${labelTxtY}" font-family="monospace" font-size="${FONT_SIZE}" fill="white" font-weight="bold">${escXml(label)}</text>`;
+  }
+
+  const svg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">${shapes}</svg>`;
+  return Buffer.from(svg);
 }
 
 // -----------------------------------------------------------------------
@@ -663,6 +836,122 @@ Use '+' to combine keys (e.g. "Command+C", "Shift+Enter", "Command+Shift+4").`,
   }
 );
 
+/**
+ * 8. macos_annotate_screenshot
+ */
+export const macosAnnotateScreenshotTool = tool(
+  async ({ region }) => {
+    const platformError = requireMacos();
+    if (platformError) return JSON.stringify({ success: false, error: platformError });
+
+    try {
+      const screenshot = await loadScreenshot();
+      const raw = await screenshot({ format: 'png' });
+      const sharp = await loadSharp();
+
+      // Resize physical pixels → logical pixels (same HiDPI handling as macos_screenshot)
+      let processedRaw = raw as Buffer;
+      try {
+        const nutjs = await loadNutjs();
+        const logicalWidth = await nutjs.screen.width();
+        const rawMeta = await sharp(raw as Buffer).metadata();
+        const physicalWidth = rawMeta.width ?? 0;
+        const physicalHeight = rawMeta.height ?? 0;
+        if (logicalWidth > 0 && physicalWidth > 0) {
+          const pixelRatio = physicalWidth / logicalWidth;
+          if (pixelRatio !== 1 && physicalHeight > 0) {
+            const lw = Math.round(physicalWidth / pixelRatio);
+            const lh = Math.round(physicalHeight / pixelRatio);
+            processedRaw = await sharp(raw as Buffer).resize(lw, lh).toBuffer();
+          }
+        }
+      } catch {
+        // nut-js unavailable – use raw buffer as-is
+      }
+
+      // Crop to region if requested
+      const offsetX = region?.x ?? 0;
+      const offsetY = region?.y ?? 0;
+      let source = processedRaw;
+      if (region) {
+        source = await sharp(processedRaw)
+          .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
+          .toBuffer();
+      }
+
+      const meta = await sharp(source).metadata();
+      const imgWidth = meta.width ?? 0;
+      const imgHeight = meta.height ?? 0;
+
+      // Get visible window bounds (logical screen coordinates)
+      let windows: WindowInfo[] = [];
+      try {
+        windows = await getWindowBoundsViaOsascript();
+      } catch (err) {
+        console.debug(
+          'macos_annotate_screenshot: window enumeration failed:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+
+      // Composite annotation SVG onto the screenshot
+      let annotated: Buffer;
+      if (windows.length > 0 && imgWidth > 0 && imgHeight > 0) {
+        const svgOverlay = buildAnnotationSVG(imgWidth, imgHeight, windows, offsetX, offsetY);
+        annotated = await sharp(source)
+          .composite([{ input: svgOverlay, blend: 'over' }])
+          .jpeg({ quality: 85 })
+          .toBuffer();
+      } else {
+        annotated = await sharp(source).jpeg({ quality: 85 }).toBuffer();
+      }
+
+      // Compress to ≤300 KB if necessary
+      const TARGET = 300 * 1024;
+      let quality = 70;
+      while (annotated.length > TARGET && quality > 20) {
+        annotated = await sharp(annotated).jpeg({ quality }).toBuffer();
+        quality -= 10;
+      }
+
+      const base64 = annotated.toString('base64');
+
+      const infoLines: string[] = [
+        `[Annotated Screenshot] ${imgWidth}×${imgHeight} px — coordinates match mouse tool coordinate space.`,
+        `Detected ${windows.length} window(s):`,
+        ...windows.map((w) =>
+          `  [${w.index + 1}] ${w.app}${w.title ? ` "${w.title}"` : ''} → x=${w.x}, y=${w.y}, w=${w.width}, h=${w.height}`,
+        ),
+      ];
+
+      return [
+        { type: 'text' as const, text: infoLines.join('\n') },
+        { type: 'image_url' as const, image_url: { url: base64 } },
+      ] as unknown as string;
+    } catch (err) {
+      return JSON.stringify({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+  {
+    name: 'macos_annotate_screenshot',
+    description: `Take a screenshot and annotate it with colour-coded dashed rectangles highlighting each visible window on screen, each labelled with its exact screen coordinates (x, y, width, height). The coordinates in the labels use the same logical-pixel space as macos_mouse_click and other mouse tools — no conversion needed. Use this tool to identify the position and extent of on-screen regions before clicking or interacting with them.`,
+    schema: z.object({
+      region: z
+        .object({
+          x: z.number().describe('Left edge of the capture region in screen pixels'),
+          y: z.number().describe('Top edge of the capture region in screen pixels'),
+          width: z.number().describe('Width of the capture region in screen pixels'),
+          height: z.number().describe('Height of the capture region in screen pixels'),
+        })
+        .optional()
+        .describe('Optional region to capture. Omit to capture the full screen.'),
+    }),
+  }
+);
+
 // -----------------------------------------------------------------------
 // Export
 // -----------------------------------------------------------------------
@@ -676,5 +965,6 @@ export default async function getMacosControlTools() {
     macosMouseScrollTool,
     macosKeyboardTypeTool,
     macosKeyPressTool,
+    macosAnnotateScreenshotTool,
   ];
 }

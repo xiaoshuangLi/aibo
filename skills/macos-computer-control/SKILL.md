@@ -25,6 +25,7 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 | Tool | Purpose |
 |------|---------|
 | `macos_screenshot` | Capture full screen or a region as a compressed JPEG (≤300 KB) |
+| `macos_annotate_screenshot` | Capture a screenshot and overlay colour-coded rectangles + coordinate labels for every visible window |
 | `macos_get_screen_size` | Return screen width × height in pixels |
 | `macos_mouse_move` | Move the cursor to (x, y) |
 | `macos_mouse_click` | Click at (x, y) — left / right / middle, single or double |
@@ -36,10 +37,10 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 
 ```
 1. GET SCREEN STATE
-   └─ macos_screenshot() → see what is currently on screen
+   └─ macos_annotate_screenshot() → see what is on screen, with labelled coordinates
 
 2. PLAN the next action
-   └─ identify target element and its approximate (x, y) coordinates
+   └─ read coordinates from labels; pick the target element's (x, y)
 
 3. ACT
    ├─ macos_mouse_click(x, y)        — click a button / link
@@ -53,6 +54,18 @@ This skill lets the agent **see and operate a macOS desktop** to complete any go
 ```
 
 ## 🖼️ Screenshot Tips
+
+### Annotated screenshot — identify element positions at a glance
+```
+macos_annotate_screenshot()
+```
+Returns the full screenshot with coloured dashed rectangles drawn around every
+visible window, each labelled with:
+```
+AppName  x=<left> y=<top> w=<width> h=<height>
+```
+All coordinates are in the same logical-pixel space used by `macos_mouse_click`.
+Use this as a first step when you need to locate an element precisely.
 
 ### Full-screen capture (default)
 ```
