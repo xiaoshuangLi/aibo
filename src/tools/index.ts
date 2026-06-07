@@ -2,7 +2,6 @@ import getBashTools from '@/tools/bash';
 import getUtilsTools from '@/tools/utils';
 import getGithubFetchTools from '@/tools/github-fetch';
 import getTencentWsaTools from '@/tools/tencent-wsa';
-import getComposioTools from '@/tools/composio';
 import getWriteSubagentTodosTools from '@/tools/write-subagent-todos';
 import getKnowledgeTools from '@/tools/knowledge';
 import getLspTools from '@/tools/lsp';
@@ -33,7 +32,6 @@ export default async function getTools(session?: Session) {
     utilsTools,
     githubFetchTools,
     tencentWsaTools,
-    composioTools,
     writeSubagentTodosTools,
     knowledgeTools,
     lspTools,
@@ -55,7 +53,6 @@ export default async function getTools(session?: Session) {
     getUtilsTools(),
     getGithubFetchTools(),
     getTencentWsaTools(),
-    getComposioTools(),
     getWriteSubagentTodosTools(),
     getKnowledgeTools(),
     getLspTools(),
@@ -79,7 +76,6 @@ export default async function getTools(session?: Session) {
     ...utilsTools,
     ...githubFetchTools,
     ...tencentWsaTools,
-    ...composioTools,
     ...writeSubagentTodosTools,
     ...knowledgeTools,
     ...lspTools,

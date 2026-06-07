@@ -103,9 +103,6 @@ const envSchema = z.object({
   AIBO_TENCENTCLOUD_SECRET_ID: z.string().optional(),
   AIBO_TENCENTCLOUD_SECRET_KEY: z.string().optional(),
   AIBO_TENCENTCLOUD_REGION: z.string().default('ap-guangzhou'),
-  // Composio Configuration
-  AIBO_COMPOSIO_API_KEY: z.string().min(1).default('test-composio-api-key'),
-  AIBO_COMPOSIO_EXTERNAL_USER_ID: z.string().min(1).default('test-external-user-id'),
   // Advanced Subtask Configuration
   AIBO_MAX_CONCURRENT_SUBTASKS: z.coerce.number().int().min(1).max(50).default(5),
   // Special keyword configuration
@@ -186,10 +183,6 @@ export const config = {
     secretId: env.AIBO_TENCENTCLOUD_SECRET_ID,
     secretKey: env.AIBO_TENCENTCLOUD_SECRET_KEY,
     region: env.AIBO_TENCENTCLOUD_REGION,
-  },
-  composio: {
-    apiKey: env.AIBO_COMPOSIO_API_KEY,
-    externalUserId: env.AIBO_COMPOSIO_EXTERNAL_USER_ID,
   },
   lark: {
     appId: env.AIBO_LARK_APP_ID,

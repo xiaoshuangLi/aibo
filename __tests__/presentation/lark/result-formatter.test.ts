@@ -109,10 +109,6 @@ describe('Tool Result Formatter', () => {
       expect(getToolType('task')).toBe('task_management');
     });
 
-    it('should return composio for composio tools', () => {
-      expect(getToolType('COMPOSIO_SEARCH_TOOLS')).toBe('composio');
-    });
-
     it('should return other for unknown tools', () => {
       expect(getToolType('unknown_tool')).toBe('other');
     });
@@ -199,11 +195,6 @@ describe('Tool Result Formatter', () => {
         `Updated todo list to ${JSON.stringify(todos)}`
       );
       expect(result).toContain('待办事项已更新');
-    });
-
-    it('should handle composio result', () => {
-      const result = formatToolResultByType('COMPOSIO_SEARCH_TOOLS', 'composio', true, {data: [{subject: 'test subject'}]});
-      expect(result).toContain('SEARCH_TOOLS');
     });
 
     it('should handle other tool types with stdout/stderr', () => {
