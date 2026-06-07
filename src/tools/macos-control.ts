@@ -1,8 +1,5 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import * as os from "os";
-import * as path from "path";
-import * as fs from "fs";
 import { createWorker } from "tesseract.js";
 
 // -----------------------------------------------------------------------
@@ -13,7 +10,15 @@ const TARGET_SIZE_BYTES = 300 * 1024; // 300 KB
 const JPEG_QUALITY_INITIAL = 75;
 const JPEG_QUALITY_STEP = 10;
 const JPEG_QUALITY_MIN = 20;
-const OSASCRIPT_TIMEOUT_MS = 6000;
+
+// Shape detection thresholds
+const SHAPE_MIN_AREA = 400;
+const RECT_FILL_THRESHOLD = 0.85;
+const ROUNDED_RECT_FILL_THRESHOLD = 0.60;
+const CIRCLE_CIRCULARITY_THRESHOLD = 0.78;
+const ELLIPSE_MAX_ASPECT_RATIO = 4;
+const SHAPE_IOU_DEDUP_THRESHOLD = 0.8;
+const ROUNDED_RECT_CORNER_FACTOR = 0.15;
 
 // -----------------------------------------------------------------------
 // Platform guard
@@ -42,6 +47,13 @@ async function loadSharp() {
 
 async function loadNutjs() {
   return import("@nut-tree-fork/nut-js");
+}
+
+async function loadOpenCV() {
+  // @techstark/opencv-js returns a thenable that resolves to the cv object
+  const cvMod = await import("@techstark/opencv-js");
+  // The default export is a thenable that resolves when the WASM runtime is ready
+  return (cvMod.default ?? cvMod) as unknown as Promise<typeof import("@techstark/opencv-js")>;
 }
 
 // -----------------------------------------------------------------------
@@ -157,10 +169,12 @@ async function overlayMouseCursor(
  * pixel coordinates correspond 1:1 to the logical coordinates expected by all
  * mouse tools.
  *
- * @param region - Optional crop region in **logical** screen pixels.
+ * @param region  - Optional crop region in **logical** screen pixels.
+ * @param annotate - When true, overlay colour-coded window-bounds rectangles.
  */
 async function captureScreenBlocks(
-  region?: { x: number; y: number; width: number; height: number }
+  region?: { x: number; y: number; width: number; height: number },
+  annotate?: boolean
 ): Promise<ContentBlock[]> {
   const screenshot = await loadScreenshot();
   const raw = await screenshot({ format: "png" });
@@ -259,12 +273,60 @@ async function captureScreenBlocks(
     // OCR is best-effort; never block the screenshot result
   }
 
+  // Annotation: detect geometric shapes in the image and highlight them
+  let annotatedImage = finalImage;
+  let shapeListNote = "";
+  if (annotate) {
+    try {
+      const shapes = await detectShapesInImage(finalImage);
+      if (shapes.length > 0 && imgWidth > 0 && imgHeight > 0) {
+        const svgOverlay = buildShapeAnnotationSVG(imgWidth, imgHeight, shapes);
+        let overlaid = await sharp(finalImage)
+          .composite([{ input: svgOverlay, blend: 'over' }])
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        // Re-compress if needed
+        const TARGET = 300 * 1024;
+        let q = 70;
+        while (overlaid.length > TARGET && q > 20) {
+          overlaid = await sharp(overlaid).jpeg({ quality: q }).toBuffer();
+          q -= 10;
+        }
+        annotatedImage = overlaid;
+      }
+      const typeLabel: Record<ShapeType, string> = {
+        rectangle: 'Rectangle',
+        rounded_rectangle: 'Rounded Rectangle',
+        circle: 'Circle',
+        ellipse: 'Ellipse',
+      };
+      const shapeLines = [
+        `[Shape Annotation] Detected ${shapes.length} shape(s):`,
+        ...shapes.map((s) => {
+          const base = `  [${s.index + 1}] ${typeLabel[s.type]} — x=${s.x}, y=${s.y}, w=${s.width}, h=${s.height}`;
+          if ((s.type === 'circle' || s.type === 'ellipse') && s.cx !== undefined) {
+            return base + ` (cx=${s.cx}, cy=${s.cy}, rx=${s.rx}, ry=${s.ry})`;
+          }
+          return base;
+        }),
+      ];
+      shapeListNote = shapeLines.join('\n');
+    } catch {
+      // Annotation is best-effort; never block the screenshot result
+    }
+  }
+
+  const finalBase64 = annotate ? annotatedImage.toString("base64") : base64;
+
   const blocks: ContentBlock[] = [
     { type: "text", text: coordNote },
-    { type: "image_url", image_url: { url: base64 } },
+    { type: "image_url", image_url: { url: finalBase64 } },
   ];
   if (ocrNote) {
     blocks.push({ type: "text", text: ocrNote });
+  }
+  if (shapeListNote) {
+    blocks.push({ type: "text", text: shapeListNote });
   }
   return blocks;
 }
@@ -315,103 +377,198 @@ function coerceXY(input: unknown): unknown {
 }
 
 // -----------------------------------------------------------------------
-// Annotate-screenshot helpers
+// Annotate-screenshot helpers  (cross-platform, open-source shape detection)
 // -----------------------------------------------------------------------
 
-interface WindowInfo {
-  app: string;
-  title: string;
+type ShapeType = 'rectangle' | 'rounded_rectangle' | 'circle' | 'ellipse';
+
+interface ShapeInfo {
+  type: ShapeType;
+  /** Bounding-box top-left x (image pixels) */
   x: number;
+  /** Bounding-box top-left y (image pixels) */
   y: number;
   width: number;
   height: number;
+  /** Circle/ellipse centre x */
+  cx?: number;
+  /** Circle/ellipse centre y */
+  cy?: number;
+  /** Horizontal radius (ellipse) or radius (circle) */
+  rx?: number;
+  /** Vertical radius (ellipse only) */
+  ry?: number;
   index: number;
 }
 
 /**
- * Retrieve visible on-screen window bounds via osascript / System Events.
- * Returns logical screen coordinates, which are the same coordinate space
- * used by all mouse tools (nut-js Point).
+ * Detect standard geometric shapes (rectangles, rounded rectangles, circles,
+ * ellipses) in an image buffer using OpenCV.js (WASM, cross-platform).
+ *
+ * Algorithm:
+ *  1. Grayscale → Gaussian blur → Canny edge detection
+ *  2. findContours (RETR_LIST so inner shapes are also found)
+ *  3. approxPolyDP to classify each contour:
+ *     – 4 vertices, right-ish angles  → rectangle
+ *     – many vertices, nearly circular area ratio → circle
+ *     – many vertices, elongated → ellipse
+ *     – 4 vertices + corner area deficit → rounded rectangle
+ *  4. De-duplicate heavily overlapping shapes (IoU > 0.8)
  */
-async function getWindowBoundsViaOsascript(): Promise<WindowInfo[]> {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const { randomBytes } = await import('crypto');
-  const execFileAsync = promisify(execFile);
+async function detectShapesInImage(imageBuffer: Buffer): Promise<ShapeInfo[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cv: any = await loadOpenCV();
+  const sharp = await loadSharp();
 
-  // AppleScript: enumerate foreground-app windows with their logical bounds.
-  // Fields are tab-separated; rows are newline-separated.
-  const script = `
-set output to ""
-tell application "System Events"
-  set allProcesses to processes where background only is false
-  repeat with proc in allProcesses
-    set procName to name of proc
-    try
-      set wins to windows of proc
-      repeat with win in wins
-        try
-          set {wx, wy} to position of win
-          set {ww, wh} to size of win
-          if ww > 20 and wh > 20 then
-            set winTitle to ""
-            try
-              set winTitle to title of win as text
-            end try
-            set output to output & procName & "\\t" & winTitle & "\\t" & wx & "\\t" & wy & "\\t" & ww & "\\t" & wh & "\\n"
-          end if
-        end try
-      end repeat
-    end try
-  end repeat
-end tell
-return output
-`;
+  // ---------- pre-process image ----------
+  const { data, info } = await sharp(imageBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  const tmpFile = path.join(os.tmpdir(), `aibo-windows-${randomBytes(8).toString('hex')}.applescript`);
-  fs.writeFileSync(tmpFile, script, 'utf8');
+  const { width, height } = info;
 
-  try {
-    const { stdout } = await execFileAsync('osascript', [tmpFile], { timeout: OSASCRIPT_TIMEOUT_MS });
-    const windows: WindowInfo[] = [];
-    let idx = 0;
+  // Build an OpenCV Mat from raw RGBA pixels
+  const src = new cv.Mat(height, width, cv.CV_8UC4);
+  src.data.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
 
-    for (const line of stdout.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const parts = trimmed.split('\t');
-      if (parts.length < 6) continue;
-      const x = parseInt(parts[2], 10);
-      const y = parseInt(parts[3], 10);
-      const w = parseInt(parts[4], 10);
-      const h = parseInt(parts[5], 10);
-      if (!Number.isFinite(x) || !Number.isFinite(y) || w <= 0 || h <= 0) continue;
-      windows.push({ app: parts[0], title: parts[1], x, y, width: w, height: h, index: idx++ });
+  const gray = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  src.delete();
+
+  const blurred = new cv.Mat();
+  cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+  gray.delete();
+
+  const edges = new cv.Mat();
+  cv.Canny(blurred, edges, 30, 120, 3, false);
+  blurred.delete();
+
+  // Dilate edges slightly to close small gaps
+  const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+  const dilated = new cv.Mat();
+  cv.dilate(edges, dilated, kernel, new cv.Point(-1, -1), 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+  kernel.delete();
+  edges.delete();
+
+  // ---------- find contours ----------
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+  cv.findContours(dilated, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+  dilated.delete();
+  hierarchy.delete();
+
+  const MIN_AREA = SHAPE_MIN_AREA;
+  const shapes: ShapeInfo[] = [];
+
+  for (let i = 0; i < contours.size(); i++) {
+    const contour = contours.get(i);
+    try {
+      const area = cv.contourArea(contour, false);
+      if (area < MIN_AREA) continue;
+
+      const arcLen = cv.arcLength(contour, true);
+      const approx = new cv.Mat();
+      cv.approxPolyDP(contour, approx, 0.04 * arcLen, true);
+      const vertices = approx.rows;
+
+      const rect = cv.boundingRect(contour);
+      const { x, y } = rect;
+      const w = rect.width;
+      const h = rect.height;
+      if (w <= 0 || h <= 0) { approx.delete(); continue; }
+
+      let type: ShapeType | null = null;
+      let cx: number | undefined;
+      let cy: number | undefined;
+      let rx: number | undefined;
+      let ry: number | undefined;
+
+      if (vertices >= 4 && vertices <= 6) {
+        // ---- rectangle / rounded-rectangle ----
+        // Compactness: how much of the bounding box is filled by the contour
+        const boxArea = w * h;
+        const fill = area / boxArea;
+
+        if (fill > RECT_FILL_THRESHOLD) {
+          type = 'rectangle';
+        } else if (fill > ROUNDED_RECT_FILL_THRESHOLD) {
+          type = 'rounded_rectangle';
+        }
+      }
+
+      if (type === null && vertices > 6) {
+        // ---- circle / ellipse ----
+        const enclosing = cv.minEnclosingCircle(contour);
+        const encR: number = enclosing.radius;
+        const circleArea = Math.PI * encR * encR;
+        const circularity = area / circleArea;
+
+        if (circularity > CIRCLE_CIRCULARITY_THRESHOLD) {
+          type = 'circle';
+          cx = Math.round(enclosing.center.x);
+          cy = Math.round(enclosing.center.y);
+          rx = Math.round(encR);
+          ry = Math.round(encR);
+        } else {
+          // Ellipse: aspect ratio check
+          const aspectRatio = Math.max(w, h) / Math.min(w, h);
+          if (aspectRatio <= ELLIPSE_MAX_ASPECT_RATIO) {
+            type = 'ellipse';
+            cx = Math.round(x + w / 2);
+            cy = Math.round(y + h / 2);
+            rx = Math.round(w / 2);
+            ry = Math.round(h / 2);
+          }
+        }
+      }
+
+      approx.delete();
+
+      if (type === null) continue;
+
+      shapes.push({ type, x, y, width: w, height: h, cx, cy, rx, ry, index: shapes.length });
+    } finally {
+      contour.delete();
     }
-
-    return windows;
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
   }
+
+  contours.delete();
+
+  // ---------- de-duplicate (remove shapes with IoU > 0.8) ----------
+  const keep: ShapeInfo[] = [];
+  for (const s of shapes) {
+    const dominated = keep.some((k) => iou(s, k) > SHAPE_IOU_DEDUP_THRESHOLD);
+    if (!dominated) {
+      s.index = keep.length;
+      keep.push(s);
+    }
+  }
+
+  return keep;
+}
+
+/** Intersection-over-union of two bounding boxes */
+function iou(a: ShapeInfo, b: ShapeInfo): number {
+  const ix1 = Math.max(a.x, b.x);
+  const iy1 = Math.max(a.y, b.y);
+  const ix2 = Math.min(a.x + a.width, b.x + b.width);
+  const iy2 = Math.min(a.y + a.height, b.y + b.height);
+  if (ix2 <= ix1 || iy2 <= iy1) return 0;
+  const inter = (ix2 - ix1) * (iy2 - iy1);
+  const areaA = a.width * a.height;
+  const areaB = b.width * b.height;
+  return inter / (areaA + areaB - inter);
 }
 
 /**
- * Build an SVG buffer that draws colour-coded dashed rectangles for each
- * window, with a label showing the screen coordinates (same space as mouse
- * tools).
- *
- * @param imgWidth       Width of the target image in pixels
- * @param imgHeight      Height of the target image in pixels
- * @param windows        Window list from getWindowBoundsViaOsascript
- * @param regionOffsetX  X offset when a screenshot region was used (default 0)
- * @param regionOffsetY  Y offset when a screenshot region was used (default 0)
+ * Build an SVG overlay that highlights detected geometric shapes with
+ * colour-coded outlines and type labels.
  */
-function buildAnnotationSVG(
+function buildShapeAnnotationSVG(
   imgWidth: number,
   imgHeight: number,
-  windows: WindowInfo[],
-  regionOffsetX: number = 0,
-  regionOffsetY: number = 0,
+  shapes: ShapeInfo[],
 ): Buffer {
   const PALETTE = [
     '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
@@ -420,46 +577,56 @@ function buildAnnotationSVG(
   const FONT_SIZE = 12;
   const LABEL_PAD = 4;
   const LABEL_HEIGHT = FONT_SIZE + LABEL_PAD * 2;
-  const CHAR_WIDTH = 7; // empirical monospace glyph width (px) at font-size 12 in SVG renderers
+  const CHAR_WIDTH = 7;
 
   const escXml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  let shapes = '';
+  let svgShapes = '';
 
-  for (const win of windows) {
-    const color = PALETTE[win.index % PALETTE.length];
+  for (const shape of shapes) {
+    const color = PALETTE[shape.index % PALETTE.length];
+    const { x, y, width: w, height: h } = shape;
 
-    // Translate screen coordinates to image coordinates
-    const rx = win.x - regionOffsetX;
-    const ry = win.y - regionOffsetY;
-    const rw = win.width;
-    const rh = win.height;
+    // Shape outline
+    let outline = '';
+    if (shape.type === 'circle' && shape.cx !== undefined && shape.cy !== undefined && shape.rx !== undefined) {
+      outline = `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.rx}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5"/>`;
+    } else if (shape.type === 'ellipse' && shape.cx !== undefined && shape.cy !== undefined && shape.rx !== undefined && shape.ry !== undefined) {
+      outline = `<ellipse cx="${shape.cx}" cy="${shape.cy}" rx="${shape.rx}" ry="${shape.ry}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5"/>`;
+    } else if (shape.type === 'rounded_rectangle') {
+      const cornerR = Math.round(Math.min(w, h) * ROUNDED_RECT_CORNER_FACTOR);
+      outline = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${cornerR}" ry="${cornerR}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5"/>`;
+    } else {
+      // rectangle
+      outline = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5"/>`;
+    }
 
-    // Skip rectangles that are completely outside the image
-    if (rx + rw <= 0 || ry + rh <= 0 || rx >= imgWidth || ry >= imgHeight) continue;
-
-    // Build label text; truncate if it would overflow the image width
-    const rawLabel = `${win.app}  x=${win.x} y=${win.y} w=${win.width} h=${win.height}`;
-    const maxChars = Math.floor((imgWidth - Math.max(0, rx)) / CHAR_WIDTH);
+    // Label: type + bounding box
+    const typeLabel: Record<ShapeType, string> = {
+      rectangle: 'rect',
+      rounded_rectangle: 'r-rect',
+      circle: 'circle',
+      ellipse: 'ellipse',
+    };
+    const rawLabel = `[${shape.index + 1}] ${typeLabel[shape.type]}  x=${x} y=${y} w=${w} h=${h}`;
+    const maxChars = Math.floor((imgWidth - Math.max(0, x)) / CHAR_WIDTH);
     const label = rawLabel.length > maxChars
       ? rawLabel.slice(0, Math.max(6, maxChars - 1)) + '…'
       : rawLabel;
     const labelW = label.length * CHAR_WIDTH + LABEL_PAD * 2;
-
-    // Place label above the rect when there is enough vertical space; below otherwise
-    const labelAbove = ry >= LABEL_HEIGHT;
-    const labelBgY = labelAbove ? ry - LABEL_HEIGHT : Math.min(ry + rh, imgHeight - LABEL_HEIGHT);
+    const labelAbove = y >= LABEL_HEIGHT;
+    const labelBgY = labelAbove ? y - LABEL_HEIGHT : Math.min(y + h, imgHeight - LABEL_HEIGHT);
     const labelTxtY = labelBgY + FONT_SIZE + LABEL_PAD - 2;
-    const labelX = Math.max(0, Math.min(rx, imgWidth - labelW));
+    const labelX = Math.max(0, Math.min(x, imgWidth - labelW));
 
-    shapes +=
-      `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="10,5" rx="2"/>` +
+    svgShapes +=
+      outline +
       `<rect x="${labelX}" y="${labelBgY}" width="${labelW}" height="${LABEL_HEIGHT}" fill="${color}" opacity="0.85" rx="3"/>` +
       `<text x="${labelX + LABEL_PAD}" y="${labelTxtY}" font-family="monospace" font-size="${FONT_SIZE}" fill="white" font-weight="bold">${escXml(label)}</text>`;
   }
 
-  const svg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">${shapes}</svg>`;
+  const svg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">${svgShapes}</svg>`;
   return Buffer.from(svg);
 }
 
@@ -548,12 +715,12 @@ async function parseKeys(keyString: string): Promise<number[] | null> {
  * 1. macos_screenshot
  */
 export const macosScreenshotTool = tool(
-  async ({ region }) => {
+  async ({ region, annotate }) => {
     const platformError = requireMacos();
     if (platformError) return JSON.stringify({ success: false, error: platformError });
 
     try {
-      const blocks = await captureScreenBlocks(region);
+      const blocks = await captureScreenBlocks(region, annotate);
       return blocks as unknown as string;
     } catch (err) {
       return JSON.stringify({
@@ -567,6 +734,7 @@ export const macosScreenshotTool = tool(
     description: `Capture a screenshot of the macOS screen and return it as a compressed JPEG image (≤300 KB).
 Supports full-screen capture or a specific region (x, y, width, height in **logical** screen pixels, matching the coordinate space used by all mouse tools).
 Returns the image as base64-encoded data for visual analysis by the model. The current cursor position is overlaid as an arrow indicator.
+When annotate is true, standard geometric shapes (rectangles, rounded rectangles, circles, ellipses) are automatically detected in the image using OpenCV and highlighted with colour-coded outlines and labels showing shape type and coordinates.
 Only works on macOS.`,
     schema: z.object({
       region: z
@@ -578,6 +746,10 @@ Only works on macOS.`,
         })
         .optional()
         .describe("Optional region to capture. Omit to capture the full screen."),
+      annotate: z
+        .boolean()
+        .optional()
+        .describe("When true, detect and highlight geometric shapes (rectangles, rounded rectangles, circles, ellipses) in the screenshot with colour-coded outlines and coordinate labels. Default: false."),
     }),
   }
 );
@@ -836,122 +1008,6 @@ Use '+' to combine keys (e.g. "Command+C", "Shift+Enter", "Command+Shift+4").`,
   }
 );
 
-/**
- * 8. macos_annotate_screenshot
- */
-export const macosAnnotateScreenshotTool = tool(
-  async ({ region }) => {
-    const platformError = requireMacos();
-    if (platformError) return JSON.stringify({ success: false, error: platformError });
-
-    try {
-      const screenshot = await loadScreenshot();
-      const raw = await screenshot({ format: 'png' });
-      const sharp = await loadSharp();
-
-      // Resize physical pixels → logical pixels (same HiDPI handling as macos_screenshot)
-      let processedRaw = raw as Buffer;
-      try {
-        const nutjs = await loadNutjs();
-        const logicalWidth = await nutjs.screen.width();
-        const rawMeta = await sharp(raw as Buffer).metadata();
-        const physicalWidth = rawMeta.width ?? 0;
-        const physicalHeight = rawMeta.height ?? 0;
-        if (logicalWidth > 0 && physicalWidth > 0) {
-          const pixelRatio = physicalWidth / logicalWidth;
-          if (pixelRatio !== 1 && physicalHeight > 0) {
-            const lw = Math.round(physicalWidth / pixelRatio);
-            const lh = Math.round(physicalHeight / pixelRatio);
-            processedRaw = await sharp(raw as Buffer).resize(lw, lh).toBuffer();
-          }
-        }
-      } catch {
-        // nut-js unavailable – use raw buffer as-is
-      }
-
-      // Crop to region if requested
-      const offsetX = region?.x ?? 0;
-      const offsetY = region?.y ?? 0;
-      let source = processedRaw;
-      if (region) {
-        source = await sharp(processedRaw)
-          .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
-          .toBuffer();
-      }
-
-      const meta = await sharp(source).metadata();
-      const imgWidth = meta.width ?? 0;
-      const imgHeight = meta.height ?? 0;
-
-      // Get visible window bounds (logical screen coordinates)
-      let windows: WindowInfo[] = [];
-      try {
-        windows = await getWindowBoundsViaOsascript();
-      } catch (err) {
-        console.debug(
-          'macos_annotate_screenshot: window enumeration failed:',
-          err instanceof Error ? err.message : err,
-        );
-      }
-
-      // Composite annotation SVG onto the screenshot
-      let annotated: Buffer;
-      if (windows.length > 0 && imgWidth > 0 && imgHeight > 0) {
-        const svgOverlay = buildAnnotationSVG(imgWidth, imgHeight, windows, offsetX, offsetY);
-        annotated = await sharp(source)
-          .composite([{ input: svgOverlay, blend: 'over' }])
-          .jpeg({ quality: 85 })
-          .toBuffer();
-      } else {
-        annotated = await sharp(source).jpeg({ quality: 85 }).toBuffer();
-      }
-
-      // Compress to ≤300 KB if necessary
-      const TARGET = 300 * 1024;
-      let quality = 70;
-      while (annotated.length > TARGET && quality > 20) {
-        annotated = await sharp(annotated).jpeg({ quality }).toBuffer();
-        quality -= 10;
-      }
-
-      const base64 = annotated.toString('base64');
-
-      const infoLines: string[] = [
-        `[Annotated Screenshot] ${imgWidth}×${imgHeight} px — coordinates match mouse tool coordinate space.`,
-        `Detected ${windows.length} window(s):`,
-        ...windows.map((w) =>
-          `  [${w.index + 1}] ${w.app}${w.title ? ` "${w.title}"` : ''} → x=${w.x}, y=${w.y}, w=${w.width}, h=${w.height}`,
-        ),
-      ];
-
-      return [
-        { type: 'text' as const, text: infoLines.join('\n') },
-        { type: 'image_url' as const, image_url: { url: base64 } },
-      ] as unknown as string;
-    } catch (err) {
-      return JSON.stringify({
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  },
-  {
-    name: 'macos_annotate_screenshot',
-    description: `Take a screenshot and annotate it with colour-coded dashed rectangles highlighting each visible window on screen, each labelled with its exact screen coordinates (x, y, width, height). The coordinates in the labels use the same logical-pixel space as macos_mouse_click and other mouse tools — no conversion needed. Use this tool to identify the position and extent of on-screen regions before clicking or interacting with them.`,
-    schema: z.object({
-      region: z
-        .object({
-          x: z.number().describe('Left edge of the capture region in screen pixels'),
-          y: z.number().describe('Top edge of the capture region in screen pixels'),
-          width: z.number().describe('Width of the capture region in screen pixels'),
-          height: z.number().describe('Height of the capture region in screen pixels'),
-        })
-        .optional()
-        .describe('Optional region to capture. Omit to capture the full screen.'),
-    }),
-  }
-);
-
 // -----------------------------------------------------------------------
 // Export
 // -----------------------------------------------------------------------
@@ -965,6 +1021,5 @@ export default async function getMacosControlTools() {
     macosMouseScrollTool,
     macosKeyboardTypeTool,
     macosKeyPressTool,
-    macosAnnotateScreenshotTool,
   ];
 }

@@ -49,6 +49,7 @@
     "@langchain/tavily": "^1.2.0",
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nut-tree-fork/nut-js": "^4.2.6",
+    "@techstark/opencv-js": "^4.12.0-release.1",
     "@types/turndown": "^5.0.6",
     "axios": "^1.13.5",
     "commander": "^9.5.0",
