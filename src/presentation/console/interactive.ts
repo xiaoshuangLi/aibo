@@ -11,10 +11,12 @@ import { Session } from '@/core/agent';
 import { createConsoleThreadId } from '@/core/utils';
 import {
   getAcpSessionState,
+  setAcpSessionState,
   clearAcpSessionState,
   getAcpAgentDisplayName,
+  resolveAcpSessionName,
 } from '@/shared/acp-session';
-import { handleCliExecutionError } from '@/shared/utils';
+import { formatCliExecutionErrorMessage, handleCliExecutionError, runAcpWithSessionRecovery } from '@/shared/utils';
 
 const execFileAsync = promisify(execFile);
 
@@ -71,7 +73,11 @@ export async function handleConsoleAcpPassthrough(input: string, session: Sessio
     return;
   }
 
-  const { agent, sessionName, cwd } = state;
+  const { agent, cwd } = state;
+  const sessionName = resolveAcpSessionName(state.sessionName, agent);
+  if (state.sessionName !== sessionName) {
+    setAcpSessionState({ ...state, sessionName });
+  }
   const displayName = getAcpAgentDisplayName(agent);
 
   // Detect natural-language exit intent before forwarding to ACP.
@@ -90,19 +96,23 @@ export async function handleConsoleAcpPassthrough(input: string, session: Sessio
   execArgs.push(input);
 
   try {
-    const promise = execFileAsync('acpx', execArgs, {
-      timeout: ACP_EXEC_TIMEOUT_MS,
-      cwd: cwd || process.cwd(),
-      env: process.env,
-      signal: session?.abortController?.signal,
-      killSignal: 'SIGKILL',
-    });
+    const runAcp = () => {
+      const promise = execFileAsync('acpx', execArgs, {
+        timeout: ACP_EXEC_TIMEOUT_MS,
+        cwd: cwd || process.cwd(),
+        env: process.env,
+        signal: session?.abortController?.signal,
+        killSignal: 'SIGKILL',
+      });
 
-    (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-      session.logToolProgress(`${displayName} 输出`, data.toString());
-    });
+      (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+        session.logToolProgress(`${displayName} 输出`, data.toString());
+      });
 
-    const { stdout } = await promise;
+      return promise;
+    };
+
+    const { stdout } = await runAcpWithSessionRecovery(runAcp, agent, cwd, sessionName);
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error: any) {
     // Provide a helpful message when acpx is not installed
@@ -113,7 +123,7 @@ export async function handleConsoleAcpPassthrough(input: string, session: Sessio
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
     let message: string;
     try {
-      message = JSON.parse(errJson)?.message || errJson;
+      message = formatCliExecutionErrorMessage(error) || JSON.parse(errJson)?.message || errJson;
     } catch {
       message = errJson;
     }

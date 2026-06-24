@@ -53,6 +53,12 @@ export function getAcpAgentDisplayName(agent: string): string {
   return names[agent.toLowerCase()] ?? (agent.charAt(0).toUpperCase() + agent.slice(1));
 }
 
+/** Return the caller's explicit ACP session name, preserving acpx default-session behavior otherwise. */
+export function resolveAcpSessionName(sessionName: string | undefined, _agent?: string): string | undefined {
+  const trimmed = sessionName?.trim();
+  return trimmed || undefined;
+}
+
 let _state: AcpSessionState | null = null;
 let _pausedState: AcpSessionState | null = null;
 

@@ -6,6 +6,13 @@
  * - onLine ACP passthrough dispatch
  */
 
+const mockExecFile = jest.fn();
+
+jest.mock('child_process', () => ({
+  ...jest.requireActual('child_process'),
+  execFile: (...args: any[]) => mockExecFile(...args),
+}));
+
 import {
   handleAcpCommand,
   createHandleInternalCommand,
@@ -54,6 +61,11 @@ beforeEach(() => {
   clearAcpSessionState();
   consoleSpy.mockClear();
   jest.clearAllMocks();
+  mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: any, cb: Function) => {
+    const err: any = new Error('spawn acpx ENOENT');
+    err.code = 'ENOENT';
+    cb(err, '', '');
+  });
 });
 
 afterAll(() => {
@@ -77,7 +89,10 @@ describe('handleAcpCommand', () => {
   it('activates passthrough for a known agent', async () => {
     const result = await handleAcpCommand(session, ['codex']);
     expect(result).toBe(true);
-    expect(getAcpSessionState()).toEqual({ agent: 'codex', sessionName: undefined, cwd: process.cwd() });
+    expect(getAcpSessionState()).toEqual({
+      agent: 'codex',
+      cwd: process.cwd(),
+    });
   });
 
   it('activates passthrough with a named session', async () => {
@@ -221,24 +236,10 @@ describe('onLine with ACP passthrough active', () => {
 
   it('dispatches to ACP passthrough when state is active', async () => {
     setAcpSessionState({ agent: 'codex' });
-    // Mock child_process.execFile to simulate acpx
-    const execFileMock = jest.fn((_cmd: string, _args: string[], _opts: any, cb: Function) => {
-      cb(null, 'acpx output here', '');
-    });
-    jest.doMock('child_process', () => ({
-      ...jest.requireActual('child_process'),
-      execFile: execFileMock,
-    }));
 
     const mockHandleInternalCommand = jest.fn().mockResolvedValue(true);
     const handler = onLine(mockSession, mockHandleInternalCommand, {});
-    // Since acpx is mocked at module level with promisify, we just verify state is read
-    // The actual call will fail (acpx not installed) but error path is covered
-    try {
-      await handler('hello codex');
-    } catch {
-      // Expected in test environment where acpx is not installed
-    }
+    await handler('hello codex');
     expect(mockSession.addToHistory).toHaveBeenCalledWith('hello codex');
     expect(mockSession.requestUserInput).toHaveBeenCalled();
   });
@@ -298,6 +299,14 @@ describe('handleConsoleAcpPassthrough', () => {
       'codex',
       expect.stringContaining('错误'),
     );
+  });
+
+  it('preserves default ACP session behavior when passthrough state has no session name', async () => {
+    setAcpSessionState({ agent: 'codex' });
+
+    await handleConsoleAcpPassthrough('do something', mockSession);
+
+    expect(getAcpSessionState()?.sessionName).toBeUndefined();
   });
 
   it('shows install hint when acpx command is not found (ENOENT)', async () => {

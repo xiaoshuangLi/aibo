@@ -19,6 +19,7 @@ jest.mock('child_process', () => {
 });
 
 import getCodexTools from '@/tools/codex';
+import { clearAcpSessionState, getAcpSessionState } from '@/shared/acp-session';
 
 describe('codex tool execution (ACP mode)', () => {
   let executeTool: any;
@@ -30,6 +31,11 @@ describe('codex tool execution (ACP mode)', () => {
 
   beforeEach(() => {
     execFileAsyncMock.mockReset();
+    clearAcpSessionState();
+  });
+
+  afterEach(() => {
+    clearAcpSessionState();
   });
 
   it('should call acpx with codex agent', async () => {
@@ -42,6 +48,20 @@ describe('codex tool execution (ACP mode)', () => {
       expect.arrayContaining(['--approve-all', '--format', 'text', 'codex', 'implement REST API']),
       expect.any(Object),
     );
+  });
+
+  it('should preserve default ACP session behavior for passthrough continuation', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'codex result', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'implement REST API' });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('-s');
+    expect(getAcpSessionState()).toEqual({
+      agent: 'codex',
+      sessionName: undefined,
+      cwd: undefined,
+    });
   });
 
   it('should return success JSON with agent field when command succeeds', async () => {
@@ -142,6 +162,26 @@ describe('codex tool execution (ACP mode)', () => {
     expect(sessionNewArgs).toContain('codex');
     expect(sessionNewArgs).toContain('sessions');
     expect(sessionNewArgs).toContain('new');
+  });
+
+  it('should refresh queue status and retry without closing history when queue owner stops accepting requests', async () => {
+    const queueErr: any = new Error('Command failed: acpx --approve-all --format text --cwd /repo codex task');
+    queueErr.stderr = '[acpx] session cwd (session-1) · /repo · agent needs reconnect\nSession queue owner is running but not accepting queue requests';
+    queueErr.stdout = '';
+
+    execFileAsyncMock
+      .mockRejectedValueOnce(queueErr)
+      .mockResolvedValueOnce({ stdout: 'session: session-1\nstatus: dead\n', stderr: '' }) // status
+      .mockResolvedValueOnce({ stdout: 'recovered', stderr: '' }); // retry
+
+    const result = await executeTool.invoke({ prompt: 'task', cwd: '/repo' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.stdout).toBe('recovered');
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(3);
+    expect(execFileAsyncMock.mock.calls[1][1]).toEqual(['--cwd', '/repo', 'codex', 'status']);
+    expect(execFileAsyncMock.mock.calls[2][1]).toEqual(['--approve-all', '--format', 'text', '--cwd', '/repo', 'codex', 'task']);
   });
 
   it('should fallback to EXECUTION_ERROR when no code', async () => {

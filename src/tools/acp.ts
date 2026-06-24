@@ -3,8 +3,8 @@ import { z } from "zod";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
-import { isCliCommandAvailable, handleCliExecutionError, isNoAcpSessionError, createAcpSession } from "@/shared/utils";
-import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
+import { isCliCommandAvailable, handleCliExecutionError, runAcpWithSessionRecovery } from "@/shared/utils";
+import { setAcpSessionState, getAcpAgentDisplayName, resolveAcpSessionName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
@@ -122,9 +122,13 @@ export function buildAcpxArgs(input: z.input<typeof acpSchema>): string[] {
   // Agent positional argument
   globalArgs.push(agent);
 
+  const resolvedSessionName = mode === "prompt"
+    ? resolveAcpSessionName(session_name, agent)
+    : session_name;
+
   // Session name flag
-  if (session_name) {
-    globalArgs.push("-s", session_name);
+  if (resolvedSessionName) {
+    globalArgs.push("-s", resolvedSessionName);
   }
 
   // Mode-specific subcommand / prompt
@@ -168,7 +172,14 @@ function createAcpExecuteTool(session?: Session) {
     async (input) => {
       const { timeout = 6000000 } = input;
       const startPassthrough = (input as any).start_passthrough === true;
-      const execArgs = buildAcpxArgs(input as z.infer<typeof acpSchema>);
+      const mode = (input as any).mode || "prompt";
+      const effectiveInput = {
+        ...(input as z.infer<typeof acpSchema>),
+        session_name: mode === "prompt"
+          ? resolveAcpSessionName((input as any).session_name, (input as any).agent)
+          : (input as any).session_name,
+      };
+      const execArgs = buildAcpxArgs(effectiveInput);
 
       try {
         const acpOptions = {
@@ -187,14 +198,12 @@ function createAcpExecuteTool(session?: Session) {
           return promise;
         };
 
-        let result: { stdout: string; stderr: string };
-        try {
-          result = await runAcp();
-        } catch (firstError) {
-          if (!isNoAcpSessionError(firstError)) throw firstError;
-          await createAcpSession((input as any).agent, (input as any).cwd);
-          result = await runAcp();
-        }
+        const result = await runAcpWithSessionRecovery(
+          runAcp,
+          (input as any).agent,
+          (input as any).cwd,
+          effectiveInput.session_name,
+        );
 
         const { stdout, stderr } = result;
 
@@ -204,7 +213,7 @@ function createAcpExecuteTool(session?: Session) {
         if (startPassthrough) {
           setAcpSessionState({
             agent: (input as any).agent,
-            sessionName: (input as any).session_name,
+            sessionName: effectiveInput.session_name,
             cwd: (input as any).cwd,
           });
         }

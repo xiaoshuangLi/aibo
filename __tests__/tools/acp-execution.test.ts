@@ -16,6 +16,7 @@ jest.mock('child_process', () => {
 });
 
 import getAcpTools from '@/tools/acp';
+import { clearAcpSessionState, getAcpSessionState } from '@/shared/acp-session';
 
 describe('acpx tool execution', () => {
   let executeTool: any;
@@ -27,6 +28,11 @@ describe('acpx tool execution', () => {
 
   beforeEach(() => {
     execFileAsyncMock.mockReset();
+    clearAcpSessionState();
+  });
+
+  afterEach(() => {
+    clearAcpSessionState();
   });
 
   it('should return success JSON when command succeeds', async () => {
@@ -116,6 +122,20 @@ describe('acpx tool execution', () => {
     expect(callArgs).toContain('--approve-all');
   });
 
+  it('should preserve default ACP session behavior when passthrough starts without a session name', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+    await executeTool.invoke({ agent: 'codex', prompt: 'task', start_passthrough: true });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('-s');
+    expect(getAcpSessionState()).toEqual({
+      agent: 'codex',
+      sessionName: undefined,
+      cwd: undefined,
+    });
+  });
+
   it('should pass --format text flag', async () => {
     execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
 
@@ -193,6 +213,7 @@ describe('acpx tool execution', () => {
     expect(sessionNewArgs).toContain('codex');
     expect(sessionNewArgs).toContain('sessions');
     expect(sessionNewArgs).toContain('new');
+    expect(sessionNewArgs).not.toContain('--name');
   });
 
   it('should NOT retry on non-session errors', async () => {

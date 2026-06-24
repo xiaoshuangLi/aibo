@@ -406,7 +406,7 @@ describe('index module comprehensive tests', () => {
     test('handles unknown command', async () => {
       const handleCommand = index.createHandleInternalCommand(mockSession, mockAgent);
       const result = await handleCommand('/unknown');
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 

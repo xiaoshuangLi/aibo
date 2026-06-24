@@ -11,6 +11,7 @@ import {
   setAcpSessionState,
   clearAcpSessionState,
   getAcpAgentDisplayName,
+  resolveAcpSessionName,
   KNOWN_ACP_AGENTS as _KNOWN_ACP_AGENTS,
 } from '@/shared/acp-session';
 
@@ -450,7 +451,7 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
 
   // /acp <代理名> [会话名]
   const agent = args[0];
-  const sessionName = args[1] || undefined;
+  const sessionName = resolveAcpSessionName(args[1], agent);
 
   if (!KNOWN_ACP_AGENTS.includes(agent)) {
     console.log(styled.error(`⚠️ 未知代理名称: \`${agent}\`\n\n支持的内置代理：${KNOWN_ACP_AGENTS.map(a => `\`${a}\``).join(', ')}`));

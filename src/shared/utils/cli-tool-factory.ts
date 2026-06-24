@@ -3,7 +3,7 @@ import { z } from "zod";
 import { execSync, execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
-import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
+import { setAcpSessionState, getAcpAgentDisplayName, resolveAcpSessionName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
@@ -77,16 +77,80 @@ export function isNoAcpSessionError(error: unknown): boolean {
 }
 
 /**
+ * Detects an acpx queue owner that still has local metadata but no longer
+ * accepts requests. This can happen after a previous persistent session dies.
+ */
+export function isAcpQueueOwnerUnavailableError(error: unknown): boolean {
+  const err = error as any;
+  const combined = `${err.message || ""} ${err.stdout || ""} ${err.stderr || ""}`;
+  return combined.includes("Session queue owner is running but not accepting");
+}
+
+function buildAcpAgentArgs(agent: string, cwd?: string, sessionName?: string): string[] {
+  const args: string[] = [];
+  if (cwd) args.push("--cwd", cwd);
+  args.push(agent);
+  if (sessionName) args.push("-s", sessionName);
+  return args;
+}
+
+/**
+ * If acpx reports a queue owner that no longer accepts requests, ask acpx for
+ * status. acpx status can clear stale owner metadata without closing the
+ * persistent session record and losing its default-session history.
+ */
+export async function refreshAcpQueueOwnerStatus(
+  agent: string,
+  cwd?: string,
+  sessionName?: string,
+): Promise<boolean> {
+  const statusArgs = [...buildAcpAgentArgs(agent, cwd, sessionName), "status"];
+  const status = await execFileAsync("acpx", statusArgs, {
+    cwd: cwd || process.cwd(),
+    env: process.env,
+  });
+  const statusText = `${status.stdout || ""}\n${status.stderr || ""}`;
+  return /^\s*status:\s*(dead|idle)\s*$/m.test(statusText);
+}
+
+export async function runAcpWithSessionRecovery<T>(
+  runAcp: () => Promise<T>,
+  agent: string,
+  cwd?: string,
+  sessionName?: string,
+): Promise<T> {
+  try {
+    return await runAcp();
+  } catch (firstError) {
+    if (isAcpQueueOwnerUnavailableError(firstError) && await refreshAcpQueueOwnerStatus(agent, cwd, sessionName)) {
+      try {
+        return await runAcp();
+      } catch (retryError) {
+        if (!isNoAcpSessionError(retryError)) throw retryError;
+        await createAcpSession(agent, cwd, sessionName);
+        return await runAcp();
+      }
+    }
+
+    if (!isNoAcpSessionError(firstError)) throw firstError;
+    await createAcpSession(agent, cwd, sessionName);
+    return await runAcp();
+  }
+}
+
+/**
  * Creates a new acpx session for the given agent and optional working directory.
  * Equivalent to: acpx [--cwd <cwd>] <agent> sessions new
  */
 export async function createAcpSession(
   agent: string,
   cwd?: string,
+  sessionName?: string,
 ): Promise<void> {
   const args: string[] = [];
   if (cwd) args.push("--cwd", cwd);
   args.push(agent, "sessions", "new");
+  if (sessionName) args.push("--name", sessionName);
   await execFileAsync("acpx", args, {
     cwd: cwd || process.cwd(),
     env: process.env,
@@ -152,6 +216,18 @@ export function handleCliExecutionError(
 }
 
 /**
+ * Extract a user-facing CLI failure message without dropping stdout/stderr,
+ * where many CLIs put the actual cause.
+ */
+export function formatCliExecutionErrorMessage(error: unknown): string {
+  const err = error as any;
+  const parts = [err.message, err.stderr, err.stdout]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .map((part) => part.trim());
+  return Array.from(new Set(parts)).join("\n");
+}
+
+/**
  * Creates a LangChain tool that delegates a prompt to a local AI CLI command.
  *
  * When `config.acpAgent` is set and the `acpx` command is available on PATH,
@@ -178,10 +254,11 @@ export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
       // ── ACP mode (preferred when acpx is available) ──────────────────────────
       if (acpAgent && isCliCommandAvailable("acpx")) {
         const displayName = getAcpAgentDisplayName(acpAgent);
+        const resolvedSessionName = resolveAcpSessionName(session_name, acpAgent);
         const execArgs: string[] = ["--approve-all", "--format", "text"];
         if (cwd) execArgs.push("--cwd", cwd);
         execArgs.push(acpAgent);
-        if (session_name) execArgs.push("-s", session_name);
+        if (resolvedSessionName) execArgs.push("-s", resolvedSessionName);
         execArgs.push(prompt);
         if (args.length) execArgs.push(...args);
 
@@ -202,19 +279,12 @@ export function createCliExecuteTool(config: CliToolConfig, session?: Session) {
             return promise;
           };
 
-          let result: { stdout: string; stderr: string };
-          try {
-            result = await runAcp();
-          } catch (firstError) {
-            if (!isNoAcpSessionError(firstError)) throw firstError;
-            await createAcpSession(acpAgent, cwd);
-            result = await runAcp();
-          }
+          const result = await runAcpWithSessionRecovery(runAcp, acpAgent, cwd, resolvedSessionName);
 
           const { stdout, stderr } = result;
 
           if (start_passthrough) {
-            setAcpSessionState({ agent: acpAgent, sessionName: session_name, cwd });
+            setAcpSessionState({ agent: acpAgent, sessionName: resolvedSessionName, cwd });
           }
 
           return JSON.stringify(

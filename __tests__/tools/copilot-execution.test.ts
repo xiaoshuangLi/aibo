@@ -19,6 +19,7 @@ jest.mock('child_process', () => {
 });
 
 import getCopilotTools from '@/tools/copilot';
+import { clearAcpSessionState, getAcpSessionState } from '@/shared/acp-session';
 
 describe('copilot tool execution (ACP mode)', () => {
   let executeTool: any;
@@ -30,6 +31,11 @@ describe('copilot tool execution (ACP mode)', () => {
 
   beforeEach(() => {
     execFileAsyncMock.mockReset();
+    clearAcpSessionState();
+  });
+
+  afterEach(() => {
+    clearAcpSessionState();
   });
 
   it('should call acpx with copilot agent', async () => {
@@ -42,6 +48,20 @@ describe('copilot tool execution (ACP mode)', () => {
       expect.arrayContaining(['--approve-all', '--format', 'text', 'copilot', 'list all running docker containers']),
       expect.any(Object),
     );
+  });
+
+  it('should preserve default ACP session behavior for passthrough continuation', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: 'docker ps', stderr: '' });
+
+    await executeTool.invoke({ prompt: 'list all running docker containers' });
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('-s');
+    expect(getAcpSessionState()).toEqual({
+      agent: 'copilot',
+      sessionName: undefined,
+      cwd: undefined,
+    });
   });
 
   it('should return success JSON with agent field when command succeeds', async () => {

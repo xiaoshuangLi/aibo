@@ -17,14 +17,14 @@ import { createAIAgent } from '@/core/agent';
 import { processStreamChunks } from '@/core/utils';
 import { createHandleInternalCommand } from './commander';
 import { LspClientManager } from '@/infrastructure/code-analysis';
-import { handleCliExecutionError, isNoAcpSessionError, createAcpSession } from '@/shared/utils';
+import { formatCliExecutionErrorMessage, handleCliExecutionError, runAcpWithSessionRecovery } from '@/shared/utils';
 import {
   AcpPassthroughState,
   getAcpPassthroughState,
   setAcpPassthroughState,
   clearAcpPassthroughState,
 } from './acp-passthrough';
-import { getAcpAgentDisplayName } from '@/shared/acp-session';
+import { getAcpAgentDisplayName, resolveAcpSessionName } from '@/shared/acp-session';
 
 export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
 
@@ -96,7 +96,11 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     return;
   }
 
-  const { agent, sessionName, cwd } = state;
+  const { agent, cwd } = state;
+  const sessionName = resolveAcpSessionName(state.sessionName, agent);
+  if (state.sessionName !== sessionName) {
+    setAcpPassthroughState({ ...state, sessionName });
+  }
   const displayName = getAcpAgentDisplayName(agent);
 
   // Detect natural-language exit intent before forwarding to ACP.
@@ -131,14 +135,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
       return promise;
     };
 
-    let stdout: string;
-    try {
-      ({ stdout } = await runAcp());
-    } catch (firstError) {
-      if (!isNoAcpSessionError(firstError)) throw firstError;
-      await createAcpSession(agent, cwd);
-      ({ stdout } = await runAcp());
-    }
+    const { stdout } = await runAcpWithSessionRecovery(runAcp, agent, cwd, sessionName);
 
     session.logAcpResponse(agent, stdout || '(empty)');
   } catch (error) {
@@ -155,7 +152,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     if (parsedError?.interrupted) {
       return;
     }
-    const message = parsedError?.message || errJson;
+    const message = formatCliExecutionErrorMessage(error) || parsedError?.message || errJson;
     session.logAcpResponse(agent, `❌ 错误: ${message}`);
   }
 }

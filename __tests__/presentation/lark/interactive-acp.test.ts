@@ -107,6 +107,17 @@ describe('handleAcpPassthrough', () => {
     expect(callArgs).toContain('backend');
   });
 
+  it('should use the default ACP session when passthrough state has no session name', async () => {
+    setAcpPassthroughState({ agent: 'codex' });
+    execFileAsyncMock.mockResolvedValue({ stdout: 'result', stderr: '' });
+
+    await handleAcpPassthrough('implement pagination', mockSession);
+
+    const callArgs = execFileAsyncMock.mock.calls[0][1] as string[];
+    expect(callArgs).not.toContain('-s');
+    expect(getAcpPassthroughState()?.sessionName).toBeUndefined();
+  });
+
   it('should log ACP response on success (not tool call/result)', async () => {
     setAcpPassthroughState({ agent: 'codex' });
     execFileAsyncMock.mockResolvedValue({ stdout: 'ok', stderr: '' });

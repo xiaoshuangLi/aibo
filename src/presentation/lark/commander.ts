@@ -6,7 +6,7 @@ import { getRestartCommand } from '@/shared/utils';
 import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { LspClientManager } from '@/infrastructure/code-analysis';
 import { setAcpPassthroughState, getAcpPassthroughState, clearAcpPassthroughState, getAcpPausedPassthroughState, pauseAcpPassthroughState, resumeAcpPassthroughState } from './acp-passthrough';
-import { getAcpAgentDisplayName, KNOWN_ACP_AGENTS } from '@/shared/acp-session';
+import { getAcpAgentDisplayName, KNOWN_ACP_AGENTS, resolveAcpSessionName } from '@/shared/acp-session';
 
 /** Built-in ACP-compatible agent names recognised by ACP commands. */
 export { KNOWN_ACP_AGENTS };
@@ -732,7 +732,7 @@ export async function handleAcpCommand(session: any, args: string[]): Promise<bo
 
   // /acp <代理名> [会话名]
   const agent = args[0];
-  const sessionName = args[1] || undefined;
+  const sessionName = resolveAcpSessionName(args[1], agent);
 
   if (!KNOWN_ACP_AGENTS.includes(agent)) {
     await emitMessage(`⚠️ **未知代理名称**: \`${agent}\`\n\n支持的内置代理：${KNOWN_ACP_AGENTS.map(a => `\`${a}\``).join(', ')}\n\n如需使用自定义代理，请直接使用 \`acpx_execute\` 工具。`);

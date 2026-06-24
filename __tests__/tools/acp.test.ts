@@ -58,6 +58,30 @@ describe('ACP Tool', () => {
       expect(args).toContain('backend');
     });
 
+    it('should use the default ACP session for prompt mode when none is provided', () => {
+      const args = buildAcpxArgs({
+        agent: 'codex',
+        prompt: 'implement pagination',
+        mode: 'prompt',
+        approve: 'approve-all',
+        timeout: 6000000,
+        args: [],
+      });
+      expect(args).not.toContain('-s');
+    });
+
+    it('should not auto-generate a session name for exec mode', () => {
+      const args = buildAcpxArgs({
+        agent: 'codex',
+        prompt: 'summarize',
+        mode: 'exec',
+        approve: 'approve-all',
+        timeout: 6000000,
+        args: [],
+      });
+      expect(args).not.toContain('-s');
+    });
+
     it('should include --cwd flag when cwd is provided', () => {
       const args = buildAcpxArgs({
         agent: 'codex',

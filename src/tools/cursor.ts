@@ -3,8 +3,8 @@ import { z } from "zod";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
-import { isCliCommandAvailable, handleCliExecutionError, isNoAcpSessionError, createAcpSession } from "@/shared/utils";
-import { setAcpSessionState, getAcpAgentDisplayName } from "@/shared/acp-session";
+import { isCliCommandAvailable, handleCliExecutionError, runAcpWithSessionRecovery } from "@/shared/utils";
+import { setAcpSessionState, getAcpAgentDisplayName, resolveAcpSessionName } from "@/shared/acp-session";
 
 const execFileAsync = promisify(execFile);
 
@@ -16,10 +16,11 @@ function createCursorExecuteTool(session?: Session) {
       // ── ACP mode (preferred when acpx is available) ──────────────────────────
       if (isCliCommandAvailable("acpx")) {
         const displayName = getAcpAgentDisplayName(ACP_AGENT);
+        const resolvedSessionName = resolveAcpSessionName(session_name, ACP_AGENT);
         const execArgs: string[] = ["--approve-all", "--format", "text"];
         if (cwd) execArgs.push("--cwd", cwd);
         execArgs.push(ACP_AGENT);
-        if (session_name) execArgs.push("-s", session_name);
+        if (resolvedSessionName) execArgs.push("-s", resolvedSessionName);
         execArgs.push(prompt);
         if (args.length) execArgs.push(...args);
 
@@ -40,19 +41,12 @@ function createCursorExecuteTool(session?: Session) {
             return promise;
           };
 
-          let result: { stdout: string; stderr: string };
-          try {
-            result = await runAcp();
-          } catch (firstError) {
-            if (!isNoAcpSessionError(firstError)) throw firstError;
-            await createAcpSession(ACP_AGENT, cwd);
-            result = await runAcp();
-          }
+          const result = await runAcpWithSessionRecovery(runAcp, ACP_AGENT, cwd, resolvedSessionName);
 
           const { stdout, stderr } = result;
 
           if (start_passthrough) {
-            setAcpSessionState({ agent: ACP_AGENT, sessionName: session_name, cwd });
+            setAcpSessionState({ agent: ACP_AGENT, sessionName: resolvedSessionName, cwd });
           }
 
           return JSON.stringify(
@@ -192,4 +186,3 @@ export default async function getCursorTools(session?: Session) {
   }
   return [createCursorExecuteTool(session), cursorOpenTool];
 }
-
