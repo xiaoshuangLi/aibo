@@ -7,6 +7,7 @@ import { getAllKnowledge, addKnowledge } from '@/shared/utils';
 import { LspClientManager } from '@/infrastructure/code-analysis';
 import { setAcpPassthroughState, getAcpPassthroughState, clearAcpPassthroughState, getAcpPausedPassthroughState, pauseAcpPassthroughState, resumeAcpPassthroughState } from './acp-passthrough';
 import { getAcpAgentDisplayName, KNOWN_ACP_AGENTS, resolveAcpSessionName } from '@/shared/acp-session';
+import { cancelAcpPrompt } from '@/shared/acp-cancel';
 
 /** Built-in ACP-compatible agent names recognised by ACP commands. */
 export { KNOWN_ACP_AGENTS };
@@ -914,12 +915,20 @@ export async function handleAcpCancelCommand(session: any): Promise<boolean> {
 
   if (session.isRunning && session.abortController && !session.abortController.signal.aborted) {
     session.abortController.abort();
-    session.isRunning = false;
     const current = getAcpPassthroughState();
     if (current) {
       const displayName = getAcpAgentDisplayName(current.agent);
-      await emitMessage(`❌ **ACP 操作已取消**\n\n已中止 \`${displayName}\` 的当前请求，直传模式保持激活。\n\n您可以继续发送新的指令，或使用 \`/acp-exit\` 退出直传模式。`);
+      try {
+        await cancelAcpPrompt(current);
+        session.isRunning = false;
+        await emitMessage(`❌ **ACP 操作已取消**\n\n已中止 \`${displayName}\` 的当前请求，直传模式保持激活。\n\n您可以继续发送新的指令，或使用 \`/acp-exit\` 退出直传模式。`);
+      } catch (error) {
+        session.isRunning = false;
+        const detail = error instanceof Error ? error.message : String(error);
+        await emitMessage(`⚠️ **ACP 取消请求失败**\n\n本地等待已中止，但 \`${displayName}\` 的后台任务可能仍在运行。\n\n错误：${detail}`);
+      }
     } else {
+      session.isRunning = false;
       await emitMessage('❌ **操作已取消**\n\n当前任务已中止。');
     }
   } else {

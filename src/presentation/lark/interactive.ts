@@ -25,6 +25,7 @@ import {
   clearAcpPassthroughState,
 } from './acp-passthrough';
 import { getAcpAgentDisplayName, resolveAcpSessionName } from '@/shared/acp-session';
+import { cancelAcpPrompt } from '@/shared/acp-cancel';
 
 export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
 
@@ -37,6 +38,20 @@ const ACP_EXEC_TIMEOUT_MS = 6_000_000;
 // 全局会话和代理实例
 let currentSession: Session | null = null;
 let currentAgent: any = null;
+
+// Monotonically increasing input generation per Session. When several messages
+// arrive while cancellation is in flight, only the newest one may start work.
+const inputGenerations = new WeakMap<Session, number>();
+
+function beginInputGeneration(session: Session): number {
+  const generation = (inputGenerations.get(session) ?? 0) + 1;
+  inputGenerations.set(session, generation);
+  return generation;
+}
+
+function isLatestInputGeneration(session: Session, generation: number): boolean {
+  return inputGenerations.get(session) === generation;
+}
 
 /**
  * Patterns that signal the user wants to exit ACP passthrough mode.
@@ -242,9 +257,21 @@ export async function handleUserMessage(
   // ACP 直传模式：将消息直接透传到 ACP 会话，不经过大模型。
   // 同时支持纯文本消息和 post 富文本消息（图片块的 URL 内嵌为文本转发给 ACP Agent）。
   if (getAcpPassthroughState()) {
+    const generation = beginInputGeneration(session);
     const textForAcp = typeof input === 'string' ? input : extractTextForAcp(input);
+    const acpState = getAcpPassthroughState()!;
     if (session.isRunning && session.abortController) {
       session.abortController.abort();
+      try {
+        await cancelAcpPrompt(acpState);
+      } catch (error) {
+        // The old client may have completed between the running check and the
+        // cancel command. Continue with the newest prompt in that case.
+        console.warn('⚠️ 取消上一条 ACP 请求失败，继续处理最新消息:', formatCliExecutionErrorMessage(error));
+      }
+    }
+    if (!isLatestInputGeneration(session, generation)) {
+      return;
     }
     session.isRunning = true;
     const abortController = new AbortController();
