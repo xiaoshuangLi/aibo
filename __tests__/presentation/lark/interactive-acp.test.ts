@@ -91,7 +91,7 @@ describe('handleAcpPassthrough', () => {
 
     expect(execFileAsyncMock).toHaveBeenCalledWith(
       'acpx',
-      expect.arrayContaining(['--approve-all', '--format', 'text', 'codex', 'fix the tests']),
+      expect.arrayContaining(['--approve-all', '--format', 'json', '--suppress-reads', 'codex', 'fix the tests']),
       expect.any(Object),
     );
   });
@@ -274,7 +274,7 @@ describe('handleAcpPassthrough', () => {
 
     await handleAcpPassthrough('do something', mockSession);
 
-    expect(mockLogToolProgress).toHaveBeenCalledWith('Claude Code 输出', 'streaming output');
+    expect(mockLogToolProgress).toHaveBeenCalledWith('Claude Code 输出', 'streaming output\n');
     // Ensure the old formats are NOT used
     expect(mockLogToolProgress).not.toHaveBeenCalledWith(
       expect.stringMatching(/^acpx\[/),

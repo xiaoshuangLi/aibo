@@ -26,6 +26,7 @@ import {
 } from './acp-passthrough';
 import { getAcpAgentDisplayName, resolveAcpSessionName } from '@/shared/acp-session';
 import { cancelAcpPrompt } from '@/shared/acp-cancel';
+import { AcpJsonStreamParser } from '@/shared/acp-json-stream';
 
 export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
 
@@ -126,33 +127,37 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   }
 
   // 构建 acpx 参数：
-  //   acpx --approve-all --format text [--cwd <cwd>] <agent> [-s <name>] <prompt>
-  const execArgs: string[] = ['--approve-all', '--format', 'text'];
+  // JSON mode emits every ACP JSON-RPC event as it happens. Text mode can be
+  // buffered by the persistent queue client until the whole prompt finishes.
+  const execArgs: string[] = ['--approve-all', '--format', 'json', '--suppress-reads'];
   if (cwd) execArgs.push('--cwd', cwd);
   execArgs.push(agent);
   if (sessionName) execArgs.push('-s', sessionName);
   execArgs.push(input);
 
   try {
+    let progressParser = new AcpJsonStreamParser(session, displayName);
     const acpOptions = {
       timeout: ACP_EXEC_TIMEOUT_MS,
       cwd: cwd || process.cwd(),
       env: process.env,
       signal: session?.abortController?.signal,
       killSignal: 'SIGKILL' as const,
+      maxBuffer: 256 * 1024 * 1024,
     };
 
     const runAcp = () => {
+      progressParser = new AcpJsonStreamParser(session, displayName);
       const promise = execFileAsync('acpx', execArgs, acpOptions);
       (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        session.logToolProgress(`${displayName} 输出`, data.toString());
+        progressParser.push(data);
       });
       return promise;
     };
 
     const { stdout } = await runAcpWithSessionRecovery(runAcp, agent, cwd, sessionName);
 
-    session.logAcpResponse(agent, stdout || '(empty)');
+    session.logAcpResponse(agent, progressParser.finish(stdout || '') || stdout || '(empty)');
   } catch (error) {
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
     let parsedError: any;
