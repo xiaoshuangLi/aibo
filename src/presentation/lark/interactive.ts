@@ -27,6 +27,7 @@ import {
 import { getAcpAgentDisplayName, resolveAcpSessionName } from '@/shared/acp-session';
 import { cancelAcpPrompt } from '@/shared/acp-cancel';
 import { AcpJsonStreamParser } from '@/shared/acp-json-stream';
+import { AcpEventStreamFollower, findAcpEventStreamPath } from '@/shared/acp-event-stream';
 
 export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, clearAcpPassthroughState };
 
@@ -135,8 +136,15 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   if (sessionName) execArgs.push('-s', sessionName);
   execArgs.push(input);
 
+  let progressParser = new AcpJsonStreamParser(session, displayName);
+  const eventStreamPath = await findAcpEventStreamPath({ agent, cwd, sessionName });
+  const eventFollower = eventStreamPath
+    ? new AcpEventStreamFollower(eventStreamPath, (data) => progressParser.push(data))
+    : null;
+  await eventFollower?.start();
+
   try {
-    let progressParser = new AcpJsonStreamParser(session, displayName);
+    let runCount = 0;
     const acpOptions = {
       timeout: ACP_EXEC_TIMEOUT_MS,
       cwd: cwd || process.cwd(),
@@ -147,18 +155,24 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     };
 
     const runAcp = () => {
-      progressParser = new AcpJsonStreamParser(session, displayName);
+      if (runCount > 0) progressParser = new AcpJsonStreamParser(session, displayName);
+      runCount += 1;
       const promise = execFileAsync('acpx', execArgs, acpOptions);
-      (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
-        progressParser.push(data);
-      });
+      // New sessions may not have an event file yet; stdout remains a fallback.
+      if (!eventFollower) {
+        (promise as any).child?.stdout?.on?.('data', (data: Buffer) => {
+          progressParser.push(data);
+        });
+      }
       return promise;
     };
 
     const { stdout } = await runAcpWithSessionRecovery(runAcp, agent, cwd, sessionName);
+    await eventFollower?.stop();
 
     session.logAcpResponse(agent, progressParser.finish(stdout || '') || stdout || '(empty)');
   } catch (error) {
+    await eventFollower?.stop();
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
     let parsedError: any;
     try {
