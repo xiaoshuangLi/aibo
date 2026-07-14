@@ -296,4 +296,24 @@ describe('LarkAdapter - Additional Coverage', () => {
       expect(mockLarkClient.im.message.create).toHaveBeenCalled();
     });
   });
+
+  describe('tool progress batching', () => {
+    it('does not flush immediately when accumulated output exceeds the old size threshold', async () => {
+      jest.useFakeTimers();
+      const adapter = new LarkAdapter();
+      const sendSpy = jest.spyOn(adapter, 'sendMessage').mockResolvedValue(undefined);
+
+      (adapter as any).handleToolProgress({ toolName: 'Codex 工具输出', chunk: 'a'.repeat(5000) });
+      (adapter as any).handleToolProgress({ toolName: 'Codex 工具输出', chunk: 'b'.repeat(5000) });
+      expect(sendSpy).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+
+      adapter.destroy();
+      jest.useRealTimers();
+    });
+  });
 });

@@ -58,7 +58,6 @@ export class LarkAdapter extends DefaultAdapter {
   private progressToolName: string = '';
   private progressFlushTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly PROGRESS_FLUSH_INTERVAL = 3000; // 3 秒
-  private static readonly PROGRESS_FLUSH_SIZE = 800;      // 超过 800 字符立即发送
 
   // 发出消息速率限制队列 - 每秒最多向即时通讯发送5条
   private sendQueue: Array<{ fn: () => Promise<void>; resolve: () => void; reject: (err: unknown) => void }> = [];
@@ -796,28 +795,25 @@ export class LarkAdapter extends DefaultAdapter {
 
   /**
    * 处理工具执行过程中的实时输出
-   * 使用缓冲机制防止消息频率过高：
-   * - 超过 PROGRESS_FLUSH_SIZE 字符时立即发送
-   * - 否则等待 PROGRESS_FLUSH_INTERVAL 毫秒后批量发送
+   * 严格按时间窗口批量发送，避免大量输出因字符阈值连续触发即时发送，
+   * 从而塞满飞书发送队列并让后续消息长时间排队。
    */
-  private async handleToolProgress(data: { toolName: string; chunk: string }): Promise<void> {
+  private handleToolProgress(data: { toolName: string; chunk: string }): void {
     if (!data?.chunk) return;
 
     this.progressToolName = data.toolName;
     this.progressBuffer += data.chunk;
-
-    if (this.progressBuffer.length >= LarkAdapter.PROGRESS_FLUSH_SIZE) {
-      await this.flushProgressBuffer();
-    } else {
-      this.scheduleProgressFlush();
-    }
+    this.scheduleProgressFlush();
   }
 
   private scheduleProgressFlush(): void {
     if (this.progressFlushTimer) return;
-    this.progressFlushTimer = setTimeout(async () => {
+    this.progressFlushTimer = setTimeout(() => {
       this.progressFlushTimer = null;
-      await this.flushProgressBuffer();
+      void this.flushProgressBuffer().catch((error) => {
+        // A failed progress message must not stop later flushes.
+        console.error('❌ 发送工具进度失败，后续消息将继续发送:', error);
+      });
     }, LarkAdapter.PROGRESS_FLUSH_INTERVAL).unref();
   }
 
