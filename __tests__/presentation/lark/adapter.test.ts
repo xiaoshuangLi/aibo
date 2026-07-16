@@ -1197,6 +1197,71 @@ describe('LarkAdapter', () => {
       expect(callback).toHaveBeenCalledWith('发一下回复卡片里的图');
     });
 
+    it('should send a native image message when inline quoted post content mentions a local image path', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_inline_quoted_post',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({
+            text: '发一下引用富文本里的图',
+            quoted_message: {
+              msg_type: 'post',
+              body: {
+                content: JSON.stringify({
+                  content: [[{ tag: 'text', text: `引用富文本图片：${tempImagePath}` }]],
+                }),
+              },
+            },
+          }),
+          message_type: 'text',
+        },
+      });
+
+      expect(mockLarkClient.im.message.get).not.toHaveBeenCalled();
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).toHaveBeenCalledWith('发一下引用富文本里的图');
+    });
+
+    it('should send a native image message when inline reply card content mentions a local image path', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_inline_reply_card',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({
+            text: '发一下回复卡片里的图',
+            reply_message: {
+              msg_type: 'interactive',
+              body: {
+                content: JSON.stringify({
+                  elements: [
+                    {
+                      tag: 'markdown',
+                      content: `回复卡片图片：${tempImagePath}`,
+                    },
+                  ],
+                }),
+              },
+            },
+          }),
+          message_type: 'text',
+        },
+      });
+
+      expect(mockLarkClient.im.message.get).not.toHaveBeenCalled();
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).toHaveBeenCalledWith('发一下回复卡片里的图');
+    });
+
     it('should support quoted local image paths containing spaces', async () => {
       const spacedImagePath = path.join(os.tmpdir(), `aibo lark image ${Date.now()}.png`);
       fs.writeFileSync(spacedImagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));

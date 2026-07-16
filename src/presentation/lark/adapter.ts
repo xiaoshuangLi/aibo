@@ -174,6 +174,58 @@ function collectStringValues(value: unknown, output: string[]): void {
   }
 }
 
+function inferLarkMessageTypeFromPayload(payload: any): string | undefined {
+  return payload?.message_type
+    ?? payload?.msg_type
+    ?? payload?.message?.message_type
+    ?? payload?.message?.msg_type
+    ?? (Array.isArray(payload?.content) ? 'post' : undefined)
+    ?? (Array.isArray(payload?.elements) ? 'interactive' : undefined);
+}
+
+function extractReferencedPayloadContent(payload: any): unknown {
+  return payload?.body?.content
+    ?? payload?.message?.body?.content
+    ?? payload?.content
+    ?? payload?.message?.content;
+}
+
+function extractTextFromReferencedPayload(payload: unknown): string[] {
+  const candidates: string[] = [];
+
+  if (typeof payload === 'string') {
+    const parsed = parseJsonObject(payload);
+    if (parsed) {
+      candidates.push(...extractTextFromReferencedPayload(parsed));
+    } else {
+      candidates.push(payload);
+    }
+    return candidates;
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return candidates;
+  }
+
+  const payloadObj = payload as any;
+  const messageType = inferLarkMessageTypeFromPayload(payloadObj);
+  const content = extractReferencedPayloadContent(payloadObj);
+  if (content !== undefined) {
+    const text = extractTextFromLarkContent(messageType, content);
+    if (text.trim()) {
+      candidates.push(text);
+    }
+  } else if (messageType) {
+    const text = extractTextFromLarkContent(messageType, JSON.stringify(payloadObj));
+    if (text.trim()) {
+      candidates.push(text);
+    }
+  }
+
+  collectStringValues(payloadObj, candidates);
+  return candidates;
+}
+
 function extractInlineQuotedTextCandidates(data: any, contentObj: any | null): string[] {
   const candidates: string[] = [];
   const quotedPayloads = [
@@ -208,7 +260,7 @@ function extractInlineQuotedTextCandidates(data: any, contentObj: any | null): s
   ].filter(Boolean);
 
   for (const payload of quotedPayloads) {
-    collectStringValues(payload, candidates);
+    candidates.push(...extractTextFromReferencedPayload(payload));
   }
 
   return candidates;
