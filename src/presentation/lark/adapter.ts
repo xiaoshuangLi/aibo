@@ -272,14 +272,24 @@ function extractReferencedMessageIds(message: any, contentObj: any | null): stri
     message?.parent_id,
     message?.root_id,
     message?.upper_message_id,
+    message?.thread_id,
     message?.reply_id,
     message?.reply_message_id,
+    message?.parent_message_id,
+    message?.root_message_id,
+    message?.upper_message_id,
     message?.replied_message_id,
     message?.message_reply_id,
     contentObj?.quote_message_id,
     contentObj?.quoteMessageId,
     contentObj?.reply_message_id,
     contentObj?.replyMessageId,
+    contentObj?.parent_message_id,
+    contentObj?.parentMessageId,
+    contentObj?.root_message_id,
+    contentObj?.rootMessageId,
+    contentObj?.thread_id,
+    contentObj?.threadId,
     contentObj?.replied_message_id,
     contentObj?.repliedMessageId,
     contentObj?.quote?.message_id,
@@ -804,7 +814,7 @@ export class LarkAdapter extends DefaultAdapter {
         });
         const items = resp?.data?.items ?? [];
         for (const item of items) {
-          const text = extractTextFromLarkContent(item?.msg_type, item?.body?.content);
+          const text = extractTextFromLarkContent(item?.msg_type ?? item?.message_type, item?.body?.content);
           if (text.trim()) {
             texts.push(text);
           }

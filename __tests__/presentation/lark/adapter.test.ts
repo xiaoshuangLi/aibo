@@ -1197,6 +1197,48 @@ describe('LarkAdapter', () => {
       expect(callback).toHaveBeenCalledWith('发一下回复卡片里的图');
     });
 
+    it('should fetch thread_id card content when replying to a card message', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      mockLarkClient.im.message.get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              message_type: 'interactive',
+              body: {
+                content: JSON.stringify({
+                  elements: [
+                    {
+                      tag: 'markdown',
+                      content: `被回复的卡片图片：${tempImagePath}`,
+                    },
+                  ],
+                }),
+              },
+            },
+          ],
+        },
+      });
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_reply_to_card',
+          thread_id: 'om_card_thread',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: '发一下这张卡片里的图' }),
+          message_type: 'text',
+        },
+      });
+
+      expect(mockLarkClient.im.message.get).toHaveBeenCalledWith({
+        path: { message_id: 'om_card_thread' },
+      });
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).toHaveBeenCalledWith('发一下这张卡片里的图');
+    });
+
     it('should send a native image message when inline quoted post content mentions a local image path', async () => {
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
       const callback = jest.fn();
