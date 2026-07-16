@@ -136,11 +136,21 @@ function extractTextFromPostContent(contentObj: any): string {
   return parts.join('\n');
 }
 
+function extractTextFromCardContent(contentObj: any): string {
+  const parts: string[] = [];
+  collectStringValues(contentObj, parts);
+  return parts.join('\n');
+}
+
 function extractTextFromLarkContent(messageType: string | undefined, content: unknown): string {
   const contentObj = parseJsonObject(content);
 
   if (messageType === 'post' && contentObj) {
     return extractTextFromPostContent(contentObj);
+  }
+
+  if ((messageType === 'interactive' || messageType === 'card') && contentObj) {
+    return extractTextFromCardContent(contentObj);
   }
 
   if (contentObj) {
