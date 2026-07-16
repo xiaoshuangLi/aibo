@@ -10,6 +10,8 @@
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
 import { config } from '@/core/config';
 import { SessionManager } from '@/infrastructure/session';
@@ -38,6 +40,77 @@ export type MessageContent = string | (TextContent | ImageContent)[];
 // 用户消息回调类型
 type UserMessageCallback = (message: MessageContent) => void;
 
+const LOCAL_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
+
+function stripPathWrapping(value: string): string {
+  return value.trim().replace(/^[`'"\(<\[]+|[`'"\)>\],.!?:;，。！？：；、]+$/g, '');
+}
+
+function decodeLocalPathCandidate(value: string): string {
+  if (value.startsWith('file://')) {
+    return decodeURIComponent(value.replace(/^file:\/\//, ''));
+  }
+  return value;
+}
+
+function resolveLocalImagePath(candidate: string): string | null {
+  const cleaned = decodeLocalPathCandidate(stripPathWrapping(candidate));
+  if (!cleaned) return null;
+
+  const ext = path.extname(cleaned).toLowerCase();
+  if (!LOCAL_IMAGE_EXTENSIONS.has(ext)) return null;
+
+  const absolutePath = path.isAbsolute(cleaned)
+    ? cleaned
+    : path.resolve(process.cwd(), cleaned);
+
+  try {
+    const stat = fs.statSync(absolutePath);
+    return stat.isFile() ? absolutePath : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractLocalImagePathsFromText(text: string): string[] {
+  if (!text) return [];
+
+  const candidates = new Set<string>();
+  const extensionPattern = '(?:png|jpe?g|gif|webp)';
+  const wrappedPathPattern = new RegExp(`(?:file://|/|\\./|\\.\\./|(?:[\\w.-]+/)+)[^\\n\`'"]+\\.${extensionPattern}`, 'gi');
+
+  for (const wrappedMatch of text.matchAll(/[`'"]([^`'"]+)[`'"]/g)) {
+    const wrappedText = wrappedMatch[1];
+    for (const pathMatch of wrappedText.matchAll(wrappedPathPattern)) {
+      if (pathMatch[0]) candidates.add(pathMatch[0]);
+    }
+  }
+
+  const pathPatterns = [
+    new RegExp(`file://[^\\s\\)\\]>，。！？；：'"\`]+\\.${extensionPattern}`, 'gi'),
+    new RegExp(`(?:/|\\./|\\.\\./)[^\\s\\)\\]>，。！？；：'"\`]+\\.${extensionPattern}`, 'gi'),
+    new RegExp(`(?<![\\w:/.-])(?:[\\w.-]+/)+[^\\s\\)\\]>，。！？；：'"\`]+\\.${extensionPattern}`, 'gi'),
+  ];
+
+  for (const pattern of pathPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      if (match[0]) candidates.add(match[0]);
+    }
+  }
+
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const imagePath = resolveLocalImagePath(candidate);
+    if (imagePath && !seen.has(imagePath)) {
+      seen.add(imagePath);
+      resolved.push(imagePath);
+    }
+  }
+
+  return resolved;
+}
+
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
   private wsClient: lark.WSClient;
@@ -63,6 +136,7 @@ export class LarkAdapter extends DefaultAdapter {
   private sendQueue: Array<{ fn: () => Promise<void>; resolve: () => void; reject: (err: unknown) => void }> = [];
   private isSendingQueue = false;
   private sendTimestamps: number[] = [];
+  private sentLocalImagePaths = new Set<string>();
   private static readonly SEND_RATE_LIMIT = 5;     // 每秒最多5条
   private static readonly SEND_RATE_WINDOW = 1000; // 1秒窗口（毫秒）
 
@@ -491,8 +565,8 @@ export class LarkAdapter extends DefaultAdapter {
    * 支持 base64 字符串（不带 data URI 前缀）或 HTTP URL。
    * 如果上传或发送失败，仅打印警告，不抛出异常。
    */
-  async sendImageToChat(imageUrl: string): Promise<void> {
-    if (!imageUrl) return;
+  async sendImageToChat(imageUrlOrPath: string): Promise<void> {
+    if (!imageUrlOrPath) return;
 
     await this.chatIdReady;
 
@@ -508,14 +582,17 @@ export class LarkAdapter extends DefaultAdapter {
 
     // Upload the image buffer to Lark im.image API to get an image_key
     let imageBuffer: Buffer;
-    if (imageUrl.startsWith('http')) {
+    if (imageUrlOrPath.startsWith('http')) {
       // Download from URL
       const axios = (await import('axios')).default;
-      const resp = await axios.get<ArrayBuffer>(imageUrl, { responseType: 'arraybuffer' });
+      const resp = await axios.get<ArrayBuffer>(imageUrlOrPath, { responseType: 'arraybuffer' });
       imageBuffer = Buffer.from(resp.data);
+    } else if (imageUrlOrPath.startsWith('file://') || fs.existsSync(imageUrlOrPath)) {
+      const localPath = decodeLocalPathCandidate(imageUrlOrPath);
+      imageBuffer = await fs.promises.readFile(localPath);
     } else {
       // Strip data URI prefix if present (e.g. "data:image/jpeg;base64,...")
-      const base64Data = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
+      const base64Data = imageUrlOrPath.includes(',') ? imageUrlOrPath.split(',')[1] : imageUrlOrPath;
       imageBuffer = Buffer.from(base64Data, 'base64');
     }
 
@@ -540,12 +617,24 @@ export class LarkAdapter extends DefaultAdapter {
     );
   }
 
+  private async sendLocalImagesMentionedInText(text: string): Promise<void> {
+    const imagePaths = extractLocalImagePathsFromText(text);
+    for (const imagePath of imagePaths) {
+      if (this.sentLocalImagePaths.has(imagePath)) continue;
+      this.sentLocalImagePaths.add(imagePath);
+      await this.sendImageToChat(imagePath).catch((err) =>
+        console.error(`⚠️ 发送本地图片到飞书失败 (${imagePath}):`, err?.message ?? err)
+      );
+    }
+  }
+
   // 事件处理器方法
   private async handleAIResponse(data: { content: string }): Promise<void> {
     if (!data?.content) return;
     // 使用富文本格式化 AI 响应
     const formattedContent = styled.assistant(data.content);
     await this.sendMessage(formattedContent);
+    await this.sendLocalImagesMentionedInText(data.content);
   }
 
   private async handleToolCall(data: { name: string; args: any }): Promise<void> {
@@ -722,6 +811,7 @@ export class LarkAdapter extends DefaultAdapter {
     if (!data?.chunk) return;
     if (this.abortSignal?.aborted) return;
     await this.sendMessage(styled.assistant(data.chunk));
+    await this.sendLocalImagesMentionedInText(data.chunk);
   }
 
   private async handleStreamEnd(data: { finalContent?: string }): Promise<void> {
@@ -767,6 +857,7 @@ export class LarkAdapter extends DefaultAdapter {
     const displayName = getAcpAgentDisplayName(data.agentName);
     const title = `🔗 正在与 ${displayName} 对话`;
     await this.sendMessage(styled.system(title, data.response));
+    await this.sendLocalImagesMentionedInText(data.response);
   }
 
   private async handleSessionEnd(data: { message: string }): Promise<void> {

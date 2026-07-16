@@ -1,5 +1,8 @@
 import { LarkAdapter } from '@/presentation/lark/adapter';
 import { config } from '@/core/config';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // Mock console methods
 const originalConsoleLog = console.log;
@@ -964,10 +967,19 @@ describe('LarkAdapter', () => {
   // Test event handlers
   describe('Event Handlers', () => {
     let adapter: LarkAdapter;
+    let tempImagePath: string;
     
     beforeEach(() => {
       adapter = new LarkAdapter();
       mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
+      tempImagePath = path.join(os.tmpdir(), `aibo-lark-image-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+      fs.writeFileSync(tempImagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    });
+
+    afterEach(() => {
+      if (tempImagePath && fs.existsSync(tempImagePath)) {
+        fs.unlinkSync(tempImagePath);
+      }
     });
 
     it('should handle aiResponse event', async () => {
@@ -980,6 +992,46 @@ describe('LarkAdapter', () => {
           })
         })
       );
+    });
+
+    it('should send a native image message when aiResponse mentions a local image path', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+
+      await (adapter as any).handleAIResponse({ content: `图片在这里：\`${tempImagePath}\`` });
+
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+    });
+
+    it('should support quoted local image paths containing spaces', async () => {
+      const spacedImagePath = path.join(os.tmpdir(), `aibo lark image ${Date.now()}.png`);
+      fs.writeFileSync(spacedImagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+
+      try {
+        await (adapter as any).handleAIResponse({ content: `图片路径是 "${spacedImagePath}"` });
+
+        expect(sendImageSpy).toHaveBeenCalledWith(spacedImagePath);
+      } finally {
+        if (fs.existsSync(spacedImagePath)) fs.unlinkSync(spacedImagePath);
+      }
+    });
+
+    it('should not send image messages for missing local image paths', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+
+      await (adapter as any).handleAIResponse({ content: '不存在的图：/tmp/not-here-aibo.png' });
+
+      expect(sendImageSpy).not.toHaveBeenCalled();
+    });
+
+    it('should send local images mentioned in stream chunks and acp responses', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+
+      await (adapter as any).handleStreamChunk({ chunk: `stream image ${tempImagePath}` });
+      await (adapter as any).handleAcpResponse({ agentName: 'codex', response: `acp image ${tempImagePath}` });
+
+      expect(sendImageSpy).toHaveBeenCalledTimes(1);
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
     });
 
     it('should handle toolCall event', async () => {
