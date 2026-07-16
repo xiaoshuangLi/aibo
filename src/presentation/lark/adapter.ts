@@ -19,6 +19,7 @@ import { SessionManager } from '@/infrastructure/session';
 import { styled } from './styler';
 import { LarkChatService } from './chat';
 import { LarkWsClientManager } from './ws-client';
+import { isImageModeCommand, isImageModeEnabled } from './image-mode';
 import { getAcpSessionState, getAcpAgentDisplayName } from '@/shared/acp-session';
 
 // 飞书配置类型
@@ -450,6 +451,13 @@ export class LarkAdapter extends DefaultAdapter {
 
       const contentObj = parseJsonObject(content);
       await this.sendLocalImagesMentionedInUserMessage(data, contentObj);
+
+      // Image mode runs only the local-path image delivery pipeline above.
+      // Keep /image commands reachable so the user can inspect or leave it.
+      const commandText = extractTextFromLarkContent(messageType, content);
+      if (isImageModeEnabled() && !isImageModeCommand(commandText)) {
+        return;
+      }
 
       // 处理图片消息
       if (messageType === 'image') {

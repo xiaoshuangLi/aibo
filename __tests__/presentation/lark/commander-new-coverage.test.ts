@@ -3,6 +3,7 @@ import {
   handleSessionCommand,
   createHandleInternalCommand,
 } from '@/presentation/lark/commander';
+import { isImageModeEnabled, setImageModeEnabled } from '@/presentation/lark/image-mode';
 
 jest.mock('@/presentation/styling/styler', () => ({
   styled: { system: (m: string) => m, error: (m: string) => m },
@@ -18,6 +19,8 @@ const makeSession = () => ({
 });
 
 describe('commander lark - additional coverage', () => {
+  afterEach(() => setImageModeEnabled(false));
+
   it('formatSessionMetadataToMarkdown with null returns no-data message', () => {
     const result = formatSessionMetadataToMarkdown(null);
     expect(result).toContain('无会话元数据');
@@ -83,5 +86,23 @@ describe('commander lark - additional coverage', () => {
     const handler = createHandleInternalCommand(session);
     const result = await handler('/session');
     expect(result).toBe(true);
+  });
+
+  it('routes /image enable, status, and off without invoking the model', async () => {
+    const session = makeSession();
+    const handler = createHandleInternalCommand(session);
+
+    await expect(handler('/image')).resolves.toBe(true);
+    expect(isImageModeEnabled()).toBe(true);
+
+    await expect(handler('/image status')).resolves.toBe(true);
+    expect(session.adapter.emit).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        result: expect.objectContaining({ message: expect.stringContaining('已开启') }),
+      }),
+    }));
+
+    await expect(handler('/image off')).resolves.toBe(true);
+    expect(isImageModeEnabled()).toBe(false);
   });
 });

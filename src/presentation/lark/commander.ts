@@ -8,6 +8,7 @@ import { LspClientManager } from '@/infrastructure/code-analysis';
 import { setAcpPassthroughState, getAcpPassthroughState, clearAcpPassthroughState, getAcpPausedPassthroughState, pauseAcpPassthroughState, resumeAcpPassthroughState } from './acp-passthrough';
 import { getAcpAgentDisplayName, KNOWN_ACP_AGENTS, resolveAcpSessionName } from '@/shared/acp-session';
 import { cancelAcpPrompt } from '@/shared/acp-cancel';
+import { isImageModeEnabled, setImageModeEnabled } from './image-mode';
 
 /** Built-in ACP-compatible agent names recognised by ACP commands. */
 export { KNOWN_ACP_AGENTS };
@@ -140,6 +141,9 @@ export async function handleHelpCommand(session: any): Promise<boolean> {
 • \`/verbose\`   - 📊 切换详细/简洁模式
 • \`/session\`   - 📊 查看会话元数据统计
 • \`/rebot\`     - 🔄 重启并重新构建
+• \`/image\`     - 🖼️ 只发送消息及引用中匹配到的本地图片
+• \`/image off\` - 退出图片模式
+• \`/image status\` - 查看图片模式状态
 
 🤖 **ACP 直传模式命令**
 • \`/acp <代理名>\`         - 🔗 进入 ACP 直传模式（如 \`/acp codex\`）
@@ -1399,6 +1403,46 @@ export async function handleStageCommand(session: any, filePath: string): Promis
  * @param session - 会话对象，包含threadId等会话状态信息
  * @returns (command: string) => Promise<boolean> - 返回一个接受命令字符串并返回Promise<boolean>的函数
  */
+export async function handleImageModeCommand(session: any, args: string[] = []): Promise<boolean> {
+  const action = args[0]?.toLowerCase();
+  let message: string;
+
+  if (!action || ['on', 'start', 'enable', '开启'].includes(action)) {
+    setImageModeEnabled(true);
+
+    if (session.isRunning && session.abortController) {
+      session.abortController.abort();
+    }
+    const acpState = getAcpPassthroughState();
+    if (acpState) {
+      await cancelAcpPrompt(acpState).catch((error) => {
+        console.warn('⚠️ 开启图片模式时取消 ACP 任务失败:', error);
+      });
+    }
+
+    message = '🖼️ **图片模式已开启**\n\n后续消息只会匹配并发送正文、引用或回复中的本地图片，不会转发给大模型或 ACP。\n\n使用 `/image off` 退出。';
+  } else if (['off', 'stop', 'disable', '关闭'].includes(action)) {
+    setImageModeEnabled(false);
+    message = '✅ **图片模式已关闭**\n\n后续消息将恢复正常处理。';
+  } else if (action === 'status') {
+    message = isImageModeEnabled()
+      ? '🖼️ **图片模式状态：已开启**'
+      : 'ℹ️ **图片模式状态：未开启**';
+  } else {
+    message = '⚠️ **用法**：`/image`、`/image off` 或 `/image status`';
+  }
+
+  await session.adapter.emit({
+    type: 'commandExecuted',
+    data: {
+      command: '/image',
+      result: { success: true, message },
+    },
+    timestamp: Date.now(),
+  });
+  return true;
+}
+
 export function createHandleInternalCommand(session: any): (command: string) => Promise<boolean> {
   return async (command: string): Promise<boolean> => {
     // 解析命令和参数
@@ -1427,6 +1471,9 @@ export function createHandleInternalCommand(session: any): (command: string) => 
         
       case "/rebot":
         return await handleRebotCommand(session);
+
+      case "/image":
+        return await handleImageModeCommand(session, args);
         
       case "/exit":
       case "/quit":

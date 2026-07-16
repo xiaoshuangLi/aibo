@@ -8,6 +8,15 @@ const execFileAsync = promisify(execFile);
 /** Keep cancellation bounded so a new user message cannot hang indefinitely. */
 const ACP_CANCEL_TIMEOUT_MS = 15_000;
 
+/** Return true when an acpx failure means its prompt wait expired. */
+export function isAcpPromptTimeoutError(error: unknown): boolean {
+  const err = error as any;
+  if (err?.name === 'TimeoutError' || err?.code === 'ETIMEDOUT') return true;
+
+  const combined = `${err?.message || ''}\n${err?.stdout || ''}\n${err?.stderr || ''}`;
+  return /timed out after|exceeded .* timeout|\b(?:ACP_)?TIMEOUT\b/i.test(combined);
+}
+
 /** Build argv for cancelling the exact persistent acpx session currently in use. */
 export function buildAcpCancelArgs(state: AcpSessionState): string[] {
   const args: string[] = [];
@@ -33,4 +42,14 @@ export async function cancelAcpPrompt(state: AcpSessionState): Promise<void> {
     timeout: ACP_CANCEL_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   });
+}
+
+/** Release the persistent queue owner's active turn after a prompt timeout. */
+export async function cancelAcpPromptAfterTimeout(
+  error: unknown,
+  state: AcpSessionState,
+): Promise<boolean> {
+  if (!isAcpPromptTimeoutError(error)) return false;
+  await cancelAcpPrompt(state);
+  return true;
 }

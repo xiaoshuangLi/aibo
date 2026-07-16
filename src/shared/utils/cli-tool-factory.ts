@@ -4,6 +4,7 @@ import { execSync, execFile } from "child_process";
 import { promisify } from "util";
 import { Session } from "@/core/agent";
 import { setAcpSessionState, getAcpAgentDisplayName, resolveAcpSessionName } from "@/shared/acp-session";
+import { cancelAcpPromptAfterTimeout } from "@/shared/acp-cancel";
 
 const execFileAsync = promisify(execFile);
 
@@ -120,21 +121,30 @@ export async function runAcpWithSessionRecovery<T>(
   sessionName?: string,
 ): Promise<T> {
   try {
-    return await runAcp();
-  } catch (firstError) {
-    if (isAcpQueueOwnerUnavailableError(firstError) && await refreshAcpQueueOwnerStatus(agent, cwd, sessionName)) {
-      try {
-        return await runAcp();
-      } catch (retryError) {
-        if (!isNoAcpSessionError(retryError)) throw retryError;
-        await createAcpSession(agent, cwd, sessionName);
-        return await runAcp();
+    try {
+      return await runAcp();
+    } catch (firstError) {
+      if (isAcpQueueOwnerUnavailableError(firstError) && await refreshAcpQueueOwnerStatus(agent, cwd, sessionName)) {
+        try {
+          return await runAcp();
+        } catch (retryError) {
+          if (!isNoAcpSessionError(retryError)) throw retryError;
+          await createAcpSession(agent, cwd, sessionName);
+          return await runAcp();
+        }
       }
-    }
 
-    if (!isNoAcpSessionError(firstError)) throw firstError;
-    await createAcpSession(agent, cwd, sessionName);
-    return await runAcp();
+      if (!isNoAcpSessionError(firstError)) throw firstError;
+      await createAcpSession(agent, cwd, sessionName);
+      return await runAcp();
+    }
+  } catch (error) {
+    try {
+      await cancelAcpPromptAfterTimeout(error, { agent, cwd, sessionName });
+    } catch (cancelError) {
+      console.warn('Failed to cancel timed-out ACP prompt:', cancelError);
+    }
+    throw error;
   }
 }
 

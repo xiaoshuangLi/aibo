@@ -3,6 +3,7 @@ import { config } from '@/core/config';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { setImageModeEnabled } from '@/presentation/lark/image-mode';
 
 // Mock console methods
 const originalConsoleLog = console.log;
@@ -110,6 +111,7 @@ describe('LarkAdapter', () => {
   let originalLarkConfig: any;
   
   beforeEach(() => {
+    setImageModeEnabled(false);
     jest.clearAllMocks();
     mockConsoleLog.mockClear();
     mockConsoleError.mockClear();
@@ -126,6 +128,7 @@ describe('LarkAdapter', () => {
   });
 
   afterEach(() => {
+    setImageModeEnabled(false);
     // Restore original config
     config.lark = originalLarkConfig;
   });
@@ -1027,6 +1030,44 @@ describe('LarkAdapter', () => {
         })
       );
       expect(callback).toHaveBeenCalledWith(`帮我看下 ${tempImagePath}`);
+    });
+
+    it('should send matched local images without forwarding the message in image mode', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      setImageModeEnabled(true);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_image_mode_path',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: `只发这张图 ${tempImagePath}` }),
+          message_type: 'text',
+        },
+      });
+
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should let /image commands reach the command handler while image mode is active', async () => {
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      setImageModeEnabled(true);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_image_mode_off',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: '/image off' }),
+          message_type: 'text',
+        },
+      });
+
+      expect(callback).toHaveBeenCalledWith('/image off');
     });
 
     it('should send a native image message when the quoted message mentions a local image path', async () => {

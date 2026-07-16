@@ -144,6 +144,25 @@ describe('handleAcpPassthrough', () => {
     expect(mockLogToolResult).not.toHaveBeenCalled();
   });
 
+  it('should cooperatively cancel the same session when acpx times out', async () => {
+    setAcpPassthroughState({ agent: 'codex', cwd: '/project', sessionName: 'main' });
+    const timeoutError: any = new Error('acpx timed out after 420000ms');
+    timeoutError.code = 'ETIMEDOUT';
+    timeoutError.stdout = '';
+    timeoutError.stderr = '[acpx] error: {"code":"TIMEOUT"}';
+    execFileAsyncMock
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await handleAcpPassthrough('long task', mockSession);
+
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(2);
+    expect(execFileAsyncMock.mock.calls[1][1]).toEqual([
+      '--cwd', '/project', 'codex', '-s', 'main', 'cancel',
+    ]);
+    expect(mockLogAcpResponse).toHaveBeenCalledWith('codex', expect.stringContaining('❌'));
+  });
+
   it('should silently return without logging an error when acpx is aborted (ABORT_ERR)', async () => {
     setAcpPassthroughState({ agent: 'copilot' });
     const err: any = new Error('aborted');
