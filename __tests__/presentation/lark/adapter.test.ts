@@ -1052,6 +1052,32 @@ describe('LarkAdapter', () => {
       expect(callback).not.toHaveBeenCalled();
     });
 
+    it('should process a repeated Lark message id only once', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      setImageModeEnabled(true, 'test-chat-id');
+      const event = {
+        message: {
+          message_id: 'om_retried_image_event',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: `只发一次 ${tempImagePath}` }),
+          message_type: 'text',
+        },
+      };
+
+      await Promise.all([
+        (adapter as any).handleUserMessage(event),
+        (adapter as any).handleUserMessage(event),
+      ]);
+
+      expect(sendImageSpy).toHaveBeenCalledTimes(1);
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).not.toHaveBeenCalled();
+      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('om_retried_image_event'));
+    });
+
     it('should let /image commands reach the command handler while image mode is active', async () => {
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);

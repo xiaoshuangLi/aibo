@@ -315,8 +315,11 @@ export class LarkAdapter extends DefaultAdapter {
   private userMessageCallback: UserMessageCallback | null = null;
   private chatId: string | null = null;
   private chatService: LarkChatService;
+  private processedMessageIds = new Map<string, number>();
   // Resolves once chatId is initialised (group_chat mode performs an async lookup)
   private chatIdReady: Promise<void> = Promise.resolve();
+  private static readonly MESSAGE_DEDUP_TTL_MS = 10 * 60 * 1000;
+  private static readonly MESSAGE_DEDUP_MAX_SIZE = 5000;
 
   // 存储待处理的消息队列（用于处理并发消息）
   private messageQueue: Array<{ content: MessageContent; chatId: string }> = [];
@@ -441,6 +444,29 @@ export class LarkAdapter extends DefaultAdapter {
     this.on('imageUploaded', this.handleImageUploaded.bind(this));
   }
 
+  private claimIncomingMessage(chatId: string, messageId?: string): boolean {
+    if (!messageId) return true;
+
+    const now = Date.now();
+    const key = `${chatId}:${messageId}`;
+    const processedAt = this.processedMessageIds.get(key);
+    if (processedAt !== undefined && now - processedAt < LarkAdapter.MESSAGE_DEDUP_TTL_MS) {
+      console.warn(`⚠️ 忽略重复的飞书消息事件: ${messageId}`);
+      return false;
+    }
+
+    this.processedMessageIds.set(key, now);
+    if (this.processedMessageIds.size > LarkAdapter.MESSAGE_DEDUP_MAX_SIZE) {
+      const expiresBefore = now - LarkAdapter.MESSAGE_DEDUP_TTL_MS;
+      for (const [storedKey, timestamp] of this.processedMessageIds) {
+        if (timestamp < expiresBefore || this.processedMessageIds.size > LarkAdapter.MESSAGE_DEDUP_MAX_SIZE) {
+          this.processedMessageIds.delete(storedKey);
+        }
+      }
+    }
+    return true;
+  }
+
   /**
    * 处理用户消息
    */
@@ -462,6 +488,12 @@ export class LarkAdapter extends DefaultAdapter {
         if (chatType !== 'p2p') {
           return;
         }
+      }
+
+      // Lark can retry an event before a slow image upload has been acknowledged.
+      // Claim synchronously so concurrent redeliveries cannot send the same image twice.
+      if (!this.claimIncomingMessage(msgChatId, messageId)) {
+        return;
       }
 
       const contentObj = parseJsonObject(content);
