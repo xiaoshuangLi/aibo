@@ -421,6 +421,32 @@ describe('Lark Command Handlers', () => {
       expect(childProcess.spawn).toHaveBeenCalled();
     });
 
+    it('should allow long project builds before timing out', async () => {
+      (require('child_process').exec as jest.Mock).mockImplementation((_cmd: string, _opts: any, callback: Function) => {
+        callback(null, 'Build successful', '');
+      });
+
+      (require('@/shared/utils/restart').getRestartCommand as jest.Mock).mockReturnValue({
+        restartCommand: 'node',
+        restartArgs: ['dist/index.js']
+      });
+
+      const mockSession = {
+        adapter: {
+          emit: jest.fn()
+        },
+        end: jest.fn()
+      };
+
+      await handleRebotCommand(mockSession as any);
+
+      expect(require('child_process').exec).toHaveBeenCalledWith(
+        'npm run build',
+        expect.objectContaining({ timeout: 600_000 }),
+        expect.any(Function),
+      );
+    });
+
     it('should handle build failure gracefully', async () => {
       // Mock exec to call callback with an error (build failed)
       const buildError: any = new Error('Compilation failed');

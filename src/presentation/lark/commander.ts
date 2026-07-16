@@ -12,6 +12,15 @@ import { cancelAcpPrompt } from '@/shared/acp-cancel';
 /** Built-in ACP-compatible agent names recognised by ACP commands. */
 export { KNOWN_ACP_AGENTS };
 
+const DEFAULT_REBOT_BUILD_TIMEOUT_MS = 600_000;
+
+function getRebotBuildTimeoutMs(): number {
+  const configured = Number(process.env.AIBO_REBOT_BUILD_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_REBOT_BUILD_TIMEOUT_MS;
+}
+
 /**
  * Command Handlers module for Lark that provides internal command processing functionality.
  * 
@@ -532,7 +541,7 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
     // 执行 npm run build 命令
     const result = await new Promise<{ success: boolean; stdout: string; stderr: string; error?: string; message?: string }>((resolve, reject) => {
       try {
-        exec("npm run build", { timeout: 60000, cwd: process.cwd() }, (error, stdout, stderr) => {
+        exec("npm run build", { timeout: getRebotBuildTimeoutMs(), cwd: process.cwd() }, (error, stdout, stderr) => {
           if (error) {
             resolve({ success: false, stdout, stderr, error: String(error.code ?? error.name), message: error.message });
           } else {
