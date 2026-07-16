@@ -1082,17 +1082,55 @@ describe('LarkAdapter', () => {
     });
 
     it('should send identical image bytes only once even when delivery sources differ', async () => {
-      mockLarkClient.im.image.create.mockResolvedValue({ data: { image_key: 'img_deduplicated' } });
+      let finishUpload!: (value: any) => void;
+      mockLarkClient.im.image.create.mockReturnValue(new Promise(resolve => {
+        finishUpload = resolve;
+      }));
       mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
 
-      await Promise.all([
+      const deliveries = Promise.all([
         adapter.sendImageToChat(tempImagePath),
         adapter.sendImageToChat(`file://${tempImagePath}`),
       ]);
+      for (let i = 0; i < 20 && mockLarkClient.im.image.create.mock.calls.length === 0; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+
+      expect(mockLarkClient.im.image.create).toHaveBeenCalledTimes(1);
+      finishUpload({ data: { image_key: 'img_deduplicated' } });
+      await deliveries;
 
       expect(mockLarkClient.im.image.create).toHaveBeenCalledTimes(1);
       expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(1);
-      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('忽略短时间内重复发送'));
+      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('忽略正在并发发送'));
+    });
+
+    it('should match a local path while shared production image mode is enabled', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      try {
+        process.env.NODE_ENV = 'production';
+        setImageModeEnabled(true, 'production-chat');
+
+        await (adapter as any).handleUserMessage({
+          message: {
+            message_id: 'om_production_image_mode',
+            chat_id: 'production-chat',
+            chat_type: 'p2p',
+            content: JSON.stringify({ text: `生产模式发送 ${tempImagePath}` }),
+            message_type: 'text',
+          },
+        });
+
+        expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+        expect(callback).not.toHaveBeenCalled();
+      } finally {
+        setImageModeEnabled(false, 'production-chat');
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
 
     it('should let /image commands reach the command handler while image mode is active', async () => {
