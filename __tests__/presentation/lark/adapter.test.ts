@@ -19,7 +19,8 @@ console.warn = mockConsoleWarn;
 const mockLarkClient = {
   im: {
     message: {
-      create: jest.fn()
+      create: jest.fn(),
+      get: jest.fn()
     }
   }
 };
@@ -994,21 +995,90 @@ describe('LarkAdapter', () => {
       );
     });
 
-    it('should send a native image message when aiResponse mentions a local image path', async () => {
+    it('should not send a native image message when aiResponse mentions a local image path', async () => {
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
 
       await (adapter as any).handleAIResponse({ content: `图片在这里：\`${tempImagePath}\`` });
 
+      expect(sendImageSpy).not.toHaveBeenCalled();
+    });
+
+    it('should send a native image message when the user message mentions a local image path', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_user_local_path',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: `帮我看下 ${tempImagePath}` }),
+          message_type: 'text',
+        },
+      });
+
       expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            content: expect.stringContaining(tempImagePath),
+          }),
+        })
+      );
+      expect(callback).toHaveBeenCalledWith(`帮我看下 ${tempImagePath}`);
+    });
+
+    it('should send a native image message when the quoted message mentions a local image path', async () => {
+      const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      mockLarkClient.im.message.get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              msg_type: 'text',
+              body: { content: JSON.stringify({ text: `引用里的图片：${tempImagePath}` }) },
+            },
+          ],
+        },
+      });
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_reply',
+          parent_id: 'om_parent',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: '发一下引用里的图' }),
+          message_type: 'text',
+        },
+      });
+
+      expect(mockLarkClient.im.message.get).toHaveBeenCalledWith({
+        path: { message_id: 'om_parent' },
+      });
+      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(callback).toHaveBeenCalledWith('发一下引用里的图');
     });
 
     it('should support quoted local image paths containing spaces', async () => {
       const spacedImagePath = path.join(os.tmpdir(), `aibo lark image ${Date.now()}.png`);
       fs.writeFileSync(spacedImagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
 
       try {
-        await (adapter as any).handleAIResponse({ content: `图片路径是 "${spacedImagePath}"` });
+        await (adapter as any).handleUserMessage({
+          message: {
+            message_id: 'om_user_spaced_path',
+            chat_id: 'test-chat-id',
+            chat_type: 'p2p',
+            content: JSON.stringify({ text: `图片路径是 "${spacedImagePath}"` }),
+            message_type: 'text',
+          },
+        });
 
         expect(sendImageSpy).toHaveBeenCalledWith(spacedImagePath);
       } finally {
@@ -1018,20 +1088,29 @@ describe('LarkAdapter', () => {
 
     it('should not send image messages for missing local image paths', async () => {
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
 
-      await (adapter as any).handleAIResponse({ content: '不存在的图：/tmp/not-here-aibo.png' });
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_missing_path',
+          chat_id: 'test-chat-id',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: '不存在的图：/tmp/not-here-aibo.png' }),
+          message_type: 'text',
+        },
+      });
 
       expect(sendImageSpy).not.toHaveBeenCalled();
     });
 
-    it('should send local images mentioned in stream chunks and acp responses', async () => {
+    it('should not send local images mentioned in stream chunks and acp responses', async () => {
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
 
       await (adapter as any).handleStreamChunk({ chunk: `stream image ${tempImagePath}` });
       await (adapter as any).handleAcpResponse({ agentName: 'codex', response: `acp image ${tempImagePath}` });
 
-      expect(sendImageSpy).toHaveBeenCalledTimes(1);
-      expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
+      expect(sendImageSpy).not.toHaveBeenCalled();
     });
 
     it('should handle toolCall event', async () => {

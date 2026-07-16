@@ -111,6 +111,97 @@ function extractLocalImagePathsFromText(text: string): string[] {
   return resolved;
 }
 
+function parseJsonObject(value: unknown): any | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractTextFromPostContent(contentObj: any): string {
+  const rows: any[][] = contentObj?.content || [];
+  const parts: string[] = [];
+
+  for (const row of rows) {
+    for (const block of row || []) {
+      if (block?.tag === 'text' && block.text) {
+        parts.push(block.text);
+      }
+    }
+  }
+
+  return parts.join('\n');
+}
+
+function extractTextFromLarkContent(messageType: string | undefined, content: unknown): string {
+  const contentObj = parseJsonObject(content);
+
+  if (messageType === 'post' && contentObj) {
+    return extractTextFromPostContent(contentObj);
+  }
+
+  if (contentObj) {
+    return typeof contentObj.text === 'string' ? contentObj.text : '';
+  }
+
+  return typeof content === 'string' ? content : '';
+}
+
+function collectStringValues(value: unknown, output: string[]): void {
+  if (typeof value === 'string') {
+    output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStringValues(item, output);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) collectStringValues(child, output);
+  }
+}
+
+function extractInlineQuotedTextCandidates(data: any, contentObj: any | null): string[] {
+  const candidates: string[] = [];
+  const quotedPayloads = [
+    contentObj?.quote,
+    contentObj?.quote_content,
+    contentObj?.quoteContent,
+    contentObj?.quoted_message,
+    contentObj?.quotedMessage,
+    data?.quote,
+    data?.quote_content,
+    data?.quoted_message,
+    data?.message?.quote,
+    data?.message?.quote_content,
+    data?.message?.quoted_message,
+  ].filter(Boolean);
+
+  for (const payload of quotedPayloads) {
+    collectStringValues(payload, candidates);
+  }
+
+  return candidates;
+}
+
+function extractReferencedMessageIds(message: any, contentObj: any | null): string[] {
+  const currentMessageId = message?.message_id;
+  const ids = [
+    message?.parent_id,
+    message?.root_id,
+    message?.upper_message_id,
+    contentObj?.quote_message_id,
+    contentObj?.quoteMessageId,
+    contentObj?.quote?.message_id,
+    contentObj?.quoted_message?.message_id,
+  ].filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
+  return Array.from(new Set(ids.filter(id => id !== currentMessageId)));
+}
+
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
   private wsClient: lark.WSClient;
@@ -136,7 +227,6 @@ export class LarkAdapter extends DefaultAdapter {
   private sendQueue: Array<{ fn: () => Promise<void>; resolve: () => void; reject: (err: unknown) => void }> = [];
   private isSendingQueue = false;
   private sendTimestamps: number[] = [];
-  private sentLocalImagePaths = new Set<string>();
   private static readonly SEND_RATE_LIMIT = 5;     // 每秒最多5条
   private static readonly SEND_RATE_WINDOW = 1000; // 1秒窗口（毫秒）
 
@@ -257,11 +347,13 @@ export class LarkAdapter extends DefaultAdapter {
         }
       }
 
+      const contentObj = parseJsonObject(content);
+      await this.sendLocalImagesMentionedInUserMessage(data, contentObj);
+
       // 处理图片消息
       if (messageType === 'image') {
         try {
-          const contentObj = JSON.parse(content);
-          const imageKey: string = contentObj.image_key;
+          const imageKey: string = contentObj?.image_key;
           if (!imageKey) {
             return;
           }
@@ -288,7 +380,6 @@ export class LarkAdapter extends DefaultAdapter {
       // 处理富文本（post）消息
       if (messageType === 'post') {
         try {
-          const contentObj = JSON.parse(content);
           const rows: any[][] = contentObj.content || [];
 
           const blocks: (TextContent | ImageContent)[] = [];
@@ -347,12 +438,7 @@ export class LarkAdapter extends DefaultAdapter {
 
       // 解析文本消息内容
       let messageContent: string = '';
-      try {
-        const contentObj = JSON.parse(content);
-        messageContent = contentObj.text || '';
-      } catch (parseError) {
-        messageContent = content;
-      }
+      messageContent = extractTextFromLarkContent(messageType, content);
 
       if (!messageContent.trim()) {
         return;
@@ -617,15 +703,58 @@ export class LarkAdapter extends DefaultAdapter {
     );
   }
 
-  private async sendLocalImagesMentionedInText(text: string): Promise<void> {
-    const imagePaths = extractLocalImagePathsFromText(text);
+  private async fetchReferencedMessageTexts(messageIds: string[]): Promise<string[]> {
+    const texts: string[] = [];
+
+    for (const messageId of messageIds) {
+      try {
+        const resp = await (this.client as any).im.message.get({
+          path: { message_id: messageId },
+        });
+        const items = resp?.data?.items ?? [];
+        for (const item of items) {
+          const text = extractTextFromLarkContent(item?.msg_type, item?.body?.content);
+          if (text.trim()) {
+            texts.push(text);
+          }
+        }
+      } catch (err: any) {
+        console.error(`⚠️ 获取飞书引用消息失败 (${messageId}):`, err?.message ?? err);
+      }
+    }
+
+    return texts;
+  }
+
+  private async sendLocalImagesMentionedInTexts(texts: string[]): Promise<void> {
+    const imagePaths = new Set<string>();
+    for (const text of texts) {
+      for (const imagePath of extractLocalImagePathsFromText(text)) {
+        imagePaths.add(imagePath);
+      }
+    }
+
     for (const imagePath of imagePaths) {
-      if (this.sentLocalImagePaths.has(imagePath)) continue;
-      this.sentLocalImagePaths.add(imagePath);
+      await this.sendMessage(`图片路径: ${imagePath}`);
       await this.sendImageToChat(imagePath).catch((err) =>
         console.error(`⚠️ 发送本地图片到飞书失败 (${imagePath}):`, err?.message ?? err)
       );
     }
+  }
+
+  private async sendLocalImagesMentionedInUserMessage(data: any, contentObj: any | null): Promise<void> {
+    const message = data?.message;
+    const texts = [
+      extractTextFromLarkContent(message?.message_type, message?.content),
+      ...extractInlineQuotedTextCandidates(data, contentObj),
+    ].filter(text => typeof text === 'string' && text.trim().length > 0);
+
+    const referencedMessageIds = extractReferencedMessageIds(message, contentObj);
+    if (referencedMessageIds.length > 0) {
+      texts.push(...await this.fetchReferencedMessageTexts(referencedMessageIds));
+    }
+
+    await this.sendLocalImagesMentionedInTexts(texts);
   }
 
   // 事件处理器方法
@@ -634,7 +763,6 @@ export class LarkAdapter extends DefaultAdapter {
     // 使用富文本格式化 AI 响应
     const formattedContent = styled.assistant(data.content);
     await this.sendMessage(formattedContent);
-    await this.sendLocalImagesMentionedInText(data.content);
   }
 
   private async handleToolCall(data: { name: string; args: any }): Promise<void> {
@@ -811,7 +939,6 @@ export class LarkAdapter extends DefaultAdapter {
     if (!data?.chunk) return;
     if (this.abortSignal?.aborted) return;
     await this.sendMessage(styled.assistant(data.chunk));
-    await this.sendLocalImagesMentionedInText(data.chunk);
   }
 
   private async handleStreamEnd(data: { finalContent?: string }): Promise<void> {
@@ -857,7 +984,6 @@ export class LarkAdapter extends DefaultAdapter {
     const displayName = getAcpAgentDisplayName(data.agentName);
     const title = `🔗 正在与 ${displayName} 对话`;
     await this.sendMessage(styled.system(title, data.response));
-    await this.sendLocalImagesMentionedInText(data.response);
   }
 
   private async handleSessionEnd(data: { message: string }): Promise<void> {
