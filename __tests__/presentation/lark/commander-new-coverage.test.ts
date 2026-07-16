@@ -3,7 +3,7 @@ import {
   handleSessionCommand,
   createHandleInternalCommand,
 } from '@/presentation/lark/commander';
-import { isImageModeEnabled, setImageModeEnabled } from '@/presentation/lark/image-mode';
+import { isImageModeEnabled, runWithImageModeConversation, setImageModeEnabled } from '@/presentation/lark/image-mode';
 
 jest.mock('@/presentation/styling/styler', () => ({
   styled: { system: (m: string) => m, error: (m: string) => m },
@@ -104,5 +104,22 @@ describe('commander lark - additional coverage', () => {
 
     await expect(handler('/image off')).resolves.toBe(true);
     expect(isImageModeEnabled()).toBe(false);
+  });
+
+  it('isolates image mode between Lark conversations in the same process', async () => {
+    const session = makeSession();
+    const handler = createHandleInternalCommand(session);
+
+    await runWithImageModeConversation('chat-a', () => handler('/image'));
+
+    expect(isImageModeEnabled('chat-a')).toBe(true);
+    expect(isImageModeEnabled('chat-b')).toBe(false);
+
+    await runWithImageModeConversation('chat-b', () => handler('/image status'));
+    expect(session.adapter.emit).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        result: expect.objectContaining({ message: expect.stringContaining('未开启') }),
+      }),
+    }));
   });
 });

@@ -575,7 +575,7 @@ export async function handleRebotCommand(session: any): Promise<boolean> {
       });
       
       // 优雅关闭当前会话
-      session.end();
+      await session.end();
       
       // 创建新会话，确保重启后使用全新的会话上下文
       sessionManager.clearCurrentSession();

@@ -1036,7 +1036,7 @@ describe('LarkAdapter', () => {
       const sendImageSpy = jest.spyOn(adapter as any, 'sendImageToChat').mockResolvedValue(undefined);
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
-      setImageModeEnabled(true);
+      setImageModeEnabled(true, 'test-chat-id');
 
       await (adapter as any).handleUserMessage({
         message: {
@@ -1055,7 +1055,7 @@ describe('LarkAdapter', () => {
     it('should let /image commands reach the command handler while image mode is active', async () => {
       const callback = jest.fn();
       adapter.setUserMessageCallback(callback);
-      setImageModeEnabled(true);
+      setImageModeEnabled(true, 'test-chat-id');
 
       await (adapter as any).handleUserMessage({
         message: {
@@ -1068,6 +1068,24 @@ describe('LarkAdapter', () => {
       });
 
       expect(callback).toHaveBeenCalledWith('/image off');
+    });
+
+    it('should not apply one conversation image mode to another conversation', async () => {
+      const callback = jest.fn();
+      adapter.setUserMessageCallback(callback);
+      setImageModeEnabled(true, 'chat-a');
+
+      await (adapter as any).handleUserMessage({
+        message: {
+          message_id: 'om_other_conversation',
+          chat_id: 'chat-b',
+          chat_type: 'p2p',
+          content: JSON.stringify({ text: '正常转发给 AI' }),
+          message_type: 'text',
+        },
+      });
+
+      expect(callback).toHaveBeenCalledWith('正常转发给 AI');
     });
 
     it('should send a native image message when the quoted message mentions a local image path', async () => {

@@ -19,7 +19,8 @@ import { SessionManager } from '@/infrastructure/session';
 import { styled } from './styler';
 import { LarkChatService } from './chat';
 import { LarkWsClientManager } from './ws-client';
-import { isImageModeCommand, isImageModeEnabled } from './image-mode';
+import { isImageModeCommand, isImageModeEnabled, runWithImageModeConversation } from './image-mode';
+import { acquireLarkInstanceLock, releaseLarkInstanceLock } from './instance-lock';
 import { getAcpSessionState, getAcpAgentDisplayName } from '@/shared/acp-session';
 
 // 飞书配置类型
@@ -39,7 +40,7 @@ export type ImageContent = { type: "image_url"; image_url: { url: string } };
 export type MessageContent = string | (TextContent | ImageContent)[];
 
 // 用户消息回调类型
-type UserMessageCallback = (message: MessageContent) => void;
+type UserMessageCallback = (message: MessageContent) => void | Promise<void>;
 
 const LOCAL_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
@@ -307,6 +308,8 @@ function extractReferencedMessageIds(message: any, contentObj: any | null): stri
 export class LarkAdapter extends DefaultAdapter {
   private client: lark.Client;
   private wsClient: lark.WSClient;
+  private wsManager: LarkWsClientManager;
+  private launchPromise: Promise<void>;
   private abortSignal: AbortSignal | null = null;
   private isDestroyed = false;
   private userMessageCallback: UserMessageCallback | null = null;
@@ -374,11 +377,23 @@ export class LarkAdapter extends DefaultAdapter {
     this.setupEventListeners();
 
     // 启动长连接（通过 Socket.IO 转发管理器实现多进程消息同步）
-    const wsManager = new LarkWsClientManager(
+    this.wsManager = new LarkWsClientManager(
       this.wsClient,
       this.handleUserMessage.bind(this)
     );
-    wsManager.start().catch(err => {
+    const startListening = async () => {
+      acquireLarkInstanceLock(this.chatId);
+      try {
+        await this.wsManager.start();
+      } catch (error) {
+        releaseLarkInstanceLock();
+        throw error;
+      }
+    };
+    this.launchPromise = config.interaction.larkType === 'group_chat'
+      ? this.chatIdReady.then(startListening)
+      : startListening();
+    this.launchPromise.catch(err => {
       console.error('❌ 启动飞书长连接失败:', err);
     });
   }
@@ -390,8 +405,8 @@ export class LarkAdapter extends DefaultAdapter {
     return config.lark;
   }
 
-  public launch(): Promise<void> {
-    return this.chatIdReady;
+  public async launch(): Promise<void> {
+    await this.launchPromise;
   }
 
   /**
@@ -455,7 +470,7 @@ export class LarkAdapter extends DefaultAdapter {
       // Image mode runs only the local-path image delivery pipeline above.
       // Keep /image commands reachable so the user can inspect or leave it.
       const commandText = extractTextFromLarkContent(messageType, content);
-      if (isImageModeEnabled() && !isImageModeCommand(commandText)) {
+      if (isImageModeEnabled(msgChatId) && !isImageModeCommand(commandText)) {
         return;
       }
 
@@ -475,7 +490,7 @@ export class LarkAdapter extends DefaultAdapter {
           const imageContent: MessageContent = [{ type: "image_url" as const, image_url: { url } }];
 
           if (this.userMessageCallback) {
-            this.userMessageCallback(imageContent);
+            await runWithImageModeConversation(msgChatId, () => this.userMessageCallback!(imageContent));
           } else {
             this.messageQueue.push({ content: imageContent, chatId: msgChatId });
             this.processMessageQueue();
@@ -534,7 +549,7 @@ export class LarkAdapter extends DefaultAdapter {
             : (blocks[0] as TextContent)?.text ?? '';
 
           if (this.userMessageCallback) {
-            this.userMessageCallback(postContent);
+            await runWithImageModeConversation(msgChatId, () => this.userMessageCallback!(postContent));
           } else {
             this.messageQueue.push({ content: postContent, chatId: msgChatId });
             this.processMessageQueue();
@@ -555,7 +570,7 @@ export class LarkAdapter extends DefaultAdapter {
 
       // 如果有用户消息回调，立即调用
       if (this.userMessageCallback) {
-        this.userMessageCallback(messageContent);
+        await runWithImageModeConversation(msgChatId, () => this.userMessageCallback!(messageContent));
       } else {
         // 如果没有回调，将消息加入队列
         this.messageQueue.push({ content: messageContent, chatId: msgChatId });
@@ -580,7 +595,7 @@ export class LarkAdapter extends DefaultAdapter {
       while (this.messageQueue.length > 0 && this.userMessageCallback) {
         const message = this.messageQueue.shift()!;
         console.log(`📨 收到队列消息: ${message.content}`);
-        this.userMessageCallback(message.content);
+        runWithImageModeConversation(message.chatId, () => this.userMessageCallback!(message.content));
       }
     } finally {
       this.isProcessingQueue = false;
@@ -725,6 +740,8 @@ export class LarkAdapter extends DefaultAdapter {
     }
     
     this.isDestroyed = true;
+    this.wsManager.stop?.();
+    releaseLarkInstanceLock();
 
     // Clear any pending progress flush timer
     if (this.progressFlushTimer) {
