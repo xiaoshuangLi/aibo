@@ -10,6 +10,7 @@
  */
 
 import * as lark from '@larksuiteoapi/node-sdk';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { DefaultAdapter, OutputEvent, OutputEventType } from '@/core/agent/adapter';
@@ -316,10 +317,13 @@ export class LarkAdapter extends DefaultAdapter {
   private chatId: string | null = null;
   private chatService: LarkChatService;
   private processedMessageIds = new Map<string, number>();
+  private recentlySentImages = new Map<string, number>();
   // Resolves once chatId is initialised (group_chat mode performs an async lookup)
   private chatIdReady: Promise<void> = Promise.resolve();
   private static readonly MESSAGE_DEDUP_TTL_MS = 10 * 60 * 1000;
   private static readonly MESSAGE_DEDUP_MAX_SIZE = 5000;
+  private static readonly IMAGE_DEDUP_TTL_MS = 2 * 60 * 1000;
+  private static readonly IMAGE_DEDUP_MAX_SIZE = 1000;
 
   // 存储待处理的消息队列（用于处理并发消息）
   private messageQueue: Array<{ content: MessageContent; chatId: string }> = [];
@@ -840,25 +844,50 @@ export class LarkAdapter extends DefaultAdapter {
       imageBuffer = Buffer.from(base64Data, 'base64');
     }
 
-    const uploadResp = await (this.client as any).im.image.create({
-      data: {
-        image_type: 'message',
-        image: imageBuffer,
-      },
-    });
-
-    // The Lark IM SDK may return image_key at the root level of the response
-    // object or nested under a `data` key depending on the SDK version; check
-    // both locations for compatibility.
-    const imageKey: string | undefined = uploadResp?.image_key ?? uploadResp?.data?.image_key;
-    if (!imageKey) {
-      throw new Error(`上传图片到飞书失败，响应: ${JSON.stringify(uploadResp)}`);
+    const now = Date.now();
+    const imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
+    const imageDeliveryKey = `${receiveIdType}:${targetReceiveId}:${imageHash}`;
+    const lastSentAt = this.recentlySentImages.get(imageDeliveryKey);
+    if (lastSentAt !== undefined && now - lastSentAt < LarkAdapter.IMAGE_DEDUP_TTL_MS) {
+      console.warn(`⚠️ 忽略短时间内重复发送的相同图片: ${imageHash.slice(0, 12)}`);
+      return;
     }
 
-    // Send native image message through the rate-limited queue
-    await this.sendMessage(
-      JSON.stringify({ msg_type: 'image', content: JSON.stringify({ image_key: imageKey }) })
-    );
+    // Claim before uploading so concurrent callers cannot both send the image.
+    this.recentlySentImages.set(imageDeliveryKey, now);
+    if (this.recentlySentImages.size > LarkAdapter.IMAGE_DEDUP_MAX_SIZE) {
+      const expiresBefore = now - LarkAdapter.IMAGE_DEDUP_TTL_MS;
+      for (const [storedKey, timestamp] of this.recentlySentImages) {
+        if (timestamp < expiresBefore || this.recentlySentImages.size > LarkAdapter.IMAGE_DEDUP_MAX_SIZE) {
+          this.recentlySentImages.delete(storedKey);
+        }
+      }
+    }
+
+    try {
+      const uploadResp = await (this.client as any).im.image.create({
+        data: {
+          image_type: 'message',
+          image: imageBuffer,
+        },
+      });
+
+      // The Lark IM SDK may return image_key at the root level of the response
+      // object or nested under a `data` key depending on the SDK version; check
+      // both locations for compatibility.
+      const imageKey: string | undefined = uploadResp?.image_key ?? uploadResp?.data?.image_key;
+      if (!imageKey) {
+        throw new Error(`上传图片到飞书失败，响应: ${JSON.stringify(uploadResp)}`);
+      }
+
+      // Send native image message through the rate-limited queue
+      await this.sendMessage(
+        JSON.stringify({ msg_type: 'image', content: JSON.stringify({ image_key: imageKey }) })
+      );
+    } catch (error) {
+      this.recentlySentImages.delete(imageDeliveryKey);
+      throw error;
+    }
   }
 
   private async fetchReferencedMessageTexts(messageIds: string[]): Promise<string[]> {

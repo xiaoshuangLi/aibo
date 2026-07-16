@@ -19,6 +19,9 @@ console.warn = mockConsoleWarn;
 // Mock lark SDK
 const mockLarkClient = {
   im: {
+    image: {
+      create: jest.fn(),
+    },
     message: {
       create: jest.fn(),
       get: jest.fn()
@@ -1076,6 +1079,20 @@ describe('LarkAdapter', () => {
       expect(sendImageSpy).toHaveBeenCalledWith(tempImagePath);
       expect(callback).not.toHaveBeenCalled();
       expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('om_retried_image_event'));
+    });
+
+    it('should send identical image bytes only once even when delivery sources differ', async () => {
+      mockLarkClient.im.image.create.mockResolvedValue({ data: { image_key: 'img_deduplicated' } });
+      mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
+
+      await Promise.all([
+        adapter.sendImageToChat(tempImagePath),
+        adapter.sendImageToChat(`file://${tempImagePath}`),
+      ]);
+
+      expect(mockLarkClient.im.image.create).toHaveBeenCalledTimes(1);
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(1);
+      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('忽略短时间内重复发送'));
     });
 
     it('should let /image commands reach the command handler while image mode is active', async () => {
