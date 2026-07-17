@@ -339,6 +339,7 @@ export class LarkAdapter extends DefaultAdapter {
   private sendTimestamps: number[] = [];
   private static readonly SEND_RATE_LIMIT = 5;     // 每秒最多5条
   private static readonly SEND_RATE_WINDOW = 1000; // 1秒窗口（毫秒）
+  private static readonly SEND_ATTEMPT_TIMEOUT_MS = 15_000;
 
   constructor() {
     super();
@@ -677,7 +678,7 @@ export class LarkAdapter extends DefaultAdapter {
         const { fn, resolve, reject } = this.sendQueue.shift()!;
         this.sendTimestamps.push(Date.now());
         try {
-          await fn();
+          await this.runSendAttemptWithTimeout(fn);
           resolve();
         } catch (err) {
           reject(err);
@@ -685,6 +686,23 @@ export class LarkAdapter extends DefaultAdapter {
       }
     } finally {
       this.isSendingQueue = false;
+    }
+  }
+
+  private async runSendAttemptWithTimeout(fn: () => Promise<void>): Promise<void> {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            reject(new Error(`Lark message send timed out after ${LarkAdapter.SEND_ATTEMPT_TIMEOUT_MS}ms`));
+          }, LarkAdapter.SEND_ATTEMPT_TIMEOUT_MS);
+          timeout.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 

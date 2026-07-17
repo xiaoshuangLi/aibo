@@ -41,6 +41,7 @@ jest.mock('@/infrastructure/code-analysis', () => ({
 import {
   handleAcpPassthrough,
   handleUserMessage,
+  waitForAcpBackgroundCompletion,
 } from '@/presentation/lark/interactive';
 import {
   getAcpPassthroughState,
@@ -303,6 +304,50 @@ describe('handleAcpPassthrough', () => {
       expect.stringMatching(/^ACP \[/),
       expect.anything(),
     );
+  });
+});
+
+describe('waitForAcpBackgroundCompletion', () => {
+  beforeEach(() => {
+    execFileAsyncMock.mockReset();
+  });
+
+  it('keeps polling the same ACP session until background work becomes idle', async () => {
+    execFileAsyncMock
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ action: 'status_snapshot', status: 'running' }),
+        stderr: '',
+      })
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ action: 'status_snapshot', status: 'idle' }),
+        stderr: '',
+      });
+
+    const result = await waitForAcpBackgroundCompletion(
+      { agent: 'codex', cwd: '/project', sessionName: 'main' },
+      undefined,
+      0,
+      1000,
+    );
+
+    expect(result).toEqual({ observedRunning: true, status: 'idle' });
+    expect(execFileAsyncMock).toHaveBeenNthCalledWith(1, 'acpx', [
+      '--format', 'json', '--cwd', '/project', 'codex', '-s', 'main', 'status',
+    ], expect.objectContaining({ cwd: '/project', timeout: 10_000 }));
+    expect(execFileAsyncMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops polling when the original request is aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(waitForAcpBackgroundCompletion(
+      { agent: 'codex', cwd: '/project' },
+      controller.signal,
+      0,
+      1000,
+    )).resolves.toEqual({ observedRunning: false, status: null });
+    expect(execFileAsyncMock).not.toHaveBeenCalled();
   });
 });
 

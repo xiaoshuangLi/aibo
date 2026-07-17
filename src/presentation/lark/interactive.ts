@@ -36,6 +36,71 @@ const execFileAsync = promisify(execFile);
 /** Timeout in ms for acpx executions (100 minutes).
  * ACP coding agents may perform long-running tasks so a generous timeout avoids premature cancellation. */
 const ACP_EXEC_TIMEOUT_MS = 6_000_000;
+const ACP_BACKGROUND_POLL_INTERVAL_MS = 2_000;
+
+type AcpRuntimeStatus = 'running' | 'idle' | 'dead';
+
+interface AcpBackgroundWaitResult {
+  observedRunning: boolean;
+  status: AcpRuntimeStatus | null;
+}
+
+function parseAcpRuntimeStatus(stdout: string): AcpRuntimeStatus | null {
+  const lines = stdout.trim().split('\n').reverse();
+  for (const line of lines) {
+    try {
+      const message = JSON.parse(line);
+      if (message?.action === 'status_snapshot' && ['running', 'idle', 'dead'].includes(message.status)) {
+        return message.status as AcpRuntimeStatus;
+      }
+    } catch {
+      const match = line.match(/^\s*status:\s*(running|idle|dead)\s*$/i);
+      if (match) return match[1].toLowerCase() as AcpRuntimeStatus;
+    }
+  }
+  return null;
+}
+
+export async function waitForAcpBackgroundCompletion(
+  state: AcpPassthroughState,
+  signal?: AbortSignal,
+  pollIntervalMs = ACP_BACKGROUND_POLL_INTERVAL_MS,
+  maxWaitMs = ACP_EXEC_TIMEOUT_MS,
+): Promise<AcpBackgroundWaitResult> {
+  const deadline = Date.now() + maxWaitMs;
+  let observedRunning = false;
+  let consecutiveFailures = 0;
+
+  while (!signal?.aborted && Date.now() < deadline) {
+    const args = ['--format', 'json'];
+    if (state.cwd) args.push('--cwd', state.cwd);
+    args.push(state.agent);
+    if (state.sessionName) args.push('-s', state.sessionName);
+    args.push('status');
+
+    try {
+      const { stdout } = await execFileAsync('acpx', args, {
+        cwd: state.cwd || process.cwd(),
+        env: process.env,
+        timeout: 10_000,
+      });
+      consecutiveFailures = 0;
+      const status = parseAcpRuntimeStatus(stdout || '');
+      if (status === 'running') {
+        observedRunning = true;
+      } else if (status === 'idle' || status === 'dead') {
+        return { observedRunning, status };
+      }
+    } catch {
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 3) return { observedRunning, status: null };
+    }
+
+    await new Promise<void>(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  return { observedRunning, status: null };
+}
 
 // 全局会话和代理实例
 let currentSession: Session | null = null;
@@ -142,6 +207,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     ? new AcpEventStreamFollower(eventStreamPath, (data) => progressParser.push(data))
     : null;
   await eventFollower?.start();
+  const requestSignal = session?.abortController?.signal;
 
   try {
     let runCount = 0;
@@ -149,7 +215,7 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
       timeout: ACP_EXEC_TIMEOUT_MS,
       cwd: cwd || process.cwd(),
       env: process.env,
-      signal: session?.abortController?.signal,
+      signal: requestSignal,
       killSignal: 'SIGKILL' as const,
       maxBuffer: 256 * 1024 * 1024,
     };
@@ -172,7 +238,6 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
 
     session.logAcpResponse(agent, progressParser.finish(stdout || '') || stdout || '(empty)');
   } catch (error) {
-    await eventFollower?.stop();
     const errJson = handleCliExecutionError(error, 'acpx', input, ACP_EXEC_TIMEOUT_MS);
     let parsedError: any;
     try {
@@ -184,7 +249,27 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
     // while a passthrough execution is in progress. The abort is intentional and the
     // new message is already being forwarded to ACP, so no error should be shown.
     if (parsedError?.interrupted) {
+      await eventFollower?.stop();
       return;
+    }
+    if (parsedError?.error !== 'Command timeout' && eventFollower) {
+      const background = await waitForAcpBackgroundCompletion(
+        { agent, cwd, sessionName },
+        requestSignal,
+      );
+      await eventFollower.stop();
+
+      if (requestSignal?.aborted) return;
+      if (background.observedRunning && background.status === 'idle') {
+        const response = progressParser.finish('');
+        session.logAcpResponse(
+          agent,
+          `${response}\n\n⚠️ 前台 acpx 连接曾中断，但后台任务已继续执行并结束。`,
+        );
+        return;
+      }
+    } else {
+      await eventFollower?.stop();
     }
     const message = formatCliExecutionErrorMessage(error) || parsedError?.message || errJson;
     session.logAcpResponse(agent, `❌ 错误: ${message}`);

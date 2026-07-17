@@ -880,6 +880,26 @@ describe('LarkAdapter', () => {
       jest.useRealTimers();
     });
 
+    it('should continue the queue when one Lark API request never settles', async () => {
+      jest.useFakeTimers();
+      mockLarkClient.im.message.create
+        .mockImplementationOnce(() => new Promise(() => {}))
+        .mockResolvedValueOnce({ code: 0 });
+      const adapter = new LarkAdapter();
+
+      const stalled = adapter.sendMessage('stalled');
+      const next = adapter.sendMessage('next');
+      const stalledExpectation = expect(stalled).rejects.toThrow('timed out');
+
+      await jest.advanceTimersByTimeAsync(15_000);
+      await stalledExpectation;
+      await expect(next).resolves.toBeUndefined();
+
+      expect(mockLarkClient.im.message.create).toHaveBeenCalledTimes(2);
+      expect(mockLarkClient.im.message.create.mock.calls[1][0].data.content).toContain('next');
+      jest.useRealTimers();
+    });
+
     it('destroy should resolve pending queued messages without sending them', async () => {
       mockLarkClient.im.message.create.mockResolvedValue({ code: 0 });
       const adapter = new LarkAdapter();
