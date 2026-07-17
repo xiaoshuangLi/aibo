@@ -92,7 +92,10 @@ describe('handleAcpPassthrough', () => {
 
     expect(execFileAsyncMock).toHaveBeenCalledWith(
       'acpx',
-      expect.arrayContaining(['--approve-all', '--format', 'json', '--suppress-reads', 'codex', 'fix the tests']),
+      expect.arrayContaining([
+        '--approve-all', '--format', 'json', '--suppress-reads',
+        '--timeout', '21600', 'codex', 'fix the tests',
+      ]),
       expect.any(Object),
     );
   });

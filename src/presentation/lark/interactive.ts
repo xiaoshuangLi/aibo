@@ -33,9 +33,10 @@ export { AcpPassthroughState, getAcpPassthroughState, setAcpPassthroughState, cl
 
 const execFileAsync = promisify(execFile);
 
-/** Timeout in ms for acpx executions (100 minutes).
+/** Timeout in ms for acpx executions (6 hours).
  * ACP coding agents may perform long-running tasks so a generous timeout avoids premature cancellation. */
-const ACP_EXEC_TIMEOUT_MS = 6_000_000;
+const ACP_EXEC_TIMEOUT_MS = 6 * 60 * 60 * 1000;
+const ACP_EXEC_TIMEOUT_SECONDS = ACP_EXEC_TIMEOUT_MS / 1000;
 const ACP_BACKGROUND_POLL_INTERVAL_MS = 2_000;
 
 type AcpRuntimeStatus = 'running' | 'idle' | 'dead';
@@ -195,7 +196,12 @@ export async function handleAcpPassthrough(input: string, session: Session): Pro
   // 构建 acpx 参数：
   // JSON mode emits every ACP JSON-RPC event as it happens. Text mode can be
   // buffered by the persistent queue client until the whole prompt finishes.
-  const execArgs: string[] = ['--approve-all', '--format', 'json', '--suppress-reads'];
+  const execArgs: string[] = [
+    '--approve-all',
+    '--format', 'json',
+    '--suppress-reads',
+    '--timeout', String(ACP_EXEC_TIMEOUT_SECONDS),
+  ];
   if (cwd) execArgs.push('--cwd', cwd);
   execArgs.push(agent);
   if (sessionName) execArgs.push('-s', sessionName);
